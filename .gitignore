@@ -1,6 +1,7 @@
 /target
-**/*.rs.bk
-Cargo.lock
+/memory
+/saves
+*.log
+.env
 .DS_Store
-memory/
-saves/
+**/*.rs.bk
