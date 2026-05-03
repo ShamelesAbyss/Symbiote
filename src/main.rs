@@ -58,7 +58,7 @@ fn main() -> Result<()> {
         }
     }
 
-    app.save_memory();
+    app.save_all();
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;

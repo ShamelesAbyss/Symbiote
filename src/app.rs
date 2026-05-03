@@ -5,14 +5,17 @@ use crate::{
     sim::{build_rule_matrix, child_from, mutate_rules, step_particles, RuleMatrix},
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::collections::VecDeque;
+use serde::{Deserialize, Serialize};
+use std::{collections::VecDeque, fs, path::Path};
+
+const ECOSYSTEM_PATH: &str = "memory/ecosystem_state.json";
 
 pub const TRIBE_COUNT: usize = 6;
-pub const PARTICLE_COUNT: usize = 460;
-pub const MAX_PARTICLES: usize = 780;
-pub const MIN_PARTICLES: usize = 230;
+pub const PARTICLE_COUNT: usize = 1200;
+pub const MAX_PARTICLES: usize = 2500;
+pub const MIN_PARTICLES: usize = 600;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Environment {
     Calm,
     Bloom,
@@ -63,6 +66,21 @@ impl Environment {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct EcosystemState {
+    particles: Vec<Particle>,
+    rules: RuleMatrix,
+    clusters: ClusterTracker,
+    memory: MemoryBank,
+    seed: u64,
+    age: u64,
+    generation: u64,
+    evolution_enabled: bool,
+    tick_ms: u64,
+    environment: Environment,
+    events: Vec<String>,
+}
+
 pub struct App {
     pub particles: Vec<Particle>,
     pub rules: RuleMatrix,
@@ -85,6 +103,13 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
+        if let Some(mut restored) = Self::load_ecosystem() {
+            restored.paused = false;
+            restored.measure();
+            restored.push_event("ecosystem restored from persistent state");
+            return restored;
+        }
+
         let seed = now_seed();
 
         let mut app = Self {
@@ -109,8 +134,7 @@ impl App {
 
         app.reset_particles();
         app.push_event("symbiote organism awakened");
-        app.push_event("predator pressure enabled");
-        app.push_event("pulsing membrane layer active");
+        app.push_event("persistent ecosystem memory online");
         app
     }
 
@@ -149,7 +173,7 @@ impl App {
         self.update_memory();
 
         if self.age % 600 == 0 {
-            self.save_memory();
+            self.save_all();
         }
     }
 
@@ -188,6 +212,7 @@ impl App {
         self.environment = Environment::Calm;
         self.measure();
         self.push_event("particle field reseeded");
+        self.save_all();
     }
 
     pub fn force_mutation(&mut self) {
@@ -198,7 +223,7 @@ impl App {
     }
 
     pub fn randomize_world(&mut self) {
-        self.save_memory();
+        self.save_all();
         self.seed = now_seed();
         self.rules = build_rule_matrix(self.seed);
         self.memory = MemoryBank::new(self.seed);
@@ -225,8 +250,63 @@ impl App {
         self.tick_ms = (self.tick_ms + 4).min(120);
     }
 
-    pub fn save_memory(&self) {
+    pub fn save_all(&mut self) {
+        self.update_memory();
+        let _ = self.save_ecosystem();
         let _ = self.memory.save();
+    }
+
+    fn load_ecosystem() -> Option<Self> {
+        if !Path::new(ECOSYSTEM_PATH).exists() {
+            return None;
+        }
+
+        let data = fs::read_to_string(ECOSYSTEM_PATH).ok()?;
+        let state = serde_json::from_str::<EcosystemState>(&data).ok()?;
+
+        Some(Self {
+            particles: state.particles,
+            rules: state.rules,
+            clusters: state.clusters,
+            memory: state.memory,
+            seed: state.seed,
+            age: state.age,
+            generation: state.generation,
+            paused: false,
+            evolution_enabled: state.evolution_enabled,
+            tick_ms: state.tick_ms,
+            energy: 0.0,
+            cohesion: 0.0,
+            chaos: 0.0,
+            drift: 0.0,
+            population: 0.0,
+            environment: state.environment,
+            events: VecDeque::from(state.events),
+        })
+    }
+
+    fn save_ecosystem(&self) -> anyhow::Result<()> {
+        fs::create_dir_all("memory")?;
+
+        let state = EcosystemState {
+            particles: self.particles.clone(),
+            rules: self.rules,
+            clusters: ClusterTracker {
+                clusters: self.clusters.clusters.clone(),
+                next_id: self.clusters.next_id,
+            },
+            memory: self.memory.clone(),
+            seed: self.seed,
+            age: self.age,
+            generation: self.generation,
+            evolution_enabled: self.evolution_enabled,
+            tick_ms: self.tick_ms,
+            environment: self.environment,
+            events: self.events.iter().cloned().collect(),
+        };
+
+        fs::write(ECOSYSTEM_PATH, serde_json::to_string_pretty(&state)?)?;
+        Ok(())
     }
 
     fn process_cluster_events(&mut self, events: ClusterEvents) {
@@ -351,6 +431,7 @@ impl App {
     }
 
     fn update_memory(&mut self) {
+        self.memory.seed = self.seed;
         self.memory.longest_age = self.memory.longest_age.max(self.age);
         self.memory.highest_generation = self.memory.highest_generation.max(self.generation);
         self.memory.peak_population = self.memory.peak_population.max(self.particles.len());

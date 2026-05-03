@@ -1,6 +1,7 @@
 use ratatui::style::Color;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Tribe {
     Blood,
     Moss,
@@ -56,7 +57,7 @@ impl Tribe {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct Genome {
     pub perception: f32,
     pub hunger: f32,
@@ -66,7 +67,7 @@ pub struct Genome {
     pub membrane: f32,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct Particle {
     pub x: f32,
     pub y: f32,

@@ -1,6 +1,7 @@
 use crate::particle::{Particle, Tribe};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Cluster {
     pub id: u64,
     pub age: u64,
@@ -22,16 +23,11 @@ impl Cluster {
     }
 
     pub fn direction_glyph(&self) -> char {
-        let speed = self.speed();
-
-        if speed < 0.0002 {
+        if self.speed() < 0.0002 {
             return '•';
         }
 
-        let ax = self.vx.abs();
-        let ay = self.vy.abs();
-
-        if ax > ay {
+        if self.vx.abs() > self.vy.abs() {
             if self.vx > 0.0 { '→' } else { '←' }
         } else if self.vy > 0.0 {
             '↓'
@@ -41,6 +37,7 @@ impl Cluster {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ClusterTracker {
     pub clusters: Vec<Cluster>,
     pub next_id: u64,
@@ -167,7 +164,6 @@ fn detect_groups(particles: &[Particle]) -> Vec<Vec<usize>> {
                 let dx = particles[idx].x - particles[j].x;
                 let dy = particles[idx].y - particles[j].y;
                 let dist = (dx * dx + dy * dy).sqrt();
-
                 let link = 0.082 + particles[idx].genome.bonding * 0.019 + particles[idx].mass * 0.004;
 
                 if dist < link {
