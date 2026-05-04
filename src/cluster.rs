@@ -86,19 +86,21 @@ impl ClusterTracker {
         let mut next_clusters = Vec::new();
         let mut events = ClusterEvents::default();
 
+        let active_species = species_bank.active_count().max(1) as f32;
+
         let root_pressure = species_bank
             .species
             .iter()
-            .filter(|species| !species.extinct && species.root_adaptation > 0.55)
+            .filter(|species| !species.extinct && is_root_adaptive_archetype(species.archetype))
             .count() as f32
-            / species_bank.active_count().max(1) as f32;
+            / active_species;
 
         let corridor_pressure = species_bank
             .species
             .iter()
-            .filter(|species| !species.extinct && species.corridor_score > 0.55)
+            .filter(|species| !species.extinct && is_corridor_archetype(species.archetype))
             .count() as f32
-            / species_bank.active_count().max(1) as f32;
+            / active_species;
 
         for group in groups {
             let min_size = if age < CLUSTER_WARMUP_AGE {
@@ -214,19 +216,26 @@ impl ClusterTracker {
             cluster.archetype = species.map(|species| species.archetype);
 
             if age >= CLUSTER_WARMUP_AGE {
+                let local_root_adaptation =
+                    root_adaptation_score(cluster.avg_genome, cluster.rare_trait, cluster.size);
+                let local_corridor_score = corridor_score(
+                    cluster.avg_genome,
+                    cluster.archetype.unwrap_or(Archetype::Parasite),
+                );
+                let local_drift_pressure = drift_pressure_score(
+                    cluster.avg_genome,
+                    cluster.archetype.unwrap_or(Archetype::Parasite),
+                    local_root_adaptation,
+                    local_corridor_score,
+                );
+
                 apply_cluster_drift(
                     &mut cluster,
                     root_pressure,
                     corridor_pressure,
-                    species
-                        .map(|species| species.root_adaptation)
-                        .unwrap_or_default(),
-                    species
-                        .map(|species| species.corridor_score)
-                        .unwrap_or_default(),
-                    species
-                        .map(|species| species.drift_pressure)
-                        .unwrap_or_default(),
+                    local_root_adaptation,
+                    local_corridor_score,
+                    local_drift_pressure,
                     age,
                 );
             } else {
@@ -301,9 +310,9 @@ fn apply_cluster_drift(
     cluster: &mut Cluster,
     root_pressure: f32,
     corridor_pressure: f32,
-    species_root_adaptation: f32,
-    species_corridor_score: f32,
-    species_drift_pressure: f32,
+    local_root_adaptation: f32,
+    local_corridor_score: f32,
+    local_drift_pressure: f32,
     world_age: u64,
 ) {
     let base = cluster.archetype;
@@ -314,9 +323,9 @@ fn apply_cluster_drift(
 
     let pressure = (root_pressure * 0.24
         + corridor_pressure * 0.24
-        + species_root_adaptation * 0.22
-        + species_corridor_score * 0.18
-        + species_drift_pressure * 0.12)
+        + local_root_adaptation * 0.22
+        + local_corridor_score * 0.18
+        + local_drift_pressure * 0.12)
         .clamp(0.0, 1.0);
 
     let heat_target =
@@ -327,7 +336,7 @@ fn apply_cluster_drift(
     {
         match base {
             Some(Archetype::Harvester) => {
-                if cluster.avg_genome.orbit > 0.48 || species_corridor_score > 0.62 {
+                if cluster.avg_genome.orbit > 0.48 || local_corridor_score > 0.62 {
                     Some(Archetype::Orbiter)
                 } else if cluster.avg_genome.bonding > 1.36 {
                     Some(Archetype::Swarmer)
@@ -354,14 +363,14 @@ fn apply_cluster_drift(
                 }
             }
             Some(Archetype::Swarmer) => {
-                if species_corridor_score > 0.72 && cluster.avg_genome.orbit > 0.58 {
+                if local_corridor_score > 0.72 && cluster.avg_genome.orbit > 0.58 {
                     Some(Archetype::Orbiter)
                 } else {
                     None
                 }
             }
             Some(Archetype::Hunter) => {
-                if species_drift_pressure > 0.72
+                if local_drift_pressure > 0.72
                     && cluster.avg_genome.volatility > 1.54
                     && cluster.avg_genome.hunger > 0.02
                 {
@@ -387,6 +396,102 @@ fn apply_cluster_drift(
     } else {
         cluster.archetype_override
     };
+}
+
+fn is_root_adaptive_archetype(archetype: Archetype) -> bool {
+    matches!(
+        archetype,
+        Archetype::Swarmer
+            | Archetype::Orbiter
+            | Archetype::Architect
+            | Archetype::Leviathan
+            | Archetype::Phantom
+    )
+}
+
+fn is_corridor_archetype(archetype: Archetype) -> bool {
+    matches!(
+        archetype,
+        Archetype::Swarmer
+            | Archetype::Orbiter
+            | Archetype::Architect
+            | Archetype::Hunter
+            | Archetype::Phantom
+    )
+}
+
+fn root_adaptation_score(genome: Genome, rare_trait: RareTrait, size: usize) -> f32 {
+    let perception = ((genome.perception - 0.18) / 0.20).clamp(0.0, 1.0);
+    let orbit = (genome.orbit / 1.35).clamp(0.0, 1.0);
+    let volatility = ((genome.volatility - 0.72) / 1.05).clamp(0.0, 1.0);
+    let membrane = (genome.membrane / 1.45).clamp(0.0, 1.0);
+    let mass_adaptation = (size as f32 / 90.0).clamp(0.0, 1.0) * 0.16;
+
+    let rare_bonus = match rare_trait {
+        RareTrait::Voidborne => 0.18,
+        RareTrait::ElderCore => 0.12,
+        RareTrait::SymbioticCore => 0.10,
+        RareTrait::SporeKing => 0.08,
+        RareTrait::Radiant => 0.04,
+        RareTrait::Voracious => 0.03,
+        RareTrait::Devourer => -0.08,
+        RareTrait::None => 0.0,
+    };
+
+    (perception * 0.30
+        + orbit * 0.26
+        + volatility * 0.16
+        + membrane * 0.16
+        + mass_adaptation
+        + rare_bonus)
+        .clamp(0.0, 1.0)
+}
+
+fn corridor_score(genome: Genome, archetype: Archetype) -> f32 {
+    let mobility =
+        (genome.orbit * 0.42 + genome.volatility * 0.22 + genome.perception * 1.15).clamp(0.0, 1.0);
+
+    let compactness = (1.0 - ((genome.bonding - 1.15).abs() / 1.25)).clamp(0.0, 1.0);
+    let hunger_control = (1.0 - ((genome.hunger - 0.017).abs() / 0.026)).clamp(0.0, 1.0);
+
+    let archetype_bonus = match archetype {
+        Archetype::Orbiter => 0.18,
+        Archetype::Swarmer => 0.13,
+        Archetype::Architect => 0.12,
+        Archetype::Phantom => 0.10,
+        Archetype::Hunter => 0.06,
+        Archetype::Reaper => 0.04,
+        Archetype::Leviathan => 0.04,
+        Archetype::Grazer => 0.02,
+        Archetype::Mycelial => 0.02,
+        Archetype::Parasite => 0.0,
+        Archetype::Harvester => -0.08,
+    };
+
+    (mobility * 0.50 + compactness * 0.26 + hunger_control * 0.16 + archetype_bonus).clamp(0.0, 1.0)
+}
+
+fn drift_pressure_score(
+    genome: Genome,
+    archetype: Archetype,
+    root_adaptation: f32,
+    corridor_score: f32,
+) -> f32 {
+    let volatility_pressure = ((genome.volatility - 1.0) / 0.95).clamp(0.0, 1.0);
+    let specialization_pressure = match archetype {
+        Archetype::Harvester => 0.18,
+        Archetype::Reaper => 0.12,
+        Archetype::Leviathan => 0.10,
+        Archetype::Phantom => 0.10,
+        Archetype::Architect => 0.08,
+        _ => 0.04,
+    };
+
+    (volatility_pressure * 0.30
+        + root_adaptation * 0.30
+        + corridor_score * 0.26
+        + specialization_pressure)
+        .clamp(0.0, 1.0)
 }
 
 fn root_mobility_score(genome: Genome) -> f32 {

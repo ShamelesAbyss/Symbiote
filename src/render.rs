@@ -51,8 +51,8 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
     let side = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(36),
-            Constraint::Percentage(22),
+            Constraint::Percentage(38),
+            Constraint::Percentage(20),
             Constraint::Percentage(18),
             Constraint::Percentage(24),
         ])
@@ -677,13 +677,67 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
     ]));
 
     lines.push(Line::from(vec![
-        Span::styled("Legend: ", Style::default().fg(Color::DarkGray)),
-        Span::styled("╋ roots ", Style::default().fg(Color::Blue)),
+        Span::styled(
+            "Terrain ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("╋┃━┳┻ roots ", Style::default().fg(Color::Blue)),
         Span::styled("∙ life ", Style::default().fg(Color::DarkGray)),
         Span::styled("+ food ", Style::default().fg(Color::Green)),
-        Span::styled("* mutagen ", Style::default().fg(Color::Magenta)),
-        Span::styled("◍ organism ", Style::default().fg(Color::Cyan)),
-        Span::styled("◆ drift", Style::default().fg(Color::Magenta)),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled(
+            "Cells   ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("× dead ", Style::default().fg(Color::DarkGray)),
+        Span::styled("░ spore ", Style::default().fg(Color::DarkGray)),
+        Span::styled("*✶ mutagen ", Style::default().fg(Color::Magenta)),
+        Span::styled("◎ nest", Style::default().fg(Color::Cyan)),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled(
+            "Signals ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("∿ hunger ", Style::default().fg(Color::Yellow)),
+        Span::styled("! fear ", Style::default().fg(Color::Red)),
+        Span::styled("∙ growth ", Style::default().fg(Color::Green)),
+        Span::styled("× danger", Style::default().fg(Color::Magenta)),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled(
+            "Bodies  ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("•∙·o solo ", Style::default().fg(Color::Cyan)),
+        Span::styled("●○ group ", Style::default().fg(Color::Cyan)),
+        Span::styled("◍◎◉ dense ", Style::default().fg(Color::Cyan)),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled(
+            "Special ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("✦✧ rare ", Style::default().fg(Color::White)),
+        Span::styled("♻ harvester ", Style::default().fg(Color::Green)),
+        Span::styled("Ωϟ reaper ", Style::default().fg(Color::Red)),
+        Span::styled("◆◇ drift ", Style::default().fg(Color::Magenta)),
+        Span::styled("○ membrane", Style::default().fg(Color::Gray)),
     ]));
 
     f.render_widget(
@@ -691,7 +745,7 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(" SYMBIOSIS RULES "),
+                    .title(" SYMBIOSIS RULES + FIELD GLOSSARY "),
             )
             .wrap(Wrap { trim: true }),
         area,
