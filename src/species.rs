@@ -66,18 +66,6 @@ impl Archetype {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct ArchetypePressure {
-    pub matrix_pressure: f32,
-    pub matrix_attraction: f32,
-    pub matrix_repulsion: f32,
-    pub substrate_density: f32,
-    pub harvester_pressure: f32,
-    pub reaper_urgency: f32,
-    pub recovery_bias: f32,
-    pub mutation_pressure: f32,
-}
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Species {
     pub id: u64,
@@ -94,6 +82,13 @@ pub struct Species {
     pub descendants: u64,
     pub births: u64,
     pub extinct: bool,
+
+    #[serde(default)]
+    pub root_adaptation: f32,
+    #[serde(default)]
+    pub corridor_score: f32,
+    #[serde(default)]
+    pub drift_pressure: f32,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -120,6 +115,11 @@ impl SpeciesBank {
         parent_hint: Option<u64>,
     ) -> u64 {
         let archetype = derive_archetype(genome, rare_trait, size);
+        let root_adaptation = root_adaptation_score(genome, rare_trait, size);
+        let corridor_score = corridor_score(genome, archetype);
+        let drift_pressure =
+            species_drift_pressure(genome, archetype, root_adaptation, corridor_score);
+
         let mut best_index = None;
         let mut best_score = f32::MAX;
 
@@ -148,8 +148,21 @@ impl SpeciesBank {
                 species.rare_trait = rare_trait;
             }
 
-            let derived = derive_archetype(species.genome, species.rare_trait, species.peak_size);
-            species.archetype = stabilize_archetype(species.archetype, derived, species.sightings);
+            species.root_adaptation =
+                (species.root_adaptation * 0.92 + root_adaptation * 0.08).clamp(0.0, 1.0);
+            species.corridor_score =
+                (species.corridor_score * 0.92 + corridor_score * 0.08).clamp(0.0, 1.0);
+            species.drift_pressure =
+                (species.drift_pressure * 0.90 + drift_pressure * 0.10).clamp(0.0, 1.0);
+
+            species.archetype = derive_adaptive_archetype(
+                species.genome,
+                species.rare_trait,
+                species.peak_size,
+                species.root_adaptation,
+                species.corridor_score,
+                species.drift_pressure,
+            );
 
             return species.id;
         }
@@ -157,10 +170,14 @@ impl SpeciesBank {
         let id = self.next_id;
         self.next_id += 1;
 
-        let name = rename_species(rare_trait, archetype, id);
+        let name = species_name(archetype, rare_trait, id, root_adaptation, corridor_score);
 
         if let Some(parent_id) = parent_hint {
-            if let Some(parent) = self.species.iter_mut().find(|s| s.id == parent_id) {
+            if let Some(parent) = self
+                .species
+                .iter_mut()
+                .find(|species| species.id == parent_id)
+            {
                 parent.descendants += 1;
             }
         }
@@ -180,6 +197,9 @@ impl SpeciesBank {
             descendants: 0,
             births: 0,
             extinct: false,
+            root_adaptation,
+            corridor_score,
+            drift_pressure,
         });
 
         id
@@ -187,7 +207,7 @@ impl SpeciesBank {
 
     pub fn record_birth(&mut self, species_id: Option<u64>) {
         if let Some(id) = species_id {
-            if let Some(species) = self.species.iter_mut().find(|s| s.id == id) {
+            if let Some(species) = self.species.iter_mut().find(|species| species.id == id) {
                 species.births += 1;
             }
         }
@@ -197,7 +217,13 @@ impl SpeciesBank {
         let mut count = 0;
 
         for species in &mut self.species {
-            if !species.extinct && age.saturating_sub(species.last_seen_age) > 3200 {
+            let stale_limit = if species.root_adaptation > 0.62 || species.corridor_score > 0.62 {
+                4200
+            } else {
+                3200
+            };
+
+            if !species.extinct && age.saturating_sub(species.last_seen_age) > stale_limit {
                 species.extinct = true;
                 count += 1;
             }
@@ -207,52 +233,23 @@ impl SpeciesBank {
     }
 
     pub fn active_count(&self) -> usize {
-        self.species.iter().filter(|s| !s.extinct).count()
-    }
-
-    pub fn drift_archetypes(&mut self, pressure: ArchetypePressure, age: u64) -> usize {
-        let mut drifted = 0;
-
-        for species in self.species.iter_mut().filter(|species| !species.extinct) {
-            if species.sightings < 3 {
-                continue;
-            }
-
-            let candidate = drift_candidate(
-                species.archetype,
-                species.genome,
-                species.rare_trait,
-                species.peak_size,
-                pressure,
-            );
-
-            if candidate == species.archetype {
-                continue;
-            }
-
-            let age_factor = age.saturating_sub(species.created_at_age) as f32 / 2_400.0;
-            let maturity = age_factor.clamp(0.0, 1.0);
-            let sightings = (species.sightings as f32 / 24.0).clamp(0.0, 1.0);
-            let pressure_gate = (pressure.matrix_pressure * 0.42
-                + pressure.mutation_pressure * 0.26
-                + pressure.reaper_urgency * 0.18
-                + pressure.recovery_bias * 0.14)
-                .clamp(0.0, 1.0);
-
-            let drift_score = maturity * 0.28 + sightings * 0.32 + pressure_gate * 0.40;
-
-            if drift_score > 0.54 {
-                species.archetype = candidate;
-                species.name = rename_species(species.rare_trait, species.archetype, species.id);
-                drifted += 1;
-            }
-        }
-
-        drifted
+        self.species
+            .iter()
+            .filter(|species| !species.extinct)
+            .count()
     }
 }
 
 pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> Archetype {
+    let root_adaptation = root_adaptation_score(genome, rare_trait, size);
+    let base = derive_base_archetype(genome, rare_trait, size);
+    let corridor = corridor_score(genome, base);
+    let drift = species_drift_pressure(genome, base, root_adaptation, corridor);
+
+    derive_adaptive_archetype(genome, rare_trait, size, root_adaptation, corridor, drift)
+}
+
+fn derive_base_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> Archetype {
     if genome.volatility > 1.54
         && genome.perception > 0.295
         && genome.hunger > 0.019
@@ -292,124 +289,176 @@ pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> A
     }
 }
 
-pub fn drift_candidate(
-    current: Archetype,
+fn derive_adaptive_archetype(
     genome: Genome,
     rare_trait: RareTrait,
     size: usize,
-    pressure: ArchetypePressure,
+    root_adaptation: f32,
+    corridor_score: f32,
+    drift_pressure: f32,
 ) -> Archetype {
-    if rare_trait == RareTrait::ElderCore || size > 90 {
-        return Archetype::Leviathan;
-    }
+    let base = derive_base_archetype(genome, rare_trait, size);
 
-    if rare_trait == RareTrait::SporeKing {
-        return Archetype::Mycelial;
+    if base == Archetype::Reaper {
+        return Archetype::Reaper;
     }
 
     if rare_trait == RareTrait::Voidborne {
         return Archetype::Phantom;
     }
 
-    let base = derive_archetype(genome, rare_trait, size);
+    if root_adaptation > 0.74 && corridor_score > 0.54 {
+        if genome.orbit > 0.66 || genome.perception > 0.31 {
+            return Archetype::Orbiter;
+        }
 
-    if pressure.harvester_pressure > 0.62
-        && pressure.reaper_urgency > 0.52
-        && pressure.matrix_repulsion > 0.38
-        && genome.volatility > 1.42
-        && genome.perception > 0.285
-    {
-        return Archetype::Reaper;
+        if genome.membrane > 0.86 && genome.bonding > 1.12 {
+            return Archetype::Architect;
+        }
+
+        if genome.bonding > 1.35 {
+            return Archetype::Swarmer;
+        }
     }
 
-    if pressure.substrate_density > 0.13
-        && pressure.matrix_attraction > pressure.matrix_repulsion
-        && pressure.harvester_pressure < 0.55
-        && genome.perception > 0.29
-        && genome.fertility > 1.48
-        && genome.hunger < 0.017
-        && genome.metabolism < 0.022
-    {
-        return Archetype::Harvester;
+    if drift_pressure > 0.68 && root_adaptation > 0.58 {
+        if genome.volatility > 1.38 && genome.hunger > 0.018 {
+            return Archetype::Hunter;
+        }
+
+        if genome.orbit > 0.55 {
+            return Archetype::Orbiter;
+        }
+
+        if genome.membrane > 0.98 {
+            return Archetype::Architect;
+        }
     }
 
-    if pressure.recovery_bias > 0.55
-        && pressure.matrix_attraction > 0.30
-        && genome.membrane > 0.82
-        && genome.bonding > 1.28
-    {
+    if base == Archetype::Harvester && root_adaptation > 0.58 {
+        if corridor_score > 0.62 && genome.orbit > 0.45 {
+            return Archetype::Orbiter;
+        }
+
+        if genome.bonding > 1.45 && genome.fertility < 1.75 {
+            return Archetype::Swarmer;
+        }
+    }
+
+    if base == Archetype::Grazer && root_adaptation > 0.66 && genome.membrane > 0.92 {
         return Archetype::Architect;
-    }
-
-    if pressure.recovery_bias > 0.48
-        && pressure.substrate_density < 0.07
-        && genome.fertility > 1.35
-        && genome.bonding > 1.35
-    {
-        return Archetype::Mycelial;
-    }
-
-    if pressure.matrix_pressure > 0.64
-        && pressure.matrix_repulsion > pressure.matrix_attraction
-        && genome.volatility > 1.32
-        && genome.metabolism > 0.019
-    {
-        return Archetype::Hunter;
-    }
-
-    if pressure.matrix_pressure > 0.58 && pressure.mutation_pressure > 0.42 && genome.orbit > 0.78 {
-        return Archetype::Phantom;
-    }
-
-    if pressure.matrix_attraction > 0.42
-        && pressure.matrix_repulsion < 0.32
-        && genome.bonding > 1.55
-    {
-        return Archetype::Swarmer;
-    }
-
-    if pressure.matrix_pressure < 0.32
-        && pressure.substrate_density > 0.10
-        && genome.metabolism < 0.018
-    {
-        return Archetype::Grazer;
-    }
-
-    if current == Archetype::Reaper && pressure.reaper_urgency > 0.38 {
-        return Archetype::Reaper;
-    }
-
-    if current == Archetype::Harvester
-        && pressure.harvester_pressure < 0.42
-        && pressure.substrate_density > 0.09
-    {
-        return Archetype::Harvester;
     }
 
     base
 }
 
-fn stabilize_archetype(current: Archetype, derived: Archetype, sightings: u64) -> Archetype {
-    if current == derived {
-        return current;
-    }
+fn root_adaptation_score(genome: Genome, rare_trait: RareTrait, size: usize) -> f32 {
+    let perception = ((genome.perception - 0.18) / 0.20).clamp(0.0, 1.0);
+    let orbit = (genome.orbit / 1.35).clamp(0.0, 1.0);
+    let volatility = ((genome.volatility - 0.72) / 1.05).clamp(0.0, 1.0);
+    let membrane = (genome.membrane / 1.45).clamp(0.0, 1.0);
+    let mass_adaptation = (size as f32 / 90.0).clamp(0.0, 1.0) * 0.16;
 
-    if sightings < 6 {
-        return current;
-    }
+    let rare_bonus = match rare_trait {
+        RareTrait::Voidborne => 0.18,
+        RareTrait::ElderCore => 0.12,
+        RareTrait::SymbioticCore => 0.10,
+        RareTrait::SporeKing => 0.08,
+        RareTrait::Radiant => 0.04,
+        RareTrait::Voracious => 0.03,
+        RareTrait::Devourer => -0.08,
+        RareTrait::None => 0.0,
+    };
 
-    if matches!(current, Archetype::Reaper | Archetype::Leviathan) && sightings < 12 {
-        return current;
-    }
-
-    derived
+    (perception * 0.30
+        + orbit * 0.26
+        + volatility * 0.16
+        + membrane * 0.16
+        + mass_adaptation
+        + rare_bonus)
+        .clamp(0.0, 1.0)
 }
 
-fn rename_species(rare_trait: RareTrait, archetype: Archetype, id: u64) -> String {
-    if rare_trait == RareTrait::None {
-        format!("{}-{}", archetype.short(), id)
+fn corridor_score(genome: Genome, archetype: Archetype) -> f32 {
+    let mobility =
+        (genome.orbit * 0.42 + genome.volatility * 0.22 + genome.perception * 1.15).clamp(0.0, 1.0);
+
+    let compactness = (1.0 - ((genome.bonding - 1.15).abs() / 1.25)).clamp(0.0, 1.0);
+    let hunger_control = (1.0 - ((genome.hunger - 0.017).abs() / 0.026)).clamp(0.0, 1.0);
+
+    let archetype_bonus = match archetype {
+        Archetype::Orbiter => 0.18,
+        Archetype::Swarmer => 0.13,
+        Archetype::Architect => 0.12,
+        Archetype::Phantom => 0.10,
+        Archetype::Hunter => 0.06,
+        Archetype::Reaper => 0.04,
+        Archetype::Leviathan => 0.04,
+        Archetype::Grazer => 0.02,
+        Archetype::Mycelial => 0.02,
+        Archetype::Parasite => 0.0,
+        Archetype::Harvester => -0.08,
+    };
+
+    (mobility * 0.50 + compactness * 0.26 + hunger_control * 0.16 + archetype_bonus).clamp(0.0, 1.0)
+}
+
+fn species_drift_pressure(
+    genome: Genome,
+    archetype: Archetype,
+    root_adaptation: f32,
+    corridor_score: f32,
+) -> f32 {
+    let volatility_pressure = ((genome.volatility - 1.0) / 0.95).clamp(0.0, 1.0);
+    let specialization_pressure = match archetype {
+        Archetype::Harvester => 0.18,
+        Archetype::Reaper => 0.12,
+        Archetype::Leviathan => 0.10,
+        Archetype::Phantom => 0.10,
+        Archetype::Architect => 0.08,
+        _ => 0.04,
+    };
+
+    (volatility_pressure * 0.30
+        + root_adaptation * 0.30
+        + corridor_score * 0.26
+        + specialization_pressure)
+        .clamp(0.0, 1.0)
+}
+
+fn species_name(
+    archetype: Archetype,
+    rare_trait: RareTrait,
+    id: u64,
+    root_adaptation: f32,
+    corridor_score: f32,
+) -> String {
+    let prefix = if root_adaptation > 0.72 {
+        "ROOT"
+    } else if corridor_score > 0.68 {
+        "PATH"
+    } else if root_adaptation > 0.54 || corridor_score > 0.54 {
+        "DRF"
     } else {
+        ""
+    };
+
+    if rare_trait == RareTrait::None {
+        if prefix.is_empty() {
+            format!("{}-{}", archetype.short(), id)
+        } else {
+            format!("{}-{}-{}", prefix, archetype.short(), id)
+        }
+    } else if prefix.is_empty() {
         format!("{}-{}-{}", rare_trait.short(), archetype.short(), id)
+    } else {
+        format!(
+            "{}-{}-{}-{}",
+            prefix,
+            rare_trait.short(),
+            archetype.short(),
+            id
+        )
     }
 }
 

@@ -7,8 +7,10 @@ const MEMORY_PATH: &str = "memory/session_memory.json";
 #[derive(Serialize, Deserialize, Clone)]
 pub struct MemoryBank {
     pub seed: u64,
+
     pub longest_age: u64,
     pub highest_generation: u64,
+
     pub peak_population: usize,
     pub peak_clusters: usize,
     pub peak_species: usize,
@@ -16,6 +18,7 @@ pub struct MemoryBank {
     pub peak_living_cells: usize,
     pub peak_harvesters: usize,
     pub peak_reapers: usize,
+
     pub total_cells_consumed: u64,
     pub total_harvesters_consumed: u64,
     pub total_species_created: u64,
@@ -26,10 +29,42 @@ pub struct MemoryBank {
     pub total_fusions: u64,
     pub total_merges: u64,
     pub total_splits: u64,
+
     pub strongest_cluster_size: usize,
     pub strongest_cluster_age: u64,
+
     pub dominant_archetype: String,
     pub richest_zone: String,
+
+    #[serde(default)]
+    pub peak_root_cells: usize,
+    #[serde(default)]
+    pub peak_root_pressure: f32,
+    #[serde(default)]
+    pub root_pressure_average: f32,
+    #[serde(default)]
+    pub root_pressure_samples: u64,
+    #[serde(default)]
+    pub root_collision_events: u64,
+    #[serde(default)]
+    pub root_corridor_events: u64,
+    #[serde(default)]
+    pub root_choked_ticks: u64,
+    #[serde(default)]
+    pub substrate_starved_ticks: u64,
+    #[serde(default)]
+    pub substrate_overgrown_ticks: u64,
+    #[serde(default)]
+    pub substrate_balance_average: f32,
+    #[serde(default)]
+    pub substrate_balance_samples: u64,
+    #[serde(default)]
+    pub adaptive_root_bias: f32,
+    #[serde(default)]
+    pub adaptive_corridor_bias: f32,
+    #[serde(default)]
+    pub adaptive_substrate_throttle: f32,
+
     pub notes: Vec<String>,
 }
 
@@ -37,8 +72,10 @@ impl MemoryBank {
     pub fn new(seed: u64) -> Self {
         Self {
             seed,
+
             longest_age: 0,
             highest_generation: 0,
+
             peak_population: 0,
             peak_clusters: 0,
             peak_species: 0,
@@ -46,6 +83,7 @@ impl MemoryBank {
             peak_living_cells: 0,
             peak_harvesters: 0,
             peak_reapers: 0,
+
             total_cells_consumed: 0,
             total_harvesters_consumed: 0,
             total_species_created: 0,
@@ -56,10 +94,28 @@ impl MemoryBank {
             total_fusions: 0,
             total_merges: 0,
             total_splits: 0,
+
             strongest_cluster_size: 0,
             strongest_cluster_age: 0,
+
             dominant_archetype: "unknown".to_string(),
             richest_zone: "unknown".to_string(),
+
+            peak_root_cells: 0,
+            peak_root_pressure: 0.0,
+            root_pressure_average: 0.0,
+            root_pressure_samples: 0,
+            root_collision_events: 0,
+            root_corridor_events: 0,
+            root_choked_ticks: 0,
+            substrate_starved_ticks: 0,
+            substrate_overgrown_ticks: 0,
+            substrate_balance_average: 0.0,
+            substrate_balance_samples: 0,
+            adaptive_root_bias: 0.0,
+            adaptive_corridor_bias: 0.0,
+            adaptive_substrate_throttle: 0.0,
+
             notes: Vec::new(),
         }
     }
@@ -67,7 +123,9 @@ impl MemoryBank {
     pub fn load_or_new(seed: u64) -> Self {
         if Path::new(MEMORY_PATH).exists() {
             if let Ok(data) = fs::read_to_string(MEMORY_PATH) {
-                if let Ok(memory) = serde_json::from_str::<Self>(&data) {
+                if let Ok(mut memory) = serde_json::from_str::<Self>(&data) {
+                    memory.seed = seed;
+                    memory.recalculate_adaptive_pressures();
                     return memory;
                 }
             }
@@ -90,56 +148,146 @@ impl MemoryBank {
         }
     }
 
+    pub fn observe_substrate(
+        &mut self,
+        living_cells: usize,
+        total_cells: usize,
+        root_cells: usize,
+        consumed_cells: usize,
+    ) {
+        let total = total_cells.max(1);
+        let living_ratio = living_cells as f32 / total as f32;
+        let root_pressure = root_cells as f32 / total as f32;
+
+        self.peak_living_cells = self.peak_living_cells.max(living_cells);
+        self.peak_root_cells = self.peak_root_cells.max(root_cells);
+        self.peak_root_pressure = self.peak_root_pressure.max(root_pressure);
+
+        self.total_cells_consumed = self
+            .total_cells_consumed
+            .saturating_add(consumed_cells as u64);
+
+        self.root_pressure_samples = self.root_pressure_samples.saturating_add(1);
+        self.root_pressure_average = rolling_average(
+            self.root_pressure_average,
+            root_pressure,
+            self.root_pressure_samples,
+        );
+
+        self.substrate_balance_samples = self.substrate_balance_samples.saturating_add(1);
+        self.substrate_balance_average = rolling_average(
+            self.substrate_balance_average,
+            living_ratio,
+            self.substrate_balance_samples,
+        );
+
+        if living_ratio < 0.035 {
+            self.substrate_starved_ticks = self.substrate_starved_ticks.saturating_add(1);
+        }
+
+        if living_ratio > 0.18 {
+            self.substrate_overgrown_ticks = self.substrate_overgrown_ticks.saturating_add(1);
+        }
+
+        if root_pressure > 0.07 && living_ratio < 0.07 {
+            self.root_choked_ticks = self.root_choked_ticks.saturating_add(1);
+        }
+
+        self.recalculate_adaptive_pressures();
+    }
+
     pub fn harvester_resistance(&self) -> f32 {
-        let harvester_pressure = self.peak_harvesters as f32 / self.peak_species.max(1) as f32;
+        let reaped_pressure = self.total_harvesters_consumed as f32 / 250.0;
+        let substrate_pressure = self.substrate_starved_ticks as f32 / 900.0;
+        let root_pressure = self.root_choked_ticks as f32 / 600.0;
 
-        let consumption_pressure =
-            self.total_cells_consumed as f32 / self.total_reproductions.max(1) as f32;
-
-        (harvester_pressure * 0.72 + (consumption_pressure / 40.0) * 0.28).clamp(0.0, 1.0)
+        (reaped_pressure + substrate_pressure + root_pressure + self.adaptive_substrate_throttle)
+            .clamp(0.0, 1.0)
     }
 
     pub fn reaper_urgency(&self) -> f32 {
-        let harvester_peak = self.peak_harvesters as f32;
-        let reaper_peak = self.peak_reapers as f32;
+        let harvester_peak = self.peak_harvesters as f32 / 80.0;
+        let consumed_pressure = self.total_cells_consumed as f32 / 15_000.0;
+        let substrate_loss = self.substrate_starved_ticks as f32 / 700.0;
 
-        if harvester_peak <= 0.0 {
-            return 0.0;
-        }
-
-        let imbalance = ((harvester_peak - reaper_peak * 1.8) / harvester_peak).clamp(0.0, 1.0);
-        let consumption = (self.total_cells_consumed as f32 / 900.0).clamp(0.0, 1.0);
-
-        (imbalance * 0.75 + consumption * 0.25).clamp(0.0, 1.0)
+        (harvester_peak + consumed_pressure + substrate_loss).clamp(0.0, 1.0)
     }
 
     pub fn substrate_recovery_bias(&self) -> f32 {
-        let population_peak = self.peak_population.max(1) as f32;
-        let living_peak = self.peak_living_cells as f32;
+        let starvation = self.substrate_starved_ticks as f32 / 900.0;
+        let overgrowth_penalty = self.substrate_overgrown_ticks as f32 / 1_400.0;
+        let root_choke = self.root_choked_ticks as f32 / 1_000.0;
 
-        let low_cell_history =
-            (1.0 - (living_peak / population_peak).clamp(0.0, 1.0)).clamp(0.0, 1.0);
-        let consumption = (self.total_cells_consumed as f32 / 1_200.0).clamp(0.0, 1.0);
-
-        (low_cell_history * 0.55 + consumption * 0.45).clamp(0.0, 1.0)
+        (starvation + root_choke - overgrowth_penalty).clamp(0.0, 1.0)
     }
 
     pub fn mutation_pressure(&self) -> f32 {
-        let extinction_pressure =
-            self.total_extinctions as f32 / self.total_species_created.max(1) as f32;
+        let extinction_pressure = self.total_extinctions as f32 / 80.0;
+        let death_pressure = self.total_deaths as f32 / 12_000.0;
+        let root_navigation_pressure = self.root_avoidance_pressure() * 0.35;
+        let substrate_instability =
+            (self.substrate_starved_ticks + self.substrate_overgrown_ticks) as f32 / 2_400.0;
 
-        let death_pressure = self.total_deaths as f32 / self.total_births.max(1) as f32;
-
-        (extinction_pressure * 0.68 + death_pressure.min(3.0) / 3.0 * 0.32).clamp(0.0, 1.0)
+        (extinction_pressure + death_pressure + root_navigation_pressure + substrate_instability)
+            .clamp(0.0, 1.0)
     }
 
-    pub fn adaptive_summary(&self) -> String {
-        format!(
-            "memory pressure hrv:{:.2} rpr:{:.2} regen:{:.2} mut:{:.2}",
-            self.harvester_resistance(),
-            self.reaper_urgency(),
-            self.substrate_recovery_bias(),
-            self.mutation_pressure(),
-        )
+    pub fn root_avoidance_pressure(&self) -> f32 {
+        let collision_pressure = self.root_collision_events as f32 / 5_000.0;
+        let choke_pressure = self.root_choked_ticks as f32 / 800.0;
+        let density_pressure = self.root_pressure_average * 8.0;
+
+        (collision_pressure + choke_pressure + density_pressure + self.adaptive_root_bias)
+            .clamp(0.0, 1.0)
+    }
+
+    pub fn corridor_pressure(&self) -> f32 {
+        let corridor_learning = self.root_corridor_events as f32 / 4_000.0;
+        let root_density = self.root_pressure_average * 6.0;
+        let choke_pressure = self.root_choked_ticks as f32 / 1_000.0;
+
+        (corridor_learning + root_density + choke_pressure + self.adaptive_corridor_bias)
+            .clamp(0.0, 1.0)
+    }
+
+    pub fn substrate_throttle_pressure(&self) -> f32 {
+        let overgrowth = self.substrate_overgrown_ticks as f32 / 900.0;
+        let high_average = ((self.substrate_balance_average - 0.15) * 7.0).max(0.0);
+        let root_density = (self.root_pressure_average - 0.065).max(0.0) * 5.0;
+
+        (overgrowth + high_average + root_density + self.adaptive_substrate_throttle)
+            .clamp(0.0, 1.0)
+    }
+
+    pub fn pathfinder_bias(&self) -> f32 {
+        let root_pressure = self.root_avoidance_pressure();
+        let corridor_pressure = self.corridor_pressure();
+        let mutation_pressure = self.mutation_pressure() * 0.25;
+
+        (root_pressure * 0.45 + corridor_pressure * 0.45 + mutation_pressure).clamp(0.0, 1.0)
+    }
+
+    fn recalculate_adaptive_pressures(&mut self) {
+        let root_density = self.root_pressure_average;
+        let choke = self.root_choked_ticks as f32 / 1_000.0;
+        let corridors = self.root_corridor_events as f32 / 5_000.0;
+        let collisions = self.root_collision_events as f32 / 5_000.0;
+        let starved = self.substrate_starved_ticks as f32 / 1_000.0;
+        let overgrown = self.substrate_overgrown_ticks as f32 / 1_000.0;
+
+        self.adaptive_root_bias = (root_density * 4.5 + collisions + choke).clamp(0.0, 1.0);
+        self.adaptive_corridor_bias =
+            (root_density * 3.5 + corridors + choke * 0.5).clamp(0.0, 1.0);
+        self.adaptive_substrate_throttle =
+            (overgrown + root_density * 1.8 - starved * 0.35).clamp(0.0, 1.0);
+    }
+}
+
+fn rolling_average(current: f32, next: f32, samples: u64) -> f32 {
+    if samples <= 1 {
+        next
+    } else {
+        let samples = samples.min(10_000) as f32;
+        current + (next - current) / samples
     }
 }

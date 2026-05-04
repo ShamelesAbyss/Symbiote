@@ -1,6 +1,6 @@
 use crate::{
     particle::{Genome, Particle, RareTrait, Tribe},
-    species::{drift_candidate, Archetype, ArchetypePressure, SpeciesBank},
+    species::{Archetype, SpeciesBank},
 };
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +9,7 @@ pub struct Cluster {
     pub id: u64,
     pub species_id: Option<u64>,
     pub archetype: Option<Archetype>,
+    pub archetype_override: Option<Archetype>,
     pub rare_trait: RareTrait,
     pub age: u64,
     pub size: usize,
@@ -21,11 +22,8 @@ pub struct Cluster {
     pub avg_genome: Genome,
     pub stability: f32,
     pub membrane: f32,
-    pub last_seen: u64,
-    #[serde(default)]
-    pub archetype_override: Option<Archetype>,
-    #[serde(default)]
     pub drift_heat: f32,
+    pub last_seen: u64,
 }
 
 impl Cluster {
@@ -56,7 +54,7 @@ impl Cluster {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ClusterTracker {
     pub clusters: Vec<Cluster>,
     pub next_id: u64,
@@ -83,6 +81,20 @@ impl ClusterTracker {
         let groups = detect_groups(particles);
         let mut next_clusters = Vec::new();
         let mut events = ClusterEvents::default();
+
+        let root_pressure = species_bank
+            .species
+            .iter()
+            .filter(|species| !species.extinct && species.root_adaptation > 0.55)
+            .count() as f32
+            / species_bank.active_count().max(1) as f32;
+
+        let corridor_pressure = species_bank
+            .species
+            .iter()
+            .filter(|species| !species.extinct && species.corridor_score > 0.55)
+            .count() as f32
+            / species_bank.active_count().max(1) as f32;
 
         for group in groups {
             if group.len() < 5 {
@@ -114,12 +126,13 @@ impl ClusterTracker {
                 current.species_id = old.species_id;
                 current.archetype = old.archetype;
                 current.archetype_override = old.archetype_override;
-                current.drift_heat = (old.drift_heat * 0.88).clamp(0.0, 100.0);
                 current.age = old.age + 1;
                 current.stability =
                     (old.stability * 0.9 + current.stability * 0.1).clamp(0.0, 100.0);
                 current.membrane =
                     (old.membrane * 0.94 + current.membrane * 0.06).clamp(0.0, 100.0);
+                current.drift_heat =
+                    (old.drift_heat * 0.90 + current.drift_heat * 0.10).clamp(0.0, 100.0);
                 current.last_seen = age;
 
                 if current.rare_trait == RareTrait::None && old.rare_trait != RareTrait::None {
@@ -134,8 +147,6 @@ impl ClusterTracker {
                 self.next_id += 1;
                 current.age = 1;
                 current.last_seen = age;
-                current.archetype_override = None;
-                current.drift_heat = 0.0;
                 events.births += 1;
 
                 current
@@ -158,6 +169,21 @@ impl ClusterTracker {
             cluster.species_id = Some(species_id);
             cluster.archetype = species.map(|species| species.archetype);
 
+            apply_cluster_drift(
+                &mut cluster,
+                root_pressure,
+                corridor_pressure,
+                species
+                    .map(|species| species.root_adaptation)
+                    .unwrap_or_default(),
+                species
+                    .map(|species| species.corridor_score)
+                    .unwrap_or_default(),
+                species
+                    .map(|species| species.drift_pressure)
+                    .unwrap_or_default(),
+            );
+
             if cluster.age > 50 && cluster.size > 14 {
                 cluster.membrane = (cluster.membrane + 1.2).min(100.0);
             }
@@ -171,6 +197,12 @@ impl ClusterTracker {
                     particle.cluster_id = Some(cluster.id);
                     particle.species_id = Some(species_id);
                     particle.mass = (particle.mass + 0.004 * cluster.size as f32).clamp(0.55, 6.5);
+
+                    if cluster.archetype_override.is_some() {
+                        particle.genome.perception =
+                            (particle.genome.perception + 0.00008).clamp(0.1, 0.38);
+                        particle.genome.orbit = (particle.genome.orbit + 0.00012).clamp(0.0, 1.55);
+                    }
                 }
             }
 
@@ -193,79 +225,6 @@ impl ClusterTracker {
 
         events
     }
-
-    pub fn drift_cluster_archetypes(
-        &mut self,
-        particles: &mut [Particle],
-        species_bank: &SpeciesBank,
-        pressure: ArchetypePressure,
-    ) -> usize {
-        let mut drifted = 0;
-
-        for cluster in &mut self.clusters {
-            let base = cluster
-                .species_id
-                .and_then(|id| species_bank.species.iter().find(|species| species.id == id))
-                .map(|species| species.archetype)
-                .or(cluster.archetype);
-
-            let Some(base_archetype) = base else {
-                continue;
-            };
-
-            let candidate = cluster_drift_candidate(cluster, base_archetype, pressure);
-
-            if candidate == base_archetype {
-                cluster.drift_heat = (cluster.drift_heat * 0.82).clamp(0.0, 100.0);
-
-                if cluster.drift_heat < 18.0 {
-                    cluster.archetype_override = None;
-                }
-
-                continue;
-            }
-
-            let age_factor = (cluster.age as f32 / 850.0).clamp(0.0, 1.0);
-            let size_factor = (cluster.size as f32 / 52.0).clamp(0.0, 1.0);
-            let stability_factor = (cluster.stability / 100.0).clamp(0.0, 1.0);
-            let membrane_factor = (cluster.membrane / 100.0).clamp(0.0, 1.0);
-            let pressure_factor = (pressure.matrix_pressure * 0.35
-                + pressure.mutation_pressure * 0.24
-                + pressure.reaper_urgency * 0.18
-                + pressure.recovery_bias * 0.14
-                + pressure.harvester_pressure * 0.09)
-                .clamp(0.0, 1.0);
-
-            let heat_gain = age_factor * 8.0
-                + size_factor * 10.0
-                + stability_factor * 7.0
-                + membrane_factor * 5.0
-                + pressure_factor * 18.0;
-
-            cluster.drift_heat = (cluster.drift_heat + heat_gain).clamp(0.0, 100.0);
-
-            if cluster.drift_heat > 62.0 {
-                cluster.archetype_override = Some(candidate);
-                drifted += 1;
-
-                for particle in particles
-                    .iter_mut()
-                    .filter(|particle| particle.cluster_id == Some(cluster.id))
-                {
-                    particle.mass = match candidate {
-                        Archetype::Leviathan => (particle.mass + 0.014).clamp(0.55, 7.0),
-                        Archetype::Architect => (particle.mass + 0.008).clamp(0.55, 7.0),
-                        Archetype::Reaper => (particle.mass + 0.006).clamp(0.55, 7.0),
-                        Archetype::Harvester => (particle.mass + 0.004).clamp(0.55, 7.0),
-                        Archetype::Phantom => (particle.mass - 0.004).clamp(0.45, 7.0),
-                        _ => particle.mass,
-                    };
-                }
-            }
-        }
-
-        drifted
-    }
 }
 
 #[derive(Default)]
@@ -276,72 +235,99 @@ pub struct ClusterEvents {
     pub extinctions: usize,
 }
 
-fn cluster_drift_candidate(
-    cluster: &Cluster,
-    base_archetype: Archetype,
-    pressure: ArchetypePressure,
-) -> Archetype {
-    if cluster.rare_trait == RareTrait::ElderCore || cluster.size > 86 {
-        return Archetype::Leviathan;
-    }
+fn apply_cluster_drift(
+    cluster: &mut Cluster,
+    root_pressure: f32,
+    corridor_pressure: f32,
+    species_root_adaptation: f32,
+    species_corridor_score: f32,
+    species_drift_pressure: f32,
+) {
+    let base = cluster.archetype;
+    let mobility = root_mobility_score(cluster.avg_genome);
+    let density = (cluster.size as f32 / 90.0).clamp(0.0, 1.0);
+    let pressure = (root_pressure * 0.24
+        + corridor_pressure * 0.24
+        + species_root_adaptation * 0.22
+        + species_corridor_score * 0.18
+        + species_drift_pressure * 0.12)
+        .clamp(0.0, 1.0);
 
-    if cluster.rare_trait == RareTrait::SporeKing {
-        return Archetype::Mycelial;
-    }
+    let heat_target = (pressure * 72.0 + mobility * 18.0 + density * 10.0).clamp(0.0, 100.0);
+    cluster.drift_heat = (cluster.drift_heat * 0.86 + heat_target * 0.14).clamp(0.0, 100.0);
 
-    if cluster.rare_trait == RareTrait::Voidborne {
-        return Archetype::Phantom;
-    }
+    cluster.archetype_override = if cluster.drift_heat > 64.0 && pressure > 0.48 {
+        match base {
+            Some(Archetype::Harvester) => {
+                if cluster.avg_genome.orbit > 0.48 || species_corridor_score > 0.62 {
+                    Some(Archetype::Orbiter)
+                } else if cluster.avg_genome.bonding > 1.36 {
+                    Some(Archetype::Swarmer)
+                } else {
+                    Some(Archetype::Grazer)
+                }
+            }
+            Some(Archetype::Grazer | Archetype::Mycelial) => {
+                if cluster.avg_genome.membrane > 0.88 {
+                    Some(Archetype::Architect)
+                } else if cluster.avg_genome.orbit > 0.62 {
+                    Some(Archetype::Orbiter)
+                } else {
+                    None
+                }
+            }
+            Some(Archetype::Parasite) => {
+                if cluster.avg_genome.volatility > 1.36 && cluster.avg_genome.perception > 0.27 {
+                    Some(Archetype::Hunter)
+                } else if cluster.avg_genome.orbit > 0.68 {
+                    Some(Archetype::Orbiter)
+                } else {
+                    None
+                }
+            }
+            Some(Archetype::Swarmer) => {
+                if species_corridor_score > 0.72 && cluster.avg_genome.orbit > 0.58 {
+                    Some(Archetype::Orbiter)
+                } else {
+                    None
+                }
+            }
+            Some(Archetype::Hunter) => {
+                if species_drift_pressure > 0.72
+                    && cluster.avg_genome.volatility > 1.54
+                    && cluster.avg_genome.hunger > 0.02
+                {
+                    Some(Archetype::Reaper)
+                } else {
+                    None
+                }
+            }
+            Some(Archetype::Leviathan) => {
+                if cluster.avg_genome.membrane > 1.05 {
+                    Some(Archetype::Architect)
+                } else {
+                    None
+                }
+            }
+            Some(
+                Archetype::Reaper | Archetype::Orbiter | Archetype::Architect | Archetype::Phantom,
+            ) => None,
+            None => None,
+        }
+    } else if cluster.drift_heat < 38.0 {
+        None
+    } else {
+        cluster.archetype_override
+    };
+}
 
-    let candidate = drift_candidate(
-        base_archetype,
-        cluster.avg_genome,
-        cluster.rare_trait,
-        cluster.size,
-        pressure,
-    );
+fn root_mobility_score(genome: Genome) -> f32 {
+    let perception = ((genome.perception - 0.18) / 0.20).clamp(0.0, 1.0);
+    let orbit = (genome.orbit / 1.35).clamp(0.0, 1.0);
+    let volatility = ((genome.volatility - 0.70) / 1.05).clamp(0.0, 1.0);
+    let membrane = (genome.membrane / 1.45).clamp(0.0, 1.0);
 
-    if cluster.stability > 78.0
-        && cluster.membrane > 48.0
-        && pressure.matrix_attraction > pressure.matrix_repulsion
-        && cluster.avg_genome.bonding > 1.35
-    {
-        return Archetype::Architect;
-    }
-
-    if pressure.matrix_repulsion > 0.42
-        && pressure.matrix_pressure > 0.55
-        && cluster.avg_genome.volatility > 1.28
-        && cluster.speed() > 0.00045
-    {
-        return Archetype::Hunter;
-    }
-
-    if pressure.reaper_urgency > 0.55
-        && pressure.harvester_pressure > 0.42
-        && cluster.avg_genome.perception > 0.28
-        && cluster.avg_genome.volatility > 1.36
-    {
-        return Archetype::Reaper;
-    }
-
-    if pressure.substrate_density > 0.12
-        && pressure.matrix_attraction > 0.34
-        && pressure.harvester_pressure < 0.55
-        && cluster.avg_genome.fertility > 1.42
-        && cluster.avg_genome.hunger < 0.018
-    {
-        return Archetype::Harvester;
-    }
-
-    if pressure.recovery_bias > 0.58
-        && cluster.avg_genome.fertility > 1.24
-        && cluster.avg_genome.bonding > 1.22
-    {
-        return Archetype::Mycelial;
-    }
-
-    candidate
+    (perception * 0.36 + orbit * 0.32 + volatility * 0.16 + membrane * 0.16).clamp(0.0, 1.0)
 }
 
 fn detect_groups(particles: &[Particle]) -> Vec<Vec<usize>> {
@@ -355,7 +341,6 @@ fn detect_groups(particles: &[Particle]) -> Vec<Vec<usize>> {
 
         let mut stack = vec![i];
         let mut group = Vec::new();
-
         visited[i] = true;
 
         while let Some(idx) = stack.pop() {
@@ -390,10 +375,8 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
     let mut y = 0.0;
     let mut vx = 0.0;
     let mut vy = 0.0;
-
     let mut tribe_counts = [0usize; 6];
     let mut rare_counts = [0usize; 8];
-
     let mut membrane = 0.0;
 
     let mut genome = Genome {
@@ -475,11 +458,13 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
     }
 
     let stability = ((indices.len() as f32 * 4.5) - radius * 125.0).clamp(0.0, 100.0);
+    let drift_heat = root_mobility_score(genome) * 28.0 + stability * 0.10;
 
     Cluster {
         id: 0,
         species_id: None,
         archetype: None,
+        archetype_override: None,
         rare_trait: rare_from_index(best_rare),
         age: 0,
         size: indices.len(),
@@ -492,9 +477,8 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
         avg_genome: genome,
         stability,
         membrane,
+        drift_heat,
         last_seen: 0,
-        archetype_override: None,
-        drift_heat: 0.0,
     }
 }
 

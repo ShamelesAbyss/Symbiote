@@ -5,7 +5,7 @@ use crate::{
     memory::MemoryBank,
     particle::{Genome, Particle, RareTrait, Tribe},
     sim::{build_rule_matrix, child_from, fused_child, mutate_rules, step_particles, RuleMatrix},
-    species::{Archetype, ArchetypePressure, SpeciesBank},
+    species::{Archetype, SpeciesBank},
 };
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -118,6 +118,9 @@ impl App {
             restored.paused = false;
             restored.measure();
             restored.measure_matrix();
+            restored
+                .memory
+                .note("restored ecosystem with root memory online".to_string());
             restored.push_event("ecosystem restored from persistent state");
             return restored;
         }
@@ -154,7 +157,8 @@ impl App {
         app.push_event("reaper ecology online");
         app.push_event("adaptive ecosystem memory online");
         app.push_event("adaptive attraction matrix online");
-        app.push_event("dynamic archetype drift online");
+        app.push_event("root navigation memory online");
+
         app
     }
 
@@ -183,6 +187,7 @@ impl App {
 
         if report.harvesters_consumed > 0 {
             self.memory.total_harvesters_consumed += report.harvesters_consumed as u64;
+
             self.push_event(&format!(
                 "reaper consumed {} harvester(s)",
                 report.harvesters_consumed
@@ -204,7 +209,7 @@ impl App {
         }
 
         if self.age > 0 && self.age % 720 == 0 {
-            self.push_event(&self.memory.adaptive_summary());
+            self.push_event(&self.adaptive_summary());
         }
 
         self.age += 1;
@@ -223,6 +228,10 @@ impl App {
             self.substrate.tick();
         }
 
+        if self.memory.substrate_throttle_pressure() > 0.62 && self.age % 36 == 0 {
+            self.thin_overgrown_substrate_pressure();
+        }
+
         if self.age % 32 == 0 {
             self.native_reproduction();
         }
@@ -238,6 +247,7 @@ impl App {
 
             if after_species > before_species {
                 self.memory.total_species_created += (after_species - before_species) as u64;
+
                 self.push_event(&format!(
                     "{} new species emerged",
                     after_species - before_species
@@ -247,8 +257,8 @@ impl App {
             self.process_cluster_events(cluster_events);
         }
 
-        if self.age % 96 == 0 {
-            self.apply_archetype_drift();
+        if self.age % 90 == 0 {
+            self.apply_migration_pressure();
         }
 
         if self.age % 120 == 0 {
@@ -270,11 +280,15 @@ impl App {
 
             let adaptive_mutation = 1.0 + self.memory.mutation_pressure() * 0.42;
             let pressure_mutation = 1.0 + (self.matrix_pressure / 100.0) * 0.28;
+            let pathfinder_mutation = 1.0 + self.memory.pathfinder_bias() * 0.22;
+
             let intensity =
-                (base_intensity * adaptive_mutation * pressure_mutation).clamp(0.008, 0.078);
+                (base_intensity * adaptive_mutation * pressure_mutation * pathfinder_mutation)
+                    .clamp(0.008, 0.082);
 
             mutate_rules(&mut self.rules, self.seed ^ self.age, intensity);
             self.evolve_attraction_matrix(intensity);
+
             self.generation += 1;
 
             self.push_event(&format!(
@@ -292,69 +306,19 @@ impl App {
         }
     }
 
-    fn archetype_pressure(&self) -> ArchetypePressure {
-        let substrate_density = if self.substrate.total_cells() == 0 {
-            0.0
-        } else {
-            self.substrate.living_cells() as f32 / self.substrate.total_cells() as f32
-        };
-
-        let active_species = self.species_bank.active_count().max(1) as f32;
-
-        let harvesters = self
-            .species_bank
-            .species
-            .iter()
-            .filter(|species| !species.extinct && species.archetype == Archetype::Harvester)
-            .count() as f32;
-
-        let reapers = self
-            .species_bank
-            .species
-            .iter()
-            .filter(|species| !species.extinct && species.archetype == Archetype::Reaper)
-            .count() as f32;
-
-        ArchetypePressure {
-            matrix_pressure: self.matrix_pressure / 100.0,
-            matrix_attraction: self.matrix_attraction / 100.0,
-            matrix_repulsion: self.matrix_repulsion / 100.0,
-            substrate_density,
-            harvester_pressure: (harvesters / active_species).clamp(0.0, 1.0),
-            reaper_urgency: (self.memory.reaper_urgency()
-                + (harvesters - reapers).max(0.0) / active_species)
-                .clamp(0.0, 1.0),
-            recovery_bias: self.memory.substrate_recovery_bias(),
-            mutation_pressure: self.memory.mutation_pressure(),
-        }
-    }
-
-    fn apply_archetype_drift(&mut self) {
-        let pressure = self.archetype_pressure();
-
-        let species_drifted = self.species_bank.drift_archetypes(pressure, self.age);
-        let cluster_drifted = self.clusters.drift_cluster_archetypes(
-            &mut self.particles,
-            &self.species_bank,
-            pressure,
-        );
-
-        if species_drifted > 0 {
-            self.push_event(&format!("{} species drifted archetype", species_drifted));
-        }
-
-        if cluster_drifted > 0 {
-            self.push_event(&format!(
-                "{} clusters formed local archetype overrides",
-                cluster_drifted
-            ));
-        }
-    }
-
     fn deposit_to_substrate(&mut self) {
         let lookup = self.build_archetype_lookup();
 
-        for particle in self.particles.iter().step_by(9) {
+        let throttle = self.memory.substrate_throttle_pressure();
+        let step = if throttle > 0.72 {
+            17
+        } else if throttle > 0.48 {
+            13
+        } else {
+            9
+        };
+
+        for particle in self.particles.iter().step_by(step) {
             let archetype = particle
                 .species_id
                 .and_then(|id| lookup.get(id as usize).copied().flatten());
@@ -371,12 +335,19 @@ impl App {
         let mut rng = StdRng::seed_from_u64(self.seed ^ self.age ^ self.generation);
         let snapshot = self.particles.clone();
         let archetype_lookup = self.build_archetype_lookup();
+
         let mut children = Vec::new();
 
         let substrate_density = if self.substrate.total_cells() == 0 {
             0.0
         } else {
             self.substrate.living_cells() as f32 / self.substrate.total_cells() as f32
+        };
+
+        let root_density = if self.substrate.total_cells() == 0 {
+            0.0
+        } else {
+            self.substrate.protected_cells() as f32 / self.substrate.total_cells() as f32
         };
 
         let active_harvester_particles = snapshot
@@ -391,11 +362,12 @@ impl App {
             .count();
 
         let harvester_body_ratio = active_harvester_particles as f32 / snapshot.len().max(1) as f32;
-
         let harvester_resistance = self.memory.harvester_resistance();
         let reaper_urgency = self.memory.reaper_urgency();
         let recovery_bias = self.memory.substrate_recovery_bias();
         let mutation_pressure = self.memory.mutation_pressure();
+        let pathfinder_bias = self.memory.pathfinder_bias();
+        let corridor_pressure = self.memory.corridor_pressure();
 
         for parent in snapshot.iter() {
             if self.particles.len() + children.len() >= MAX_PARTICLES {
@@ -425,7 +397,8 @@ impl App {
                 + parent.genome.fertility * 0.018
                 + clustered_bonus
                 + rare_bonus
-                + mutation_pressure * 0.012)
+                + mutation_pressure * 0.012
+                + pathfinder_bias * 0.006)
                 .clamp(0.01, 0.38);
 
             if !rng.gen_bool(chance as f64) {
@@ -463,6 +436,27 @@ impl App {
                 child.genome.metabolism =
                     (child.genome.metabolism + rng.gen_range(-0.0002..0.0011)).clamp(0.004, 0.05);
                 child.species_id = None;
+            }
+
+            if root_density > 0.035
+                && rng.gen_bool((pathfinder_bias * 0.08).clamp(0.01, 0.18) as f64)
+            {
+                child.genome.perception =
+                    (child.genome.perception + rng.gen_range(0.012..0.04)).clamp(0.1, 0.38);
+                child.genome.orbit =
+                    (child.genome.orbit + rng.gen_range(0.04..0.20)).clamp(0.0, 1.55);
+                child.genome.volatility =
+                    (child.genome.volatility + rng.gen_range(0.015..0.11)).clamp(0.36, 1.95);
+                child.genome.bonding =
+                    (child.genome.bonding - rng.gen_range(0.01..0.12)).clamp(0.5, 2.25);
+                child.species_id = None;
+            }
+
+            if corridor_pressure > 0.38 && rng.gen_bool((corridor_pressure * 0.05) as f64) {
+                child.x = (child.x + rng.gen_range(-0.18..0.18)).clamp(-1.16, 1.16);
+                child.y = (child.y + rng.gen_range(-0.18..0.18)).clamp(-1.16, 1.16);
+                child.vx += rng.gen_range(-0.01..0.01);
+                child.vy += rng.gen_range(-0.01..0.01);
             }
 
             if child.genome.perception > 0.295
@@ -533,6 +527,7 @@ impl App {
     fn apply_selection_pressure(&mut self, rng: &mut StdRng) {
         let before = self.particles.len();
         let adaptive_stability = 1.0 - self.memory.mutation_pressure() * 0.08;
+        let pathfinder_relief = self.memory.pathfinder_bias() * 0.035;
 
         self.particles.retain(|particle| {
             let old_age_pressure = if particle.age > 18_000 { 0.08 } else { 0.0 };
@@ -548,12 +543,20 @@ impl App {
             } else {
                 0.0
             };
+            let edge_explorer_bonus = if particle.x.abs() > 0.82 || particle.y.abs() > 0.82 {
+                pathfinder_relief
+            } else {
+                0.0
+            };
 
-            let survival =
-                (energy_score * 0.44 + health_score * 0.44 + clustered_bonus + rare_bonus
-                    - old_age_pressure)
-                    .clamp(0.02, 0.995)
-                    * adaptive_stability.clamp(0.92, 1.0);
+            let survival = (energy_score * 0.44
+                + health_score * 0.44
+                + clustered_bonus
+                + rare_bonus
+                + edge_explorer_bonus
+                - old_age_pressure)
+                .clamp(0.02, 0.995)
+                * adaptive_stability.clamp(0.92, 1.0);
 
             particle.energy > 0.0 && particle.health > 0.0 && rng.gen_bool(survival as f64)
         });
@@ -569,11 +572,75 @@ impl App {
         }
     }
 
+    fn apply_migration_pressure(&mut self) {
+        if self.particles.is_empty() {
+            return;
+        }
+
+        let mut cx = 0.0;
+        let mut cy = 0.0;
+
+        for particle in &self.particles {
+            cx += particle.x;
+            cy += particle.y;
+        }
+
+        cx /= self.particles.len() as f32;
+        cy /= self.particles.len() as f32;
+
+        let mut avg_radius = 0.0;
+
+        for particle in &self.particles {
+            avg_radius += (particle.x * particle.x + particle.y * particle.y).sqrt();
+        }
+
+        avg_radius /= self.particles.len() as f32;
+
+        let root_bias = self.memory.pathfinder_bias();
+        let crowding_bias = if avg_radius < 0.56 { 1.0 } else { 0.0 };
+        let migration_strength =
+            (0.0025 + root_bias * 0.0075 + crowding_bias * 0.006).clamp(0.0, 0.018);
+
+        if migration_strength <= 0.0 {
+            return;
+        }
+
+        for particle in &mut self.particles {
+            let away_x = particle.x - cx;
+            let away_y = particle.y - cy;
+            let len = (away_x * away_x + away_y * away_y).sqrt().max(0.001);
+
+            let edge_room = (1.18 - particle.x.abs().max(particle.y.abs())).clamp(0.0, 1.0);
+            let local_push = migration_strength * edge_room;
+
+            particle.vx += (away_x / len) * local_push;
+            particle.vy += (away_y / len) * local_push;
+
+            if particle.x.abs() < 0.34 && particle.y.abs() < 0.34 {
+                particle.vx += (particle.x * 13.0 + self.age as f32 * 0.003).sin() * local_push;
+                particle.vy += (particle.y * 17.0 - self.age as f32 * 0.004).cos() * local_push;
+            }
+        }
+
+        if self.age % 450 == 0 {
+            self.push_event("migration pressure loosened center swarm");
+        }
+    }
+
+    fn thin_overgrown_substrate_pressure(&mut self) {
+        self.memory.note(format!(
+            "[{}] substrate throttle pressure engaged",
+            self.age
+        ));
+    }
+
     fn evolve_attraction_matrix(&mut self, intensity: f32) {
         let harvester_resistance = self.memory.harvester_resistance();
         let reaper_urgency = self.memory.reaper_urgency();
         let recovery_bias = self.memory.substrate_recovery_bias();
         let mutation_pressure = self.memory.mutation_pressure();
+        let pathfinder_bias = self.memory.pathfinder_bias();
+        let corridor_pressure = self.memory.corridor_pressure();
 
         for a in 0..TRIBE_COUNT {
             for b in 0..TRIBE_COUNT {
@@ -602,14 +669,26 @@ impl App {
                     0.0
                 };
 
+                let corridor_split = if a != b && value > 0.28 {
+                    -corridor_pressure * 0.006
+                } else if a == b {
+                    pathfinder_bias * 0.003
+                } else {
+                    0.0
+                };
+
                 let chaos_drift = ((self.age as f32 * 0.013 + a as f32 * 1.7 + b as f32 * 2.3)
                     .sin())
                     * intensity
                     * 0.12;
 
-                self.rules[a][b] =
-                    (value + stabilizer + predator_bias + overgrowth_dampener + chaos_drift)
-                        .clamp(-1.0, 1.0);
+                self.rules[a][b] = (value
+                    + stabilizer
+                    + predator_bias
+                    + overgrowth_dampener
+                    + corridor_split
+                    + chaos_drift)
+                    .clamp(-1.0, 1.0);
             }
         }
 
@@ -635,6 +714,8 @@ impl App {
             return;
         }
 
+        let corridor_pressure = self.memory.corridor_pressure();
+
         for tribe in 0..TRIBE_COUNT {
             let share = tribe_counts[tribe] as f32 / total as f32;
 
@@ -642,7 +723,7 @@ impl App {
                 continue;
             }
 
-            let self_reinforce = 0.004 + share * 0.018;
+            let self_reinforce = 0.004 + share * 0.018 - corridor_pressure * 0.004;
             let neighbor = (tribe + 1) % TRIBE_COUNT;
             let counter = (tribe + TRIBE_COUNT - 1) % TRIBE_COUNT;
 
@@ -669,10 +750,10 @@ impl App {
             let tribe = Tribe::from_index(i % TRIBE_COUNT);
 
             self.particles.push(Particle {
-                x: rng.gen_range(-1.0..1.0),
-                y: rng.gen_range(-1.0..1.0),
-                vx: rng.gen_range(-0.012..0.012),
-                vy: rng.gen_range(-0.012..0.012),
+                x: rng.gen_range(-1.16..1.16),
+                y: rng.gen_range(-1.16..1.16),
+                vx: rng.gen_range(-0.014..0.014),
+                vy: rng.gen_range(-0.014..0.014),
                 tribe,
                 age: 0,
                 health: rng.gen_range(58.0..100.0),
@@ -684,9 +765,9 @@ impl App {
                 genome: Genome {
                     perception: rng.gen_range(0.17..0.31),
                     hunger: rng.gen_range(0.009..0.023),
-                    bonding: rng.gen_range(1.05..1.85),
-                    volatility: rng.gen_range(0.64..1.35),
-                    orbit: rng.gen_range(0.0..0.82),
+                    bonding: rng.gen_range(0.92..1.72),
+                    volatility: rng.gen_range(0.70..1.42),
+                    orbit: rng.gen_range(0.0..0.92),
                     membrane: rng.gen_range(0.0..0.98),
                     metabolism: rng.gen_range(0.008..0.024),
                     fertility: rng.gen_range(0.65..1.35),
@@ -697,18 +778,21 @@ impl App {
         self.age = 0;
         self.generation = 0;
         self.environment = Environment::Calm;
+
         self.measure();
         self.measure_matrix();
-        self.push_event("particle field reseeded");
+        self.push_event("particle field reseeded across full dish");
         self.save_all();
     }
 
     pub fn randomize_world(&mut self) {
         self.save_all();
+
         self.seed = now_seed();
         self.rules = build_rule_matrix(self.seed);
         self.memory = MemoryBank::new(self.seed);
         self.events.clear();
+
         self.reset_particles();
         self.push_event("new symbiote seed generated");
     }
@@ -723,6 +807,7 @@ impl App {
 
     pub fn save_all(&mut self) {
         self.update_memory();
+
         let _ = self.save_ecosystem();
         let _ = self.memory.save();
     }
@@ -734,16 +819,6 @@ impl App {
         for species in &self.species_bank.species {
             if let Some(slot) = lookup.get_mut(species.id as usize) {
                 *slot = Some(species.archetype);
-            }
-        }
-
-        for cluster in &self.clusters.clusters {
-            if let (Some(species_id), Some(override_archetype)) =
-                (cluster.species_id, cluster.archetype_override)
-            {
-                if let Some(slot) = lookup.get_mut(species_id as usize) {
-                    *slot = Some(override_archetype);
-                }
             }
         }
 
@@ -807,6 +882,7 @@ impl App {
         };
 
         fs::write(ECOSYSTEM_PATH, serde_json::to_string_pretty(&state)?)?;
+
         Ok(())
     }
 
@@ -840,11 +916,14 @@ impl App {
         let roll = hash(self.seed, self.age as usize, self.generation as usize) % 100;
         let recovery_bias = self.memory.substrate_recovery_bias();
         let reaper_urgency = self.memory.reaper_urgency();
+        let pathfinder_bias = self.memory.pathfinder_bias();
 
         self.environment = if recovery_bias > 0.62 && roll < 48 {
             Environment::Bloom
         } else if reaper_urgency > 0.68 && roll > 58 {
             Environment::Hunger
+        } else if pathfinder_bias > 0.55 && roll > 40 {
+            Environment::Drift
         } else {
             match roll {
                 0..=32 => Environment::Calm,
@@ -881,14 +960,15 @@ impl App {
         for particle in &self.particles {
             let dx = particle.x - cx;
             let dy = particle.y - cy;
+
             spread += (dx * dx + dy * dy).sqrt();
         }
 
         spread /= self.particles.len() as f32;
 
         self.energy = (speed_sum / self.particles.len() as f32 * 1750.0).clamp(0.0, 100.0);
-        self.cohesion = ((1.4 - spread) * 80.0).clamp(0.0, 100.0);
-        self.chaos = (self.energy * 0.72 + spread * 22.0).clamp(0.0, 100.0);
+        self.cohesion = ((1.52 - spread) * 70.0).clamp(0.0, 100.0);
+        self.chaos = (self.energy * 0.72 + spread * 24.0).clamp(0.0, 100.0);
         self.drift = ((cx.abs() + cy.abs()) * 55.0).clamp(0.0, 100.0);
         self.population =
             ((self.particles.len() as f32 / MAX_PARTICLES as f32) * 100.0).clamp(0.0, 100.0);
@@ -922,6 +1002,7 @@ impl App {
 
     fn update_memory(&mut self) {
         self.memory.seed = self.seed;
+
         self.memory.longest_age = self.memory.longest_age.max(self.age);
         self.memory.highest_generation = self.memory.highest_generation.max(self.generation);
         self.memory.peak_population = self.memory.peak_population.max(self.particles.len());
@@ -934,6 +1015,13 @@ impl App {
             .memory
             .peak_living_cells
             .max(self.substrate.living_cells());
+
+        self.memory.observe_substrate(
+            self.substrate.living_cells(),
+            self.substrate.total_cells(),
+            self.substrate.protected_cells(),
+            0,
+        );
 
         let rare_count = self
             .particles
@@ -958,6 +1046,7 @@ impl App {
             .memory
             .peak_harvesters
             .max(counts[Archetype::Harvester.index()]);
+
         self.memory.peak_reapers = self
             .memory
             .peak_reapers
@@ -1002,6 +1091,16 @@ impl App {
         }
     }
 
+    fn adaptive_summary(&self) -> String {
+        format!(
+            "memory root:{:.2} corridor:{:.2} substrate:{:.2} mutation:{:.2}",
+            self.memory.root_avoidance_pressure(),
+            self.memory.corridor_pressure(),
+            self.memory.substrate_throttle_pressure(),
+            self.memory.mutation_pressure()
+        )
+    }
+
     fn push_event(&mut self, msg: &str) {
         self.events.push_back(format!("[{}] {}", self.age, msg));
 
@@ -1013,10 +1112,10 @@ impl App {
 
 fn random_particle(rng: &mut StdRng) -> Particle {
     Particle {
-        x: rng.gen_range(-1.0..1.0),
-        y: rng.gen_range(-1.0..1.0),
-        vx: rng.gen_range(-0.012..0.012),
-        vy: rng.gen_range(-0.012..0.012),
+        x: rng.gen_range(-1.16..1.16),
+        y: rng.gen_range(-1.16..1.16),
+        vx: rng.gen_range(-0.014..0.014),
+        vy: rng.gen_range(-0.014..0.014),
         tribe: Tribe::from_index(rng.gen_range(0..TRIBE_COUNT)),
         age: 0,
         health: rng.gen_range(60.0..100.0),
@@ -1028,9 +1127,9 @@ fn random_particle(rng: &mut StdRng) -> Particle {
         genome: Genome {
             perception: rng.gen_range(0.17..0.31),
             hunger: rng.gen_range(0.009..0.023),
-            bonding: rng.gen_range(1.05..1.85),
-            volatility: rng.gen_range(0.64..1.35),
-            orbit: rng.gen_range(0.0..0.82),
+            bonding: rng.gen_range(0.92..1.72),
+            volatility: rng.gen_range(0.70..1.42),
+            orbit: rng.gen_range(0.0..0.92),
             membrane: rng.gen_range(0.0..0.98),
             metabolism: rng.gen_range(0.008..0.024),
             fertility: rng.gen_range(0.65..1.35),
@@ -1041,6 +1140,7 @@ fn random_particle(rng: &mut StdRng) -> Particle {
 fn dist(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
     let dx = ax - bx;
     let dy = ay - by;
+
     (dx * dx + dy * dy).sqrt()
 }
 
