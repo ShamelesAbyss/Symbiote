@@ -127,7 +127,7 @@ impl App {
             age: 0,
             generation: 0,
             paused: false,
-            tick_ms: 22,
+            tick_ms: 90,
             energy: 0.0,
             cohesion: 0.0,
             chaos: 0.0,
