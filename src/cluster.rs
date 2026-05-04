@@ -1,5 +1,5 @@
 use crate::{
-    particle::{Genome, Particle, Tribe},
+    particle::{Genome, Particle, RareTrait, Tribe},
     species::{Archetype, SpeciesBank},
 };
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,7 @@ pub struct Cluster {
     pub id: u64,
     pub species_id: Option<u64>,
     pub archetype: Option<Archetype>,
+    pub rare_trait: RareTrait,
     pub age: u64,
     pub size: usize,
     pub x: f32,
@@ -102,6 +103,11 @@ impl ClusterTracker {
                 c.stability = (old.stability * 0.9 + c.stability * 0.1).clamp(0.0, 100.0);
                 c.membrane = (old.membrane * 0.94 + c.membrane * 0.06).clamp(0.0, 100.0);
                 c.last_seen = age;
+
+                if c.rare_trait == RareTrait::None && old.rare_trait != RareTrait::None {
+                    c.rare_trait = old.rare_trait;
+                }
+
                 c
             } else {
                 let mut c = measured;
@@ -116,6 +122,7 @@ impl ClusterTracker {
             let species_id = species_bank.assign_or_create(
                 cluster.dominant,
                 cluster.avg_genome,
+                cluster.rare_trait,
                 cluster.size,
                 age,
                 parent_species,
@@ -164,7 +171,6 @@ impl ClusterTracker {
 #[derive(Default)]
 pub struct ClusterEvents {
     pub births: usize,
-    pub deaths: usize,
     pub merges: usize,
     pub splits: usize,
     pub extinctions: usize,
@@ -215,6 +221,7 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
     let mut vx = 0.0;
     let mut vy = 0.0;
     let mut tribe_counts = [0usize; 6];
+    let mut rare_counts = [0usize; 7];
     let mut membrane = 0.0;
 
     let mut genome = Genome {
@@ -224,16 +231,21 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
         volatility: 0.0,
         orbit: 0.0,
         membrane: 0.0,
+        metabolism: 0.0,
+        fertility: 0.0,
     };
 
     for &idx in indices {
         let p = particles[idx];
+
         x += p.x;
         y += p.y;
         vx += p.vx;
         vy += p.vy;
         membrane += p.genome.membrane;
+
         tribe_counts[p.tribe.index()] += 1;
+        rare_counts[rare_index(p.rare_trait)] += 1;
 
         genome.perception += p.genome.perception;
         genome.hunger += p.genome.hunger;
@@ -241,9 +253,12 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
         genome.volatility += p.genome.volatility;
         genome.orbit += p.genome.orbit;
         genome.membrane += p.genome.membrane;
+        genome.metabolism += p.genome.metabolism;
+        genome.fertility += p.genome.fertility;
     }
 
     let count = indices.len() as f32;
+
     x /= count;
     y /= count;
     vx /= count;
@@ -256,6 +271,8 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
     genome.volatility /= count;
     genome.orbit /= count;
     genome.membrane /= count;
+    genome.metabolism /= count;
+    genome.fertility /= count;
 
     let mut radius = 0.0;
 
@@ -268,11 +285,19 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
 
     radius /= count;
 
-    let mut best = 0;
+    let mut best_tribe = 0;
 
     for i in 1..6 {
-        if tribe_counts[i] > tribe_counts[best] {
-            best = i;
+        if tribe_counts[i] > tribe_counts[best_tribe] {
+            best_tribe = i;
+        }
+    }
+
+    let mut best_rare = 0;
+
+    for i in 1..7 {
+        if rare_counts[i] > rare_counts[best_rare] {
+            best_rare = i;
         }
     }
 
@@ -282,6 +307,7 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
         id: 0,
         species_id: None,
         archetype: None,
+        rare_trait: rare_from_index(best_rare),
         age: 0,
         size: indices.len(),
         x,
@@ -289,10 +315,34 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
         vx,
         vy,
         radius,
-        dominant: Tribe::from_index(best),
+        dominant: Tribe::from_index(best_tribe),
         avg_genome: genome,
         stability,
         membrane,
         last_seen: 0,
+    }
+}
+
+fn rare_index(rare_trait: RareTrait) -> usize {
+    match rare_trait {
+        RareTrait::None => 0,
+        RareTrait::ElderCore => 1,
+        RareTrait::Radiant => 2,
+        RareTrait::Voracious => 3,
+        RareTrait::Voidborne => 4,
+        RareTrait::SymbioticCore => 5,
+        RareTrait::SporeKing => 6,
+    }
+}
+
+fn rare_from_index(index: usize) -> RareTrait {
+    match index {
+        1 => RareTrait::ElderCore,
+        2 => RareTrait::Radiant,
+        3 => RareTrait::Voracious,
+        4 => RareTrait::Voidborne,
+        5 => RareTrait::SymbioticCore,
+        6 => RareTrait::SporeKing,
+        _ => RareTrait::None,
     }
 }

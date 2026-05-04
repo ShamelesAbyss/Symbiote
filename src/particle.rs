@@ -57,6 +57,31 @@ impl Tribe {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+pub enum RareTrait {
+    None,
+    ElderCore,
+    Radiant,
+    Voracious,
+    Voidborne,
+    SymbioticCore,
+    SporeKing,
+}
+
+impl RareTrait {
+    pub fn short(self) -> &'static str {
+        match self {
+            Self::None => "",
+            Self::ElderCore => "ELD",
+            Self::Radiant => "RAD",
+            Self::Voracious => "VOR",
+            Self::Voidborne => "VOI",
+            Self::SymbioticCore => "SYM",
+            Self::SporeKing => "SPK",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct Genome {
     pub perception: f32,
@@ -65,6 +90,8 @@ pub struct Genome {
     pub volatility: f32,
     pub orbit: f32,
     pub membrane: f32,
+    pub metabolism: f32,
+    pub fertility: f32,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -76,8 +103,10 @@ pub struct Particle {
     pub tribe: Tribe,
     pub age: u32,
     pub health: f32,
+    pub energy: f32,
     pub mass: f32,
     pub cluster_id: Option<u64>,
     pub species_id: Option<u64>,
+    pub rare_trait: RareTrait,
     pub genome: Genome,
 }
