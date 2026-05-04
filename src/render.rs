@@ -261,25 +261,73 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                 let tribe = cell.dominant_tribe();
                 let avg_health = cell.health / cell.count as f32;
                 let avg_mass = cell.mass / cell.count as f32;
+                let organic_phase = cell.organic_phase(app.age);
 
                 let glyph = if cell.reaper {
-                    'Ω'
+                    match organic_phase % 4 {
+                        0 => 'Ω',
+                        1 => 'ϟ',
+                        2 => '◉',
+                        _ => '○',
+                    }
                 } else if cell.harvester {
-                    '♻'
+                    match organic_phase % 4 {
+                        0 => '♻',
+                        1 => '◌',
+                        2 => '○',
+                        _ => '∙',
+                    }
                 } else if cell.drifting {
-                    '◆'
+                    match organic_phase % 4 {
+                        0 => '◆',
+                        1 => '◇',
+                        2 => '✧',
+                        _ => '◌',
+                    }
                 } else if cell.rare {
-                    '✦'
+                    match organic_phase % 4 {
+                        0 => '✦',
+                        1 => '✧',
+                        2 => '◇',
+                        _ => '○',
+                    }
                 } else if cell.clustered > 0 && avg_mass > 3.8 {
-                    '█'
+                    match organic_phase % 5 {
+                        0 => '◉',
+                        1 => '◎',
+                        2 => '◍',
+                        3 => '○',
+                        _ => '◌',
+                    }
                 } else if cell.clustered > 0 && cell.count >= 5 {
-                    '⬤'
+                    match organic_phase % 5 {
+                        0 => '◍',
+                        1 => '◎',
+                        2 => '○',
+                        3 => '◌',
+                        _ => 'o',
+                    }
                 } else if avg_mass > 2.5 {
-                    '◉'
+                    match organic_phase % 4 {
+                        0 => '◉',
+                        1 => '◎',
+                        2 => '○',
+                        _ => 'o',
+                    }
                 } else if cell.count >= 3 {
-                    '●'
+                    match organic_phase % 4 {
+                        0 => '●',
+                        1 => '○',
+                        2 => 'o',
+                        _ => '∙',
+                    }
                 } else {
-                    '•'
+                    match organic_phase % 4 {
+                        0 => '•',
+                        1 => '∙',
+                        2 => '·',
+                        _ => 'o',
+                    }
                 };
 
                 let mut style = if cell.reaper {
@@ -480,19 +528,21 @@ fn draw_ecology_zones(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
 
 fn draw_cluster_membranes(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
     for cluster in &app.clusters.clusters {
-        if cluster.size < 14 || cluster.membrane < 25.0 {
+        if cluster.size < 18 || cluster.membrane < 34.0 || cluster.age < 80 {
             continue;
         }
 
         let cx = (((cluster.x + 1.2) / 2.4) * width as f32) as i32;
         let cy = (((cluster.y + 1.2) / 2.4) * height as f32) as i32;
-        let pulse = ((app.age as f32 / 12.0).sin() * 1.2) as i32;
-        let radius = ((cluster.radius * width as f32 * 0.9).max(2.0)).min(9.0) as i32 + pulse;
+        let pulse = ((app.age as f32 / 18.0 + cluster.id as f32).sin() * 0.9) as i32;
+        let radius = ((cluster.radius * width as f32 * 0.72).max(2.0)).min(8.0) as i32 + pulse;
 
-        for deg in (0..360).step_by(18) {
+        for deg in (0..360).step_by(24) {
             let rad = deg as f32 * std::f32::consts::PI / 180.0;
-            let x = cx + (rad.cos() * radius as f32) as i32;
-            let y = cy + (rad.sin() * (radius as f32 * 0.62)) as i32;
+            let wobble = ((app.age as f32 * 0.015 + deg as f32 + cluster.id as f32).sin() * 0.6)
+                .round() as i32;
+            let x = cx + (rad.cos() * (radius + wobble) as f32) as i32;
+            let y = cy + (rad.sin() * ((radius + wobble) as f32 * 0.62)) as i32;
 
             if x >= 0 && y >= 0 && x < width as i32 && y < height as i32 {
                 cells[y as usize][x as usize].membrane = true;
@@ -503,18 +553,18 @@ fn draw_cluster_membranes(cells: &mut [Vec<Cell>], app: &App, width: usize, heig
 
 fn draw_cluster_motion_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
     for cluster in &app.clusters.clusters {
-        if cluster.speed() < 0.00035 {
+        if cluster.speed() < 0.00035 || cluster.age < 45 {
             continue;
         }
 
         let cx = (((cluster.x + 1.2) / 2.4) * width as f32) as i32;
         let cy = (((cluster.y + 1.2) / 2.4) * height as f32) as i32;
-        let tx = cx - (cluster.vx * 900.0) as i32;
-        let ty = cy - (cluster.vy * 900.0) as i32;
+        let tx = cx - (cluster.vx * 780.0) as i32;
+        let ty = cy - (cluster.vy * 780.0) as i32;
 
-        for i in 0..4 {
-            let x = cx + ((tx - cx) * i) / 4;
-            let y = cy + ((ty - cy) * i) / 4;
+        for i in 0..3 {
+            let x = cx + ((tx - cx) * i) / 3;
+            let y = cy + ((ty - cy) * i) / 3;
 
             if x >= 0 && y >= 0 && x < width as i32 && y < height as i32 {
                 cells[y as usize][x as usize].trail = true;
@@ -632,6 +682,7 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
         Span::styled("∙ life ", Style::default().fg(Color::DarkGray)),
         Span::styled("+ food ", Style::default().fg(Color::Green)),
         Span::styled("* mutagen ", Style::default().fg(Color::Magenta)),
+        Span::styled("◍ organism ", Style::default().fg(Color::Cyan)),
         Span::styled("◆ drift", Style::default().fg(Color::Magenta)),
     ]));
 
@@ -985,6 +1036,15 @@ impl Cell {
         }
 
         Tribe::from_index(best)
+    }
+
+    fn organic_phase(&self, age: u64) -> usize {
+        let mut value = age as usize;
+        value ^= self.count.wrapping_mul(97);
+        value ^= self.clustered.wrapping_mul(131);
+        value ^= self.dominant_tribe().index().wrapping_mul(389);
+        value = (value ^ (value >> 11)).wrapping_mul(1_103_515_245);
+        value ^ (value >> 15)
     }
 }
 

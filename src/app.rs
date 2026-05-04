@@ -19,6 +19,10 @@ pub const PARTICLE_COUNT: usize = 1200;
 pub const MAX_PARTICLES: usize = 2500;
 pub const MIN_PARTICLES: usize = 600;
 
+const DISPERSAL_WARMUP_TICKS: u64 = 720;
+const REPRODUCTION_WARMUP_TICKS: u64 = 420;
+const STRUCTURE_WARMUP_TICKS: u64 = 900;
+
 #[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Environment {
     Calm,
@@ -158,6 +162,7 @@ impl App {
         app.push_event("adaptive ecosystem memory online");
         app.push_event("adaptive attraction matrix online");
         app.push_event("root navigation memory online");
+        app.push_event("early dispersal warmup online");
 
         app
     }
@@ -173,6 +178,10 @@ impl App {
             &mut self.substrate,
             &archetype_lookup,
         );
+
+        if self.age < DISPERSAL_WARMUP_TICKS {
+            self.apply_early_dispersal();
+        }
 
         if report.cells_consumed > 0 {
             self.memory.total_cells_consumed += report.cells_consumed as u64;
@@ -232,7 +241,7 @@ impl App {
             self.thin_overgrown_substrate_pressure();
         }
 
-        if self.age % 32 == 0 {
+        if self.age >= REPRODUCTION_WARMUP_TICKS && self.age % 32 == 0 {
             self.native_reproduction();
         }
 
@@ -257,11 +266,13 @@ impl App {
             self.process_cluster_events(cluster_events);
         }
 
-        if self.age % 90 == 0 {
+        if self.age % 60 == 0 && self.age < STRUCTURE_WARMUP_TICKS {
+            self.apply_migration_pressure();
+        } else if self.age % 90 == 0 {
             self.apply_migration_pressure();
         }
 
-        if self.age % 120 == 0 {
+        if self.age >= STRUCTURE_WARMUP_TICKS && self.age % 120 == 0 {
             self.reinforce_matrix_from_clusters();
         }
 
@@ -369,13 +380,17 @@ impl App {
         let pathfinder_bias = self.memory.pathfinder_bias();
         let corridor_pressure = self.memory.corridor_pressure();
 
+        let structure_maturity = ((self.age.saturating_sub(REPRODUCTION_WARMUP_TICKS)) as f32
+            / (STRUCTURE_WARMUP_TICKS - REPRODUCTION_WARMUP_TICKS).max(1) as f32)
+            .clamp(0.0, 1.0);
+
         for parent in snapshot.iter() {
             if self.particles.len() + children.len() >= MAX_PARTICLES {
                 break;
             }
 
             let clustered_bonus = if parent.cluster_id.is_some() {
-                0.18
+                0.18 * structure_maturity
             } else {
                 0.0
             };
@@ -386,20 +401,20 @@ impl App {
             };
             let adaptive_fertility_drag = harvester_resistance * 4.5;
 
-            let threshold = 115.0 - parent.genome.fertility * 13.0 - clustered_bonus * 20.0
+            let threshold = 118.0 - parent.genome.fertility * 11.5 - clustered_bonus * 14.0
                 + adaptive_fertility_drag;
 
-            if parent.energy < threshold || parent.health < 48.0 || parent.age < 180 {
+            if parent.energy < threshold || parent.health < 48.0 || parent.age < 220 {
                 continue;
             }
 
-            let chance = (0.018
-                + parent.genome.fertility * 0.018
+            let chance = (0.012
+                + parent.genome.fertility * 0.014
                 + clustered_bonus
                 + rare_bonus
                 + mutation_pressure * 0.012
                 + pathfinder_bias * 0.006)
-                .clamp(0.01, 0.38);
+                .clamp(0.006, 0.30);
 
             if !rng.gen_bool(chance as f64) {
                 continue;
@@ -410,7 +425,8 @@ impl App {
                 .find(|other| {
                     other.species_id != parent.species_id
                         && other.energy > 95.0
-                        && dist(parent.x, parent.y, other.x, other.y) < 0.14
+                        && dist(parent.x, parent.y, other.x, other.y)
+                            < 0.11 + structure_maturity * 0.03
                 })
                 .copied();
 
@@ -534,7 +550,11 @@ impl App {
             let energy_score = (particle.energy / 130.0).clamp(0.0, 1.0);
             let health_score = (particle.health / 100.0).clamp(0.0, 1.0);
             let clustered_bonus = if particle.cluster_id.is_some() {
-                0.18
+                if u64::from(particle.age) < STRUCTURE_WARMUP_TICKS {
+                    0.03
+                } else {
+                    0.18
+                }
             } else {
                 0.0
             };
@@ -572,6 +592,52 @@ impl App {
         }
     }
 
+    fn apply_early_dispersal(&mut self) {
+        if self.particles.is_empty() {
+            return;
+        }
+
+        let warmup_left = 1.0 - (self.age as f32 / DISPERSAL_WARMUP_TICKS as f32).clamp(0.0, 1.0);
+
+        let mut cx = 0.0;
+        let mut cy = 0.0;
+
+        for particle in &self.particles {
+            cx += particle.x;
+            cy += particle.y;
+        }
+
+        cx /= self.particles.len() as f32;
+        cy /= self.particles.len() as f32;
+
+        for particle in &mut self.particles {
+            let dx = particle.x - cx;
+            let dy = particle.y - cy;
+            let len = (dx * dx + dy * dy).sqrt().max(0.001);
+
+            let center_pullout = if particle.x.abs() < 0.72 && particle.y.abs() < 0.72 {
+                1.0
+            } else {
+                0.35
+            };
+
+            let jitter_x =
+                (self.seed as f32 * 0.000001 + particle.y * 19.0 + self.age as f32 * 0.021).sin();
+            let jitter_y =
+                (self.seed as f32 * 0.000002 + particle.x * 23.0 - self.age as f32 * 0.017).cos();
+
+            let force = warmup_left * center_pullout * 0.0065;
+
+            particle.vx += (dx / len) * force + jitter_x * force * 0.55;
+            particle.vy += (dy / len) * force + jitter_y * force * 0.55;
+
+            particle.genome.bonding =
+                (particle.genome.bonding - warmup_left * 0.00022).clamp(0.5, 2.25);
+            particle.genome.orbit =
+                (particle.genome.orbit + warmup_left * 0.00010).clamp(0.0, 1.55);
+        }
+    }
+
     fn apply_migration_pressure(&mut self) {
         if self.particles.is_empty() {
             return;
@@ -598,8 +664,14 @@ impl App {
 
         let root_bias = self.memory.pathfinder_bias();
         let crowding_bias = if avg_radius < 0.56 { 1.0 } else { 0.0 };
+        let early_bias = if self.age < STRUCTURE_WARMUP_TICKS {
+            1.0
+        } else {
+            0.0
+        };
         let migration_strength =
-            (0.0025 + root_bias * 0.0075 + crowding_bias * 0.006).clamp(0.0, 0.018);
+            (0.0025 + root_bias * 0.0075 + crowding_bias * 0.006 + early_bias * 0.006)
+                .clamp(0.0, 0.020);
 
         if migration_strength <= 0.0 {
             return;
@@ -750,27 +822,27 @@ impl App {
             let tribe = Tribe::from_index(i % TRIBE_COUNT);
 
             self.particles.push(Particle {
-                x: rng.gen_range(-1.16..1.16),
-                y: rng.gen_range(-1.16..1.16),
-                vx: rng.gen_range(-0.014..0.014),
-                vy: rng.gen_range(-0.014..0.014),
+                x: rng.gen_range(-1.17..1.17),
+                y: rng.gen_range(-1.17..1.17),
+                vx: rng.gen_range(-0.020..0.020),
+                vy: rng.gen_range(-0.020..0.020),
                 tribe,
                 age: 0,
                 health: rng.gen_range(58.0..100.0),
                 energy: rng.gen_range(60.0..110.0),
-                mass: rng.gen_range(0.65..1.5),
+                mass: rng.gen_range(0.58..1.32),
                 cluster_id: None,
                 species_id: None,
                 rare_trait: RareTrait::None,
                 genome: Genome {
-                    perception: rng.gen_range(0.17..0.31),
+                    perception: rng.gen_range(0.145..0.285),
                     hunger: rng.gen_range(0.009..0.023),
-                    bonding: rng.gen_range(0.92..1.72),
-                    volatility: rng.gen_range(0.70..1.42),
-                    orbit: rng.gen_range(0.0..0.92),
-                    membrane: rng.gen_range(0.0..0.98),
+                    bonding: rng.gen_range(0.58..1.22),
+                    volatility: rng.gen_range(0.82..1.55),
+                    orbit: rng.gen_range(0.10..1.02),
+                    membrane: rng.gen_range(0.0..0.52),
                     metabolism: rng.gen_range(0.008..0.024),
-                    fertility: rng.gen_range(0.65..1.35),
+                    fertility: rng.gen_range(0.55..1.18),
                 },
             });
         }
@@ -819,6 +891,16 @@ impl App {
         for species in &self.species_bank.species {
             if let Some(slot) = lookup.get_mut(species.id as usize) {
                 *slot = Some(species.archetype);
+            }
+        }
+
+        for cluster in &self.clusters.clusters {
+            if let (Some(species_id), Some(override_archetype)) =
+                (cluster.species_id, cluster.archetype_override)
+            {
+                if let Some(slot) = lookup.get_mut(species_id as usize) {
+                    *slot = Some(override_archetype);
+                }
             }
         }
 
@@ -1112,27 +1194,27 @@ impl App {
 
 fn random_particle(rng: &mut StdRng) -> Particle {
     Particle {
-        x: rng.gen_range(-1.16..1.16),
-        y: rng.gen_range(-1.16..1.16),
-        vx: rng.gen_range(-0.014..0.014),
-        vy: rng.gen_range(-0.014..0.014),
+        x: rng.gen_range(-1.17..1.17),
+        y: rng.gen_range(-1.17..1.17),
+        vx: rng.gen_range(-0.020..0.020),
+        vy: rng.gen_range(-0.020..0.020),
         tribe: Tribe::from_index(rng.gen_range(0..TRIBE_COUNT)),
         age: 0,
         health: rng.gen_range(60.0..100.0),
         energy: rng.gen_range(60.0..110.0),
-        mass: rng.gen_range(0.65..1.5),
+        mass: rng.gen_range(0.58..1.32),
         cluster_id: None,
         species_id: None,
         rare_trait: RareTrait::None,
         genome: Genome {
-            perception: rng.gen_range(0.17..0.31),
+            perception: rng.gen_range(0.145..0.285),
             hunger: rng.gen_range(0.009..0.023),
-            bonding: rng.gen_range(0.92..1.72),
-            volatility: rng.gen_range(0.70..1.42),
-            orbit: rng.gen_range(0.0..0.92),
-            membrane: rng.gen_range(0.0..0.98),
+            bonding: rng.gen_range(0.58..1.22),
+            volatility: rng.gen_range(0.82..1.55),
+            orbit: rng.gen_range(0.10..1.02),
+            membrane: rng.gen_range(0.0..0.52),
             metabolism: rng.gen_range(0.008..0.024),
-            fertility: rng.gen_range(0.65..1.35),
+            fertility: rng.gen_range(0.55..1.18),
         },
     }
 }
