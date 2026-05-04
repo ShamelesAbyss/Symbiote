@@ -70,6 +70,13 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let status = if app.paused { "paused" } else { "alive" };
     let pulse = ["░", "▒", "▓", "█", "▓", "▒"][(app.age as usize / 4) % 6];
 
+    let override_count = app
+        .clusters
+        .clusters
+        .iter()
+        .filter(|cluster| cluster.archetype_override.is_some())
+        .count();
+
     let lines = vec![
         Line::from(vec![
             Span::styled(
@@ -79,7 +86,7 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "adaptive matrix signal trails substrate ",
+                "dynamic archetypes adaptive matrix signal trails ",
                 Style::default().fg(Color::Magenta),
             ),
             Span::styled(
@@ -105,15 +112,19 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 format!("{}", app.species_bank.active_count()),
                 Style::default().fg(Color::Yellow),
             ),
-            Span::styled(" | cells: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("{}", app.substrate.living_cells()),
-                Style::default().fg(Color::Green),
-            ),
             Span::styled(" | matrix: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{:.0}", app.matrix_pressure),
                 Style::default().fg(matrix_color(app.matrix_pressure)),
+            ),
+            Span::styled(" | drift: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", override_count),
+                Style::default().fg(if override_count > 0 {
+                    Color::Magenta
+                } else {
+                    Color::DarkGray
+                }),
             ),
             Span::styled(" | eaten: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
@@ -158,15 +169,22 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         let y = (((particle.y + 1.2) / 2.4) * height as f32) as isize;
 
         if x >= 0 && y >= 0 && x < width as isize && y < height as isize {
-            let archetype = particle
-                .species_id
-                .and_then(|id| {
-                    app.species_bank
-                        .species
-                        .iter()
-                        .find(|species| species.id == id)
-                })
-                .map(|species| species.archetype);
+            let archetype = particle.species_id.and_then(|id| {
+                app.clusters
+                    .clusters
+                    .iter()
+                    .find(|cluster| {
+                        cluster.species_id == Some(id) && cluster.archetype_override.is_some()
+                    })
+                    .and_then(|cluster| cluster.archetype_override)
+                    .or_else(|| {
+                        app.species_bank
+                            .species
+                            .iter()
+                            .find(|species| species.id == id)
+                            .map(|species| species.archetype)
+                    })
+            });
 
             let cell = &mut cells[y as usize][x as usize];
 
@@ -190,6 +208,17 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
             if archetype == Some(Archetype::Reaper) {
                 cell.reaper = true;
+            }
+
+            if let Some(cluster_id) = particle.cluster_id {
+                if app
+                    .clusters
+                    .clusters
+                    .iter()
+                    .any(|cluster| cluster.id == cluster_id && cluster.archetype_override.is_some())
+                {
+                    cell.drifting = true;
+                }
             }
         }
     }
@@ -230,6 +259,8 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                     'Ω'
                 } else if cell.harvester {
                     '♻'
+                } else if cell.drifting {
+                    '◆'
                 } else if cell.rare {
                     '✦'
                 } else if cell.clustered > 0 && avg_mass > 3.8 {
@@ -250,15 +281,19 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                     Style::default()
                         .fg(Color::Green)
                         .add_modifier(Modifier::BOLD)
+                } else if cell.drifting {
+                    Style::default()
+                        .fg(Color::Magenta)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
                         .fg(tribe.color())
                         .add_modifier(Modifier::BOLD)
                 };
 
-                if cell.rare && !cell.reaper {
+                if cell.rare && !cell.reaper && !cell.drifting {
                     style = style.fg(Color::White).add_modifier(Modifier::BOLD);
-                } else if avg_health < 24.0 && !cell.reaper {
+                } else if avg_health < 24.0 && !cell.reaper && !cell.drifting {
                     style = style.fg(Color::DarkGray);
                 }
 
@@ -498,7 +533,8 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         Span::styled("∿ hunger ", Style::default().fg(Color::Yellow)),
         Span::styled("! fear ", Style::default().fg(Color::Red)),
         Span::styled("∙ growth ", Style::default().fg(Color::Green)),
-        Span::styled("× danger", Style::default().fg(Color::Magenta)),
+        Span::styled("× danger ", Style::default().fg(Color::Magenta)),
+        Span::styled("◆ drift", Style::default().fg(Color::Magenta)),
     ]));
 
     f.render_widget(
@@ -514,11 +550,27 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 }
 
 fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
+    let drifting = app
+        .clusters
+        .clusters
+        .iter()
+        .filter(|cluster| cluster.archetype_override.is_some())
+        .count();
+
     let mut lines = vec![Line::from(vec![
         Span::styled("Clusters: ", Style::default().fg(Color::DarkGray)),
         Span::styled(
             format!("{}", app.clusters.clusters.len()),
             Style::default().fg(Color::Green),
+        ),
+        Span::styled(" Drift: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("{}", drifting),
+            Style::default().fg(if drifting > 0 {
+                Color::Magenta
+            } else {
+                Color::DarkGray
+            }),
         ),
         Span::styled(" Peak: ", Style::default().fg(Color::DarkGray)),
         Span::styled(
@@ -528,17 +580,36 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     ])];
 
     for cluster in app.clusters.clusters.iter().take(4) {
-        let archetype = cluster
+        let base = cluster
             .archetype
             .map(|value| value.short())
             .unwrap_or("UNK");
+        let effective = cluster
+            .effective_archetype()
+            .map(|value| value.short())
+            .unwrap_or("UNK");
+        let overridden = cluster.archetype_override.is_some();
 
-        let archetype_color = if archetype == "RPR" {
+        let archetype_color = if effective == "RPR" {
             Color::Red
-        } else if archetype == "HRV" {
+        } else if effective == "HRV" {
             Color::Green
-        } else {
+        } else if overridden {
             Color::Magenta
+        } else {
+            Color::Cyan
+        };
+
+        let drift_marker = if overridden {
+            if cluster.drift_heat > 80.0 {
+                "🔥"
+            } else if cluster.drift_heat > 60.0 {
+                "⚡"
+            } else {
+                "~"
+            }
+        } else {
+            " "
         };
 
         lines.push(Line::from(vec![
@@ -551,15 +622,36 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 Style::default().fg(Color::Cyan),
             ),
             Span::raw(" "),
-            Span::styled(archetype, Style::default().fg(archetype_color)),
+            Span::styled(
+                effective,
+                Style::default()
+                    .fg(archetype_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                if overridden {
+                    format!("({})", base)
+                } else {
+                    String::new()
+                },
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::raw(" "),
             Span::styled(
                 format!("{} ", cluster.size),
                 Style::default().fg(cluster.dominant.color()),
             ),
             Span::styled(
-                format!("a{}", cluster.age),
+                format!("a{} ", cluster.age),
                 Style::default().fg(Color::Cyan),
+            ),
+            Span::styled(
+                format!("h{:.0}{}", cluster.drift_heat, drift_marker),
+                Style::default().fg(if overridden {
+                    Color::Magenta
+                } else {
+                    Color::DarkGray
+                }),
             ),
         ]));
     }
@@ -754,6 +846,7 @@ struct Cell {
     rare: bool,
     harvester: bool,
     reaper: bool,
+    drifting: bool,
     zone: Option<(char, Color)>,
     substrate: Option<(char, Color)>,
     signal: Option<(char, Color)>,
@@ -773,6 +866,7 @@ impl Default for Cell {
             rare: false,
             harvester: false,
             reaper: false,
+            drifting: false,
             zone: None,
             substrate: None,
             signal: None,

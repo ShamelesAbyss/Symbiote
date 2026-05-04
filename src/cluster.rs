@@ -1,6 +1,6 @@
 use crate::{
     particle::{Genome, Particle, RareTrait, Tribe},
-    species::{Archetype, SpeciesBank},
+    species::{drift_candidate, Archetype, ArchetypePressure, SpeciesBank},
 };
 use serde::{Deserialize, Serialize};
 
@@ -22,6 +22,10 @@ pub struct Cluster {
     pub stability: f32,
     pub membrane: f32,
     pub last_seen: u64,
+    #[serde(default)]
+    pub archetype_override: Option<Archetype>,
+    #[serde(default)]
+    pub drift_heat: f32,
 }
 
 impl Cluster {
@@ -45,6 +49,10 @@ impl Cluster {
         } else {
             '↑'
         }
+    }
+
+    pub fn effective_archetype(&self) -> Option<Archetype> {
+        self.archetype_override.or(self.archetype)
     }
 }
 
@@ -82,6 +90,7 @@ impl ClusterTracker {
             }
 
             let measured = measure_group(&group, particles);
+
             let mut best_match = None;
             let mut best_dist = f32::MAX;
 
@@ -100,9 +109,12 @@ impl ClusterTracker {
 
             let mut cluster = if let Some(old) = best_match {
                 let mut current = measured;
+
                 current.id = old.id;
                 current.species_id = old.species_id;
                 current.archetype = old.archetype;
+                current.archetype_override = old.archetype_override;
+                current.drift_heat = (old.drift_heat * 0.88).clamp(0.0, 100.0);
                 current.age = old.age + 1;
                 current.stability =
                     (old.stability * 0.9 + current.stability * 0.1).clamp(0.0, 100.0);
@@ -117,11 +129,15 @@ impl ClusterTracker {
                 current
             } else {
                 let mut current = measured;
+
                 current.id = self.next_id;
                 self.next_id += 1;
                 current.age = 1;
                 current.last_seen = age;
+                current.archetype_override = None;
+                current.drift_heat = 0.0;
                 events.births += 1;
+
                 current
             };
 
@@ -138,6 +154,7 @@ impl ClusterTracker {
                 .species
                 .iter()
                 .find(|species| species.id == species_id);
+
             cluster.species_id = Some(species_id);
             cluster.archetype = species.map(|species| species.archetype);
 
@@ -173,7 +190,81 @@ impl ClusterTracker {
 
         self.clusters = next_clusters;
         events.extinctions += species_bank.mark_extinctions(age);
+
         events
+    }
+
+    pub fn drift_cluster_archetypes(
+        &mut self,
+        particles: &mut [Particle],
+        species_bank: &SpeciesBank,
+        pressure: ArchetypePressure,
+    ) -> usize {
+        let mut drifted = 0;
+
+        for cluster in &mut self.clusters {
+            let base = cluster
+                .species_id
+                .and_then(|id| species_bank.species.iter().find(|species| species.id == id))
+                .map(|species| species.archetype)
+                .or(cluster.archetype);
+
+            let Some(base_archetype) = base else {
+                continue;
+            };
+
+            let candidate = cluster_drift_candidate(cluster, base_archetype, pressure);
+
+            if candidate == base_archetype {
+                cluster.drift_heat = (cluster.drift_heat * 0.82).clamp(0.0, 100.0);
+
+                if cluster.drift_heat < 18.0 {
+                    cluster.archetype_override = None;
+                }
+
+                continue;
+            }
+
+            let age_factor = (cluster.age as f32 / 850.0).clamp(0.0, 1.0);
+            let size_factor = (cluster.size as f32 / 52.0).clamp(0.0, 1.0);
+            let stability_factor = (cluster.stability / 100.0).clamp(0.0, 1.0);
+            let membrane_factor = (cluster.membrane / 100.0).clamp(0.0, 1.0);
+            let pressure_factor = (pressure.matrix_pressure * 0.35
+                + pressure.mutation_pressure * 0.24
+                + pressure.reaper_urgency * 0.18
+                + pressure.recovery_bias * 0.14
+                + pressure.harvester_pressure * 0.09)
+                .clamp(0.0, 1.0);
+
+            let heat_gain = age_factor * 8.0
+                + size_factor * 10.0
+                + stability_factor * 7.0
+                + membrane_factor * 5.0
+                + pressure_factor * 18.0;
+
+            cluster.drift_heat = (cluster.drift_heat + heat_gain).clamp(0.0, 100.0);
+
+            if cluster.drift_heat > 62.0 {
+                cluster.archetype_override = Some(candidate);
+                drifted += 1;
+
+                for particle in particles
+                    .iter_mut()
+                    .filter(|particle| particle.cluster_id == Some(cluster.id))
+                {
+                    particle.mass = match candidate {
+                        Archetype::Leviathan => (particle.mass + 0.014).clamp(0.55, 7.0),
+                        Archetype::Architect => (particle.mass + 0.008).clamp(0.55, 7.0),
+                        Archetype::Reaper => (particle.mass + 0.006).clamp(0.55, 7.0),
+                        Archetype::Harvester => (particle.mass + 0.004).clamp(0.55, 7.0),
+                        Archetype::Phantom => (particle.mass - 0.004).clamp(0.45, 7.0),
+                        _ => particle.mass,
+                    };
+                }
+            }
+        }
+
+        drifted
     }
 }
 
@@ -183,6 +274,74 @@ pub struct ClusterEvents {
     pub merges: usize,
     pub splits: usize,
     pub extinctions: usize,
+}
+
+fn cluster_drift_candidate(
+    cluster: &Cluster,
+    base_archetype: Archetype,
+    pressure: ArchetypePressure,
+) -> Archetype {
+    if cluster.rare_trait == RareTrait::ElderCore || cluster.size > 86 {
+        return Archetype::Leviathan;
+    }
+
+    if cluster.rare_trait == RareTrait::SporeKing {
+        return Archetype::Mycelial;
+    }
+
+    if cluster.rare_trait == RareTrait::Voidborne {
+        return Archetype::Phantom;
+    }
+
+    let candidate = drift_candidate(
+        base_archetype,
+        cluster.avg_genome,
+        cluster.rare_trait,
+        cluster.size,
+        pressure,
+    );
+
+    if cluster.stability > 78.0
+        && cluster.membrane > 48.0
+        && pressure.matrix_attraction > pressure.matrix_repulsion
+        && cluster.avg_genome.bonding > 1.35
+    {
+        return Archetype::Architect;
+    }
+
+    if pressure.matrix_repulsion > 0.42
+        && pressure.matrix_pressure > 0.55
+        && cluster.avg_genome.volatility > 1.28
+        && cluster.speed() > 0.00045
+    {
+        return Archetype::Hunter;
+    }
+
+    if pressure.reaper_urgency > 0.55
+        && pressure.harvester_pressure > 0.42
+        && cluster.avg_genome.perception > 0.28
+        && cluster.avg_genome.volatility > 1.36
+    {
+        return Archetype::Reaper;
+    }
+
+    if pressure.substrate_density > 0.12
+        && pressure.matrix_attraction > 0.34
+        && pressure.harvester_pressure < 0.55
+        && cluster.avg_genome.fertility > 1.42
+        && cluster.avg_genome.hunger < 0.018
+    {
+        return Archetype::Harvester;
+    }
+
+    if pressure.recovery_bias > 0.58
+        && cluster.avg_genome.fertility > 1.24
+        && cluster.avg_genome.bonding > 1.22
+    {
+        return Archetype::Mycelial;
+    }
+
+    candidate
 }
 
 fn detect_groups(particles: &[Particle]) -> Vec<Vec<usize>> {
@@ -196,6 +355,7 @@ fn detect_groups(particles: &[Particle]) -> Vec<Vec<usize>> {
 
         let mut stack = vec![i];
         let mut group = Vec::new();
+
         visited[i] = true;
 
         while let Some(idx) = stack.pop() {
@@ -230,8 +390,10 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
     let mut y = 0.0;
     let mut vx = 0.0;
     let mut vy = 0.0;
+
     let mut tribe_counts = [0usize; 6];
     let mut rare_counts = [0usize; 8];
+
     let mut membrane = 0.0;
 
     let mut genome = Genome {
@@ -290,6 +452,7 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
         let particle = particles[idx];
         let dx = particle.x - x;
         let dy = particle.y - y;
+
         radius += (dx * dx + dy * dy).sqrt();
     }
 
@@ -330,6 +493,8 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
         stability,
         membrane,
         last_seen: 0,
+        archetype_override: None,
+        drift_heat: 0.0,
     }
 }
 

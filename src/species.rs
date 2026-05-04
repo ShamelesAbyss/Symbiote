@@ -66,6 +66,18 @@ impl Archetype {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ArchetypePressure {
+    pub matrix_pressure: f32,
+    pub matrix_attraction: f32,
+    pub matrix_repulsion: f32,
+    pub substrate_density: f32,
+    pub harvester_pressure: f32,
+    pub reaper_urgency: f32,
+    pub recovery_bias: f32,
+    pub mutation_pressure: f32,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Species {
     pub id: u64,
@@ -108,7 +120,6 @@ impl SpeciesBank {
         parent_hint: Option<u64>,
     ) -> u64 {
         let archetype = derive_archetype(genome, rare_trait, size);
-
         let mut best_index = None;
         let mut best_score = f32::MAX;
 
@@ -127,6 +138,7 @@ impl SpeciesBank {
 
         if let Some(idx) = best_index {
             let species = &mut self.species[idx];
+
             species.last_seen_age = age;
             species.peak_size = species.peak_size.max(size);
             species.sightings += 1;
@@ -136,8 +148,8 @@ impl SpeciesBank {
                 species.rare_trait = rare_trait;
             }
 
-            species.archetype =
-                derive_archetype(species.genome, species.rare_trait, species.peak_size);
+            let derived = derive_archetype(species.genome, species.rare_trait, species.peak_size);
+            species.archetype = stabilize_archetype(species.archetype, derived, species.sightings);
 
             return species.id;
         }
@@ -145,11 +157,7 @@ impl SpeciesBank {
         let id = self.next_id;
         self.next_id += 1;
 
-        let name = if rare_trait == RareTrait::None {
-            format!("{}-{}", archetype.short(), id)
-        } else {
-            format!("{}-{}-{}", rare_trait.short(), archetype.short(), id)
-        };
+        let name = rename_species(rare_trait, archetype, id);
 
         if let Some(parent_id) = parent_hint {
             if let Some(parent) = self.species.iter_mut().find(|s| s.id == parent_id) {
@@ -201,10 +209,50 @@ impl SpeciesBank {
     pub fn active_count(&self) -> usize {
         self.species.iter().filter(|s| !s.extinct).count()
     }
+
+    pub fn drift_archetypes(&mut self, pressure: ArchetypePressure, age: u64) -> usize {
+        let mut drifted = 0;
+
+        for species in self.species.iter_mut().filter(|species| !species.extinct) {
+            if species.sightings < 3 {
+                continue;
+            }
+
+            let candidate = drift_candidate(
+                species.archetype,
+                species.genome,
+                species.rare_trait,
+                species.peak_size,
+                pressure,
+            );
+
+            if candidate == species.archetype {
+                continue;
+            }
+
+            let age_factor = age.saturating_sub(species.created_at_age) as f32 / 2_400.0;
+            let maturity = age_factor.clamp(0.0, 1.0);
+            let sightings = (species.sightings as f32 / 24.0).clamp(0.0, 1.0);
+            let pressure_gate = (pressure.matrix_pressure * 0.42
+                + pressure.mutation_pressure * 0.26
+                + pressure.reaper_urgency * 0.18
+                + pressure.recovery_bias * 0.14)
+                .clamp(0.0, 1.0);
+
+            let drift_score = maturity * 0.28 + sightings * 0.32 + pressure_gate * 0.40;
+
+            if drift_score > 0.54 {
+                species.archetype = candidate;
+                species.name = rename_species(species.rare_trait, species.archetype, species.id);
+                drifted += 1;
+            }
+        }
+
+        drifted
+    }
 }
 
 pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> Archetype {
-    // Reaper checked first so the predator counter can appear before Harvesters dominate.
     if genome.volatility > 1.54
         && genome.perception > 0.295
         && genome.hunger > 0.019
@@ -241,6 +289,127 @@ pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> A
         Archetype::Grazer
     } else {
         Archetype::Parasite
+    }
+}
+
+pub fn drift_candidate(
+    current: Archetype,
+    genome: Genome,
+    rare_trait: RareTrait,
+    size: usize,
+    pressure: ArchetypePressure,
+) -> Archetype {
+    if rare_trait == RareTrait::ElderCore || size > 90 {
+        return Archetype::Leviathan;
+    }
+
+    if rare_trait == RareTrait::SporeKing {
+        return Archetype::Mycelial;
+    }
+
+    if rare_trait == RareTrait::Voidborne {
+        return Archetype::Phantom;
+    }
+
+    let base = derive_archetype(genome, rare_trait, size);
+
+    if pressure.harvester_pressure > 0.62
+        && pressure.reaper_urgency > 0.52
+        && pressure.matrix_repulsion > 0.38
+        && genome.volatility > 1.42
+        && genome.perception > 0.285
+    {
+        return Archetype::Reaper;
+    }
+
+    if pressure.substrate_density > 0.13
+        && pressure.matrix_attraction > pressure.matrix_repulsion
+        && pressure.harvester_pressure < 0.55
+        && genome.perception > 0.29
+        && genome.fertility > 1.48
+        && genome.hunger < 0.017
+        && genome.metabolism < 0.022
+    {
+        return Archetype::Harvester;
+    }
+
+    if pressure.recovery_bias > 0.55
+        && pressure.matrix_attraction > 0.30
+        && genome.membrane > 0.82
+        && genome.bonding > 1.28
+    {
+        return Archetype::Architect;
+    }
+
+    if pressure.recovery_bias > 0.48
+        && pressure.substrate_density < 0.07
+        && genome.fertility > 1.35
+        && genome.bonding > 1.35
+    {
+        return Archetype::Mycelial;
+    }
+
+    if pressure.matrix_pressure > 0.64
+        && pressure.matrix_repulsion > pressure.matrix_attraction
+        && genome.volatility > 1.32
+        && genome.metabolism > 0.019
+    {
+        return Archetype::Hunter;
+    }
+
+    if pressure.matrix_pressure > 0.58 && pressure.mutation_pressure > 0.42 && genome.orbit > 0.78 {
+        return Archetype::Phantom;
+    }
+
+    if pressure.matrix_attraction > 0.42
+        && pressure.matrix_repulsion < 0.32
+        && genome.bonding > 1.55
+    {
+        return Archetype::Swarmer;
+    }
+
+    if pressure.matrix_pressure < 0.32
+        && pressure.substrate_density > 0.10
+        && genome.metabolism < 0.018
+    {
+        return Archetype::Grazer;
+    }
+
+    if current == Archetype::Reaper && pressure.reaper_urgency > 0.38 {
+        return Archetype::Reaper;
+    }
+
+    if current == Archetype::Harvester
+        && pressure.harvester_pressure < 0.42
+        && pressure.substrate_density > 0.09
+    {
+        return Archetype::Harvester;
+    }
+
+    base
+}
+
+fn stabilize_archetype(current: Archetype, derived: Archetype, sightings: u64) -> Archetype {
+    if current == derived {
+        return current;
+    }
+
+    if sightings < 6 {
+        return current;
+    }
+
+    if matches!(current, Archetype::Reaper | Archetype::Leviathan) && sightings < 12 {
+        return current;
+    }
+
+    derived
+}
+
+fn rename_species(rare_trait: RareTrait, archetype: Archetype, id: u64) -> String {
+    if rare_trait == RareTrait::None {
+        format!("{}-{}", archetype.short(), id)
+    } else {
+        format!("{}-{}-{}", rare_trait.short(), archetype.short(), id)
     }
 }
 

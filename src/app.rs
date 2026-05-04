@@ -5,7 +5,7 @@ use crate::{
     memory::MemoryBank,
     particle::{Genome, Particle, RareTrait, Tribe},
     sim::{build_rule_matrix, child_from, fused_child, mutate_rules, step_particles, RuleMatrix},
-    species::{Archetype, SpeciesBank},
+    species::{Archetype, ArchetypePressure, SpeciesBank},
 };
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -154,6 +154,7 @@ impl App {
         app.push_event("reaper ecology online");
         app.push_event("adaptive ecosystem memory online");
         app.push_event("adaptive attraction matrix online");
+        app.push_event("dynamic archetype drift online");
         app
     }
 
@@ -246,6 +247,10 @@ impl App {
             self.process_cluster_events(cluster_events);
         }
 
+        if self.age % 96 == 0 {
+            self.apply_archetype_drift();
+        }
+
         if self.age % 120 == 0 {
             self.reinforce_matrix_from_clusters();
         }
@@ -284,6 +289,65 @@ impl App {
 
         if self.age % 600 == 0 {
             self.save_all();
+        }
+    }
+
+    fn archetype_pressure(&self) -> ArchetypePressure {
+        let substrate_density = if self.substrate.total_cells() == 0 {
+            0.0
+        } else {
+            self.substrate.living_cells() as f32 / self.substrate.total_cells() as f32
+        };
+
+        let active_species = self.species_bank.active_count().max(1) as f32;
+
+        let harvesters = self
+            .species_bank
+            .species
+            .iter()
+            .filter(|species| !species.extinct && species.archetype == Archetype::Harvester)
+            .count() as f32;
+
+        let reapers = self
+            .species_bank
+            .species
+            .iter()
+            .filter(|species| !species.extinct && species.archetype == Archetype::Reaper)
+            .count() as f32;
+
+        ArchetypePressure {
+            matrix_pressure: self.matrix_pressure / 100.0,
+            matrix_attraction: self.matrix_attraction / 100.0,
+            matrix_repulsion: self.matrix_repulsion / 100.0,
+            substrate_density,
+            harvester_pressure: (harvesters / active_species).clamp(0.0, 1.0),
+            reaper_urgency: (self.memory.reaper_urgency()
+                + (harvesters - reapers).max(0.0) / active_species)
+                .clamp(0.0, 1.0),
+            recovery_bias: self.memory.substrate_recovery_bias(),
+            mutation_pressure: self.memory.mutation_pressure(),
+        }
+    }
+
+    fn apply_archetype_drift(&mut self) {
+        let pressure = self.archetype_pressure();
+
+        let species_drifted = self.species_bank.drift_archetypes(pressure, self.age);
+        let cluster_drifted = self.clusters.drift_cluster_archetypes(
+            &mut self.particles,
+            &self.species_bank,
+            pressure,
+        );
+
+        if species_drifted > 0 {
+            self.push_event(&format!("{} species drifted archetype", species_drifted));
+        }
+
+        if cluster_drifted > 0 {
+            self.push_event(&format!(
+                "{} clusters formed local archetype overrides",
+                cluster_drifted
+            ));
         }
     }
 
@@ -670,6 +734,16 @@ impl App {
         for species in &self.species_bank.species {
             if let Some(slot) = lookup.get_mut(species.id as usize) {
                 *slot = Some(species.archetype);
+            }
+        }
+
+        for cluster in &self.clusters.clusters {
+            if let (Some(species_id), Some(override_archetype)) =
+                (cluster.species_id, cluster.archetype_override)
+            {
+                if let Some(slot) = lookup.get_mut(species_id as usize) {
+                    *slot = Some(override_archetype);
+                }
             }
         }
 
