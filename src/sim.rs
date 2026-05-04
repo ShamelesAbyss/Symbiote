@@ -19,7 +19,11 @@ const BOND_RADIUS: f32 = 0.105;
 const LOW_SUBSTRATE_RATIO: f32 = 0.035;
 const HARVESTER_BODY_PRESSURE_RATIO: f32 = 0.115;
 const HARVESTER_OVERGROWTH_RATIO: f32 = 0.18;
+
 const SIGNAL_FORCE_SCALE: f32 = 0.42;
+const ROOT_AVOIDANCE_RADIUS: f32 = 0.068;
+const ROOT_FORCE_SCALE: f32 = 1.18;
+const ROOT_CHANNEL_FORCE: f32 = 0.48;
 
 #[allow(dead_code)]
 #[derive(Default, Clone, Copy, Debug)]
@@ -130,7 +134,6 @@ pub fn step_particles(
         let mut orbit_y = 0.0;
 
         let archetype = snapshot_archetypes[idx];
-
         let is_reaper = matches!(archetype, Some(Archetype::Reaper));
         let is_harvester = matches!(archetype, Some(Archetype::Harvester))
             || particle.rare_trait == RareTrait::Devourer;
@@ -145,16 +148,24 @@ pub fn step_particles(
             &mut fy,
         );
 
+        apply_root_field(
+            particle,
+            substrate,
+            archetype,
+            low_substrate,
+            harvester_overgrowth,
+            &mut fx,
+            &mut fy,
+        );
+
         for (other_idx, other) in snapshot.iter().enumerate() {
             if idx == other_idx {
                 continue;
             }
 
             let other_archetype = snapshot_archetypes[other_idx];
-
             let other_is_harvester = matches!(other_archetype, Some(Archetype::Harvester))
                 || other.rare_trait == RareTrait::Devourer;
-
             let other_is_reaper = matches!(other_archetype, Some(Archetype::Reaper));
 
             let dx = other.x - particle.x;
@@ -257,7 +268,6 @@ pub fn step_particles(
                         (3.25 + particle.genome.volatility * 1.35) * (1.0 + matrix_pressure * 0.08);
 
                     damage[other_idx] += bite;
-
                     particle.energy += bite * 2.05;
                     particle.health += bite * 0.48;
                     particle.mass += 0.0045;
@@ -392,6 +402,10 @@ pub fn step_particles(
         particle.x = (particle.x + particle.vx).clamp(-1.2, 1.2);
         particle.y = (particle.y + particle.vy).clamp(-1.2, 1.2);
 
+        if substrate.influence_at(particle.x, particle.y) == CellKind::Root {
+            nudge_from_root(particle, substrate);
+        }
+
         if friendly_density >= 4 {
             particle.health += 0.14;
             particle.energy += 0.028;
@@ -435,6 +449,7 @@ pub fn step_particles(
                 particle.health -= 0.034;
                 particle.mass -= 0.012;
                 particle.genome.fertility = (particle.genome.fertility - 0.00025).clamp(0.2, 2.4);
+
                 substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.08);
                 substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.025);
             } else {
@@ -446,6 +461,7 @@ pub fn step_particles(
                 particle.energy -= 0.026;
                 particle.health -= 0.018;
                 particle.genome.hunger = (particle.genome.hunger + 0.00008).clamp(0.005, 0.04);
+
                 substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.06);
             }
         }
@@ -456,6 +472,7 @@ pub fn step_particles(
             particle.energy -= 0.018 * starvation_relief;
             particle.health -= 0.006 * starvation_relief;
             particle.mass = (particle.mass + 0.002).clamp(0.45, 7.0);
+
             substrate.deposit_signal(particle.x, particle.y, SignalKind::Fear, 0.052);
         }
 
@@ -473,6 +490,7 @@ pub fn step_particles(
         if particle.rare_trait == RareTrait::Devourer {
             particle.energy -= if low_substrate { 0.035 } else { 0.012 };
             particle.health += if low_substrate { 0.0 } else { 0.004 };
+
             substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.06);
         }
 
@@ -604,23 +622,27 @@ fn apply_signal_field(
         Some(Archetype::Harvester) => {
             seek += signal.hunger * if low_substrate { 0.55 } else { 0.92 };
             seek += signal.growth * 0.42;
+
             avoid += signal.fear * 1.15;
             avoid += signal.danger * 0.55;
         }
         Some(Archetype::Reaper) => {
             seek += signal.hunger * if reaper_pressure_needed { 1.28 } else { 0.68 };
             seek += signal.fear * 0.25;
+
             avoid += signal.growth * 0.15;
             avoid += signal.danger * 0.18;
         }
         Some(Archetype::Grazer | Archetype::Mycelial) => {
             seek += signal.growth * 0.86;
+
             avoid += signal.danger * 0.82;
             avoid += signal.fear * 0.42;
         }
         Some(Archetype::Hunter | Archetype::Parasite) => {
             seek += signal.danger * 0.34;
             seek += signal.hunger * 0.26;
+
             avoid += signal.fear * 0.22;
         }
         Some(Archetype::Architect | Archetype::Leviathan) => {
@@ -630,10 +652,12 @@ fn apply_signal_field(
         Some(Archetype::Phantom) => {
             seek += signal.fear * 0.34;
             seek += signal.danger * 0.28;
+
             avoid += signal.growth * 0.18;
         }
         Some(Archetype::Swarmer | Archetype::Orbiter) | None => {
             seek += signal.growth * 0.32;
+
             avoid += signal.danger * 0.36;
             avoid += signal.fear * 0.24;
         }
@@ -656,6 +680,144 @@ fn apply_signal_field(
 
     *fx += curl_x;
     *fy += curl_y;
+}
+
+fn apply_root_field(
+    particle: &Particle,
+    substrate: &CellularAutomata,
+    archetype: Option<Archetype>,
+    low_substrate: bool,
+    harvester_overgrowth: bool,
+    fx: &mut f32,
+    fy: &mut f32,
+) {
+    let root_here = substrate.influence_at(particle.x, particle.y) == CellKind::Root;
+    let mut push_x = 0.0;
+    let mut push_y = 0.0;
+    let mut root_pressure = 0.0;
+    let mut clear_x = 0.0;
+    let mut clear_y = 0.0;
+    let mut clear_count = 0.0;
+
+    let probes = [
+        (-ROOT_AVOIDANCE_RADIUS, 0.0),
+        (ROOT_AVOIDANCE_RADIUS, 0.0),
+        (0.0, -ROOT_AVOIDANCE_RADIUS),
+        (0.0, ROOT_AVOIDANCE_RADIUS),
+        (-ROOT_AVOIDANCE_RADIUS * 0.72, -ROOT_AVOIDANCE_RADIUS * 0.72),
+        (ROOT_AVOIDANCE_RADIUS * 0.72, -ROOT_AVOIDANCE_RADIUS * 0.72),
+        (-ROOT_AVOIDANCE_RADIUS * 0.72, ROOT_AVOIDANCE_RADIUS * 0.72),
+        (ROOT_AVOIDANCE_RADIUS * 0.72, ROOT_AVOIDANCE_RADIUS * 0.72),
+    ];
+
+    for (dx, dy) in probes {
+        let kind = substrate.influence_at(particle.x + dx, particle.y + dy);
+
+        if kind == CellKind::Root {
+            let dist = (dx * dx + dy * dy).sqrt().max(0.001);
+            let pressure = (1.0 - dist / (ROOT_AVOIDANCE_RADIUS * 1.25)).max(0.0);
+
+            push_x -= (dx / dist) * pressure;
+            push_y -= (dy / dist) * pressure;
+            root_pressure += pressure;
+        } else if kind == CellKind::Empty || kind == CellKind::Nutrient || kind == CellKind::Life {
+            clear_x += dx;
+            clear_y += dy;
+            clear_count += 1.0;
+        }
+    }
+
+    if root_here {
+        root_pressure += 1.65;
+        push_x += (particle.x * 19.0 + particle.y * 7.0).sin() * 0.7;
+        push_y += (particle.y * 17.0 - particle.x * 5.0).cos() * 0.7;
+    }
+
+    if root_pressure <= 0.0 {
+        return;
+    }
+
+    let archetype_respect = match archetype {
+        Some(Archetype::Architect | Archetype::Leviathan) => 0.82,
+        Some(Archetype::Mycelial) => 0.74,
+        Some(Archetype::Harvester) => {
+            if low_substrate || harvester_overgrowth {
+                1.42
+            } else {
+                1.18
+            }
+        }
+        Some(Archetype::Reaper) => 1.08,
+        Some(Archetype::Hunter | Archetype::Parasite) => 1.14,
+        Some(Archetype::Phantom) => 0.68,
+        Some(Archetype::Grazer) => 1.22,
+        Some(Archetype::Swarmer | Archetype::Orbiter) | None => 1.0,
+    };
+
+    let mass_resistance = (1.0 / (1.0 + particle.mass * 0.11)).clamp(0.58, 1.0);
+    let panic = if particle.health < 28.0 || particle.energy < 22.0 {
+        1.22
+    } else {
+        1.0
+    };
+
+    let mut root_force =
+        root_pressure * ROOT_FORCE_SCALE * archetype_respect * mass_resistance * panic;
+
+    if particle.rare_trait == RareTrait::Devourer {
+        root_force *= 1.2;
+    }
+
+    *fx += push_x * root_force;
+    *fy += push_y * root_force;
+
+    if clear_count > 0.0 {
+        let channel_x = clear_x / clear_count;
+        let channel_y = clear_y / clear_count;
+        let channel_len = (channel_x * channel_x + channel_y * channel_y).sqrt();
+
+        if channel_len > 0.001 {
+            *fx += (channel_x / channel_len) * ROOT_CHANNEL_FORCE * root_pressure;
+            *fy += (channel_y / channel_len) * ROOT_CHANNEL_FORCE * root_pressure;
+        }
+    }
+}
+
+fn nudge_from_root(particle: &mut Particle, substrate: &CellularAutomata) {
+    let probes = [
+        (-0.055, 0.0),
+        (0.055, 0.0),
+        (0.0, -0.055),
+        (0.0, 0.055),
+        (-0.04, -0.04),
+        (0.04, -0.04),
+        (-0.04, 0.04),
+        (0.04, 0.04),
+    ];
+
+    let mut best = None;
+
+    for (dx, dy) in probes {
+        let kind = substrate.influence_at(particle.x + dx, particle.y + dy);
+
+        if kind != CellKind::Root {
+            let score = if kind == CellKind::Empty { 2.0 } else { 1.0 };
+            best = Some((dx, dy, score));
+            break;
+        }
+    }
+
+    if let Some((dx, dy, score)) = best {
+        particle.x = (particle.x + dx * score).clamp(-1.2, 1.2);
+        particle.y = (particle.y + dy * score).clamp(-1.2, 1.2);
+        particle.vx = (particle.vx + dx * 0.04).clamp(-0.04, 0.04);
+        particle.vy = (particle.vy + dy * 0.04).clamp(-0.04, 0.04);
+    } else {
+        particle.vx = -particle.vx * 0.55;
+        particle.vy = -particle.vy * 0.55;
+    }
+
+    particle.energy -= 0.012;
 }
 
 fn deposit_behavior_signal(
@@ -745,11 +907,30 @@ fn apply_substrate(
     let is_harvester = matches!(archetype, Some(Archetype::Harvester))
         || particle.rare_trait == RareTrait::Devourer;
 
+    if kind == CellKind::Root {
+        let penalty = if is_harvester {
+            if low_substrate || harvester_overgrowth {
+                0.052
+            } else {
+                0.031
+            }
+        } else {
+            0.014
+        };
+
+        particle.energy -= penalty;
+        particle.health -= penalty * 0.35;
+        particle.vx *= -0.42;
+        particle.vy *= -0.42;
+
+        substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.038);
+
+        return consumed;
+    }
+
     if is_harvester && kind != CellKind::Empty {
-        let protected_regeneration = matches!(
-            kind,
-            CellKind::Dead | CellKind::Nutrient | CellKind::Spore | CellKind::Root
-        );
+        let protected_regeneration =
+            matches!(kind, CellKind::Dead | CellKind::Nutrient | CellKind::Spore);
 
         if protected_regeneration {
             particle.energy -= if low_substrate { 0.028 } else { 0.014 };
@@ -834,10 +1015,7 @@ fn apply_substrate(
             particle.energy += 0.032;
             particle.mass += 0.002;
         }
-        CellKind::Root => {
-            particle.energy += 0.006;
-            particle.health += 0.004;
-        }
+        CellKind::Root => {}
         CellKind::Empty => {}
     }
 
@@ -898,6 +1076,7 @@ fn apply_environment_current(particle: &mut Particle, env: Environment) {
         }
         Environment::Storm => {
             let phase = ((particle.x * 22.0 + particle.y * 31.0).sin()) * 0.00105;
+
             particle.vx += phase;
             particle.vy -= phase;
         }

@@ -6,7 +6,7 @@ use crate::{
 };
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Gauge, List, ListItem, Paragraph, Wrap},
@@ -66,7 +66,7 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
     render_footer(f, root[3]);
 }
 
-fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
+fn render_header(f: &mut Frame<'_>, area: Rect, app: &App) {
     let status = if app.paused { "paused" } else { "alive" };
     let pulse = ["░", "▒", "▓", "█", "▓", "▒"][(app.age as usize / 4) % 6];
 
@@ -86,7 +86,7 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "dynamic archetypes adaptive matrix signal trails ",
+                "root lattice adaptive matrix signal ecology ",
                 Style::default().fg(Color::Magenta),
             ),
             Span::styled(
@@ -126,6 +126,13 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                     Color::DarkGray
                 }),
             ),
+            Span::styled(" | roots: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", app.substrate.protected_cells()),
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" | eaten: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{}", app.memory.total_cells_consumed),
@@ -154,7 +161,7 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     );
 }
 
-fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
+fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
     let width = area.width.saturating_sub(2) as usize;
     let height = area.height.saturating_sub(2) as usize;
 
@@ -317,6 +324,10 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 }
 
 fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
+    if width == 0 || height == 0 {
+        return;
+    }
+
     for y in 0..height {
         for x in 0..width {
             let kind = app.substrate.sample_screen(x, y, width, height);
@@ -325,18 +336,103 @@ fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usiz
                 continue;
             }
 
-            let color = match kind {
-                CellKind::Life => Color::DarkGray,
-                CellKind::Nutrient => Color::Green,
-                CellKind::Dead => Color::DarkGray,
-                CellKind::Mutagen => Color::Magenta,
-                CellKind::Nest => Color::Cyan,
-                CellKind::Spore => Color::DarkGray,
-                CellKind::Root => Color::Blue,
-                CellKind::Empty => Color::DarkGray,
+            let Some((glyph, color)) = substrate_visual(app, kind, x, y, width, height) else {
+                continue;
             };
 
-            cells[y][x].substrate = Some((kind.glyph(), color));
+            cells[y][x].substrate = Some((glyph, color));
+        }
+    }
+}
+
+fn substrate_visual(
+    app: &App,
+    kind: CellKind,
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+) -> Option<(char, Color)> {
+    match kind {
+        CellKind::Empty => None,
+        CellKind::Life => {
+            let shimmer = visual_hash(app.age, x, y) % 9;
+            if shimmer <= 1 {
+                Some(('∙', Color::DarkGray))
+            } else if shimmer == 2 {
+                Some(('·', Color::DarkGray))
+            } else {
+                None
+            }
+        }
+        CellKind::Nutrient => {
+            let shimmer = visual_hash(app.age / 2, x, y) % 6;
+            if shimmer == 0 {
+                Some(('+', Color::Green))
+            } else if shimmer <= 2 {
+                Some(('.', Color::Green))
+            } else {
+                None
+            }
+        }
+        CellKind::Dead => {
+            if visual_hash(app.age / 3, x, y) % 5 == 0 {
+                Some(('×', Color::DarkGray))
+            } else {
+                None
+            }
+        }
+        CellKind::Mutagen => {
+            let glyph = if visual_hash(app.age, x, y) % 2 == 0 {
+                '*'
+            } else {
+                '✶'
+            };
+            Some((glyph, Color::Magenta))
+        }
+        CellKind::Nest => Some(('◎', Color::Cyan)),
+        CellKind::Spore => {
+            let shimmer = visual_hash(app.age, x, y) % 7;
+            if shimmer <= 1 {
+                Some(('░', Color::DarkGray))
+            } else {
+                None
+            }
+        }
+        CellKind::Root => Some((root_screen_glyph(app, x, y, width, height), Color::Blue)),
+    }
+}
+
+fn root_screen_glyph(app: &App, x: usize, y: usize, width: usize, height: usize) -> char {
+    let up = y > 0 && app.substrate.sample_screen(x, y - 1, width, height) == CellKind::Root;
+    let down =
+        y + 1 < height && app.substrate.sample_screen(x, y + 1, width, height) == CellKind::Root;
+    let left = x > 0 && app.substrate.sample_screen(x - 1, y, width, height) == CellKind::Root;
+    let right =
+        x + 1 < width && app.substrate.sample_screen(x + 1, y, width, height) == CellKind::Root;
+
+    match (up, down, left, right) {
+        (true, true, true, true) => '╋',
+        (true, true, true, false) => '┫',
+        (true, true, false, true) => '┣',
+        (true, false, true, true) => '┻',
+        (false, true, true, true) => '┳',
+        (true, true, false, false) => '┃',
+        (false, false, true, true) => '━',
+        (false, true, false, true) => '┏',
+        (false, true, true, false) => '┓',
+        (true, false, false, true) => '┗',
+        (true, false, true, false) => '┛',
+        (true, false, false, false) => '╹',
+        (false, true, false, false) => '╻',
+        (false, false, true, false) => '╸',
+        (false, false, false, true) => '╺',
+        _ => {
+            if visual_hash(app.age / 8, x, y) % 3 == 0 {
+                '╋'
+            } else {
+                '•'
+            }
         }
     }
 }
@@ -351,6 +447,10 @@ fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
             let signal = app.substrate.sample_signal_screen(x, y, width, height);
 
             if let Some((kind, value)) = signal.strongest() {
+                if value < 0.18 {
+                    continue;
+                }
+
                 let color = signal_color(kind, value);
                 cells[y][x].signal = Some((kind.glyph(), color));
             }
@@ -386,7 +486,6 @@ fn draw_cluster_membranes(cells: &mut [Vec<Cell>], app: &App, width: usize, heig
 
         let cx = (((cluster.x + 1.2) / 2.4) * width as f32) as i32;
         let cy = (((cluster.y + 1.2) / 2.4) * height as f32) as i32;
-
         let pulse = ((app.age as f32 / 12.0).sin() * 1.2) as i32;
         let radius = ((cluster.radius * width as f32 * 0.9).max(2.0)).min(9.0) as i32 + pulse;
 
@@ -410,7 +509,6 @@ fn draw_cluster_motion_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, 
 
         let cx = (((cluster.x + 1.2) / 2.4) * width as f32) as i32;
         let cy = (((cluster.y + 1.2) / 2.4) * height as f32) as i32;
-
         let tx = cx - (cluster.vx * 900.0) as i32;
         let ty = cy - (cluster.vy * 900.0) as i32;
 
@@ -425,7 +523,7 @@ fn draw_cluster_motion_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, 
     }
 }
 
-fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
+fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
     let tribes = [
         Tribe::Blood,
         Tribe::Moss,
@@ -529,11 +627,11 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     ]));
 
     lines.push(Line::from(vec![
-        Span::styled("Signals: ", Style::default().fg(Color::DarkGray)),
-        Span::styled("∿ hunger ", Style::default().fg(Color::Yellow)),
-        Span::styled("! fear ", Style::default().fg(Color::Red)),
-        Span::styled("∙ growth ", Style::default().fg(Color::Green)),
-        Span::styled("× danger ", Style::default().fg(Color::Magenta)),
+        Span::styled("Legend: ", Style::default().fg(Color::DarkGray)),
+        Span::styled("╋ roots ", Style::default().fg(Color::Blue)),
+        Span::styled("∙ life ", Style::default().fg(Color::DarkGray)),
+        Span::styled("+ food ", Style::default().fg(Color::Green)),
+        Span::styled("* mutagen ", Style::default().fg(Color::Magenta)),
         Span::styled("◆ drift", Style::default().fg(Color::Magenta)),
     ]));
 
@@ -549,7 +647,7 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     );
 }
 
-fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
+fn render_clusters(f: &mut Frame<'_>, area: Rect, app: &App) {
     let drifting = app
         .clusters
         .clusters
@@ -584,10 +682,12 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
             .archetype
             .map(|value| value.short())
             .unwrap_or("UNK");
+
         let effective = cluster
             .effective_archetype()
             .map(|value| value.short())
             .unwrap_or("UNK");
+
         let overridden = cluster.archetype_override.is_some();
 
         let archetype_color = if effective == "RPR" {
@@ -602,7 +702,7 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
         let drift_marker = if overridden {
             if cluster.drift_heat > 80.0 {
-                "🔥"
+                "✦"
             } else if cluster.drift_heat > 60.0 {
                 "⚡"
             } else {
@@ -664,7 +764,7 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     );
 }
 
-fn render_species(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
+fn render_species(f: &mut Frame<'_>, area: Rect, app: &App) {
     let extinct = app
         .species_bank
         .species
@@ -751,7 +851,7 @@ fn render_species(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     );
 }
 
-fn render_events(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
+fn render_events(f: &mut Frame<'_>, area: Rect, app: &App) {
     let items = app
         .events
         .iter()
@@ -774,7 +874,7 @@ fn render_events(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     );
 }
 
-fn render_metrics(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
+fn render_metrics(f: &mut Frame<'_>, area: Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -805,7 +905,7 @@ fn render_metrics(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     );
 }
 
-fn render_footer(f: &mut Frame<'_>, area: ratatui::layout::Rect) {
+fn render_footer(f: &mut Frame<'_>, area: Rect) {
     let line = Line::from(vec![
         Span::styled(
             " CONTROLS ",
@@ -958,4 +1058,12 @@ fn background_glyph(env: Environment) -> &'static str {
         Environment::Storm => "∴",
         Environment::Drift => "˙",
     }
+}
+
+fn visual_hash(age: u64, x: usize, y: usize) -> usize {
+    let mut value = age as usize;
+    value ^= x.wrapping_mul(374_761_393);
+    value ^= y.wrapping_mul(668_265_263);
+    value = (value ^ (value >> 13)).wrapping_mul(1_274_126_177);
+    value ^ (value >> 16)
 }
