@@ -143,7 +143,7 @@ impl App {
 
         app.reset_particles();
         app.push_event("native reproduction engine online");
-        app.push_event("cellular automata substrate online");
+        app.push_event("balanced cellular substrate online");
         app
     }
 
@@ -163,11 +163,11 @@ impl App {
 
         self.ecology.tick(self.seed, self.age, self.environment);
 
-        if self.age % 2 == 0 {
+        if self.age % 8 == 0 {
             self.deposit_to_substrate();
         }
 
-        if self.age % 3 == 0 {
+        if self.age % 12 == 0 {
             self.substrate.tick();
         }
 
@@ -219,7 +219,7 @@ impl App {
     fn deposit_to_substrate(&mut self) {
         let lookup = self.build_archetype_lookup();
 
-        for particle in self.particles.iter().step_by(3) {
+        for particle in self.particles.iter().step_by(9) {
             let archetype = particle
                 .species_id
                 .and_then(|id| lookup.get(id as usize).copied().flatten());

@@ -71,7 +71,7 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let lines = vec![
         Line::from(vec![
             Span::styled(" ◉ SYMBIOTE ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            Span::styled("cellular artificial ecosystem ", Style::default().fg(Color::Magenta)),
+            Span::styled("balanced cellular ecosystem ", Style::default().fg(Color::Magenta)),
             Span::styled(pulse.repeat(12), Style::default().fg(env_color(app.environment))),
         ]),
         Line::from(vec![
@@ -137,7 +137,7 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
         for cell in row {
             if cell.trail {
-                spans.push(Span::styled("·", Style::default().fg(Color::Cyan)));
+                spans.push(Span::styled("·", Style::default().fg(Color::DarkGray)));
             } else if cell.membrane {
                 spans.push(Span::styled("○", Style::default().fg(Color::Gray)));
             } else if cell.count == 0 && cell.zone.is_some() {
@@ -200,12 +200,12 @@ fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usiz
             }
 
             let color = match kind {
-                CellKind::Life => Color::Green,
-                CellKind::Nutrient => Color::Yellow,
+                CellKind::Life => Color::DarkGray,
+                CellKind::Nutrient => Color::Green,
                 CellKind::Dead => Color::DarkGray,
                 CellKind::Mutagen => Color::Magenta,
                 CellKind::Nest => Color::Cyan,
-                CellKind::Spore => Color::LightGreen,
+                CellKind::Spore => Color::DarkGray,
                 CellKind::Empty => Color::DarkGray,
             };
 

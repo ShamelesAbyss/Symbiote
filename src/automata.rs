@@ -19,7 +19,7 @@ impl CellKind {
     pub fn glyph(self) -> char {
         match self {
             Self::Empty => ' ',
-            Self::Life => '▒',
+            Self::Life => '·',
             Self::Nutrient => '+',
             Self::Dead => '×',
             Self::Mutagen => '*',
@@ -93,71 +93,92 @@ impl CellularAutomata {
 
                 match cell.kind {
                     CellKind::Empty => {
-                        if neighbors == 3 || (neighbors == 2 && nutrient_neighbors > 0) {
+                        if neighbors == 3 && nutrient_neighbors > 0 {
                             next.kind = CellKind::Life;
-                            next.energy = 36.0 + nutrient_neighbors as f32 * 8.0;
+                            next.energy = 28.0 + nutrient_neighbors as f32 * 5.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
                         }
                     }
                     CellKind::Life => {
-                        if neighbors < 2 || neighbors > 5 {
+                        if neighbors < 2 || neighbors > 3 {
                             next.kind = CellKind::Dead;
-                            next.energy = 22.0;
-                        } else if neighbors == 3 && nutrient_neighbors > 1 {
+                            next.energy = 12.0;
+                        } else if neighbors == 3 && nutrient_neighbors > 2 {
                             next.kind = CellKind::Spore;
-                            next.energy = (cell.energy + 5.0).min(100.0);
+                            next.energy = (cell.energy + 3.0).min(80.0);
                         } else {
                             next.energy =
-                                (cell.energy + nutrient_neighbors as f32 * 1.2 - 0.9).clamp(0.0, 100.0);
-                        }
-                    }
-                    CellKind::Spore => {
-                        if neighbors < 1 || neighbors > 6 {
-                            next.kind = CellKind::Dead;
-                            next.energy = 20.0;
-                        } else if neighbors == 2 || neighbors == 3 {
-                            next.energy = (cell.energy + 1.6).min(100.0);
-                        } else {
-                            next.energy = (cell.energy - 1.1).max(0.0);
-                        }
-                    }
-                    CellKind::Nutrient => {
-                        if neighbors >= 3 {
-                            next.kind = CellKind::Life;
-                            next.energy = 54.0;
-                            next.age = 0;
-                        } else {
-                            next.energy = (cell.energy - 0.05).max(0.0);
-                        }
-                    }
-                    CellKind::Dead => {
-                        if nutrient_neighbors >= 2 && neighbors >= 2 {
-                            next.kind = CellKind::Nutrient;
-                            next.energy = 35.0;
-                        } else {
-                            next.energy = (cell.energy - 0.22).max(0.0);
+                                (cell.energy + nutrient_neighbors as f32 * 0.45 - 1.25).clamp(0.0, 80.0);
 
-                            if next.energy <= 0.0 || dead_neighbors > 5 {
+                            if next.energy <= 0.0 {
                                 next.kind = CellKind::Empty;
                                 next.age = 0;
                             }
                         }
                     }
-                    CellKind::Mutagen => {
-                        if neighbors >= 2 && neighbors <= 4 {
-                            next.kind = CellKind::Spore;
-                            next.energy = 58.0;
+                    CellKind::Spore => {
+                        if neighbors < 2 || neighbors > 4 {
+                            next.kind = CellKind::Dead;
+                            next.energy = 14.0;
                         } else {
-                            next.energy = (cell.energy - 0.08).max(0.0);
+                            next.energy = (cell.energy - 1.35).max(0.0);
+
+                            if next.energy <= 0.0 {
+                                next.kind = CellKind::Empty;
+                                next.age = 0;
+                            }
+                        }
+                    }
+                    CellKind::Nutrient => {
+                        if neighbors == 3 && cell.energy > 40.0 {
+                            next.kind = CellKind::Life;
+                            next.energy = 42.0;
+                            next.age = 0;
+                        } else {
+                            next.energy = (cell.energy - 0.18).max(0.0);
+
+                            if next.energy <= 0.0 {
+                                next.kind = CellKind::Empty;
+                                next.age = 0;
+                            }
+                        }
+                    }
+                    CellKind::Dead => {
+                        next.energy = (cell.energy - 0.45).max(0.0);
+
+                        if nutrient_neighbors >= 3 && neighbors == 2 {
+                            next.kind = CellKind::Nutrient;
+                            next.energy = 28.0;
+                        } else if next.energy <= 0.0 || dead_neighbors > 4 {
+                            next.kind = CellKind::Empty;
+                            next.age = 0;
+                        }
+                    }
+                    CellKind::Mutagen => {
+                        if neighbors == 3 {
+                            next.kind = CellKind::Spore;
+                            next.energy = 42.0;
+                        } else {
+                            next.energy = (cell.energy - 0.22).max(0.0);
+
+                            if next.energy <= 0.0 {
+                                next.kind = CellKind::Empty;
+                                next.age = 0;
+                            }
                         }
                     }
                     CellKind::Nest => {
-                        if neighbors > 6 {
+                        if neighbors > 4 {
                             next.kind = CellKind::Dead;
-                            next.energy = 32.0;
+                            next.energy = 18.0;
                         } else {
-                            next.energy = (cell.energy + 0.35).min(100.0);
+                            next.energy = (cell.energy - 0.08).max(0.0);
+
+                            if next.energy <= 0.0 {
+                                next.kind = CellKind::Empty;
+                                next.age = 0;
+                            }
                         }
                     }
                 }
@@ -179,7 +200,19 @@ impl CellularAutomata {
         let idx = self.idx(x, y);
         let cell = &mut self.cells[idx];
 
-        let desired = if particle.rare_trait != RareTrait::None {
+        let deposit_allowed = match cell.kind {
+            CellKind::Empty => true,
+            CellKind::Dead => particle.energy > 95.0,
+            CellKind::Nutrient => matches!(archetype, Some(Archetype::Grazer | Archetype::Mycelial)),
+            CellKind::Mutagen => particle.rare_trait != RareTrait::None,
+            CellKind::Life | CellKind::Spore | CellKind::Nest => particle.energy > 125.0,
+        };
+
+        if !deposit_allowed {
+            return;
+        }
+
+        let desired = if particle.rare_trait != RareTrait::None && particle.energy > 110.0 {
             CellKind::Mutagen
         } else {
             match archetype {
@@ -192,11 +225,9 @@ impl CellularAutomata {
             }
         };
 
-        if cell.kind == CellKind::Empty || particle.energy > 80.0 || particle.rare_trait != RareTrait::None {
-            cell.kind = desired;
-            cell.energy = (cell.energy + particle.energy * 0.18).clamp(0.0, 100.0);
-            cell.tribe_hint = particle.tribe.index();
-        }
+        cell.kind = desired;
+        cell.energy = (cell.energy + particle.energy * 0.055).clamp(0.0, 80.0);
+        cell.tribe_hint = particle.tribe.index();
     }
 
     pub fn influence_at(&self, x: f32, y: f32) -> CellKind {
@@ -225,27 +256,27 @@ impl CellularAutomata {
     fn seed_initial_life(&mut self) {
         for y in 0..self.height {
             for x in 0..self.width {
-                let n = hash(self.seed, x, y) % 1000;
+                let n = hash(self.seed, x, y) % 10_000;
                 let idx = self.idx(x, y);
 
-                self.cells[idx] = if n < 28 {
+                self.cells[idx] = if n < 70 {
                     Cell {
                         kind: CellKind::Life,
-                        energy: 42.0,
+                        energy: 34.0,
                         age: 0,
                         tribe_hint: n % 6,
                     }
-                } else if n < 38 {
+                } else if n < 95 {
                     Cell {
                         kind: CellKind::Nutrient,
-                        energy: 64.0,
+                        energy: 48.0,
                         age: 0,
                         tribe_hint: n % 6,
                     }
-                } else if n < 42 {
+                } else if n < 102 {
                     Cell {
                         kind: CellKind::Mutagen,
-                        energy: 70.0,
+                        energy: 55.0,
                         age: 0,
                         tribe_hint: n % 6,
                     }
