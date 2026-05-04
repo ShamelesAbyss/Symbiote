@@ -101,6 +101,10 @@ pub fn step_particles(
     let reaper_pressure_needed =
         harvester_ratio > HARVESTER_BODY_PRESSURE_RATIO || harvester_particles >= 15;
 
+    let matrix_pressure = matrix_pressure(rules);
+    let matrix_attraction = matrix_attraction(rules);
+    let matrix_repulsion = matrix_repulsion(rules);
+
     let mut report = StepReport {
         cells_consumed: 0,
         harvesters_consumed: 0,
@@ -128,8 +132,8 @@ pub fn step_particles(
         let archetype = snapshot_archetypes[idx];
 
         let is_reaper = matches!(archetype, Some(Archetype::Reaper));
-        let is_harvester =
-            matches!(archetype, Some(Archetype::Harvester)) || particle.rare_trait == RareTrait::Devourer;
+        let is_harvester = matches!(archetype, Some(Archetype::Harvester))
+            || particle.rare_trait == RareTrait::Devourer;
 
         apply_signal_field(
             particle,
@@ -148,9 +152,8 @@ pub fn step_particles(
 
             let other_archetype = snapshot_archetypes[other_idx];
 
-            let other_is_harvester =
-                matches!(other_archetype, Some(Archetype::Harvester))
-                    || other.rare_trait == RareTrait::Devourer;
+            let other_is_harvester = matches!(other_archetype, Some(Archetype::Harvester))
+                || other.rare_trait == RareTrait::Devourer;
 
             let other_is_reaper = matches!(other_archetype, Some(Archetype::Reaper));
 
@@ -165,6 +168,14 @@ pub fn step_particles(
             let d = d2.sqrt();
             let attraction = rules[particle.tribe.index()][other.tribe.index()];
             let predator_pressure = predator_factor(particle.tribe, other.tribe, archetype);
+            let pair_pressure = matrix_pair_pressure(
+                attraction,
+                particle.tribe,
+                other.tribe,
+                matrix_pressure,
+                matrix_attraction,
+                matrix_repulsion,
+            );
 
             if d < BOND_RADIUS {
                 local_density += 1;
@@ -187,7 +198,15 @@ pub fn step_particles(
                     _ => 1.0,
                 };
 
-                let bond = (1.0 - d / BOND_RADIUS) * particle.genome.bonding * bond_mult;
+                let matrix_bond = if attraction > 0.0 {
+                    1.0 + attraction.abs() * matrix_attraction * 0.22
+                } else {
+                    1.0 - attraction.abs() * matrix_repulsion * 0.12
+                }
+                .clamp(0.72, 1.42);
+
+                let bond =
+                    (1.0 - d / BOND_RADIUS) * particle.genome.bonding * bond_mult * matrix_bond;
 
                 fx += dx * bond * 0.62;
                 fy += dy * bond * 0.62;
@@ -200,7 +219,12 @@ pub fn step_particles(
 
             if matches!(
                 archetype,
-                Some(Archetype::Grazer | Archetype::Hunter | Archetype::Harvester | Archetype::Reaper)
+                Some(
+                    Archetype::Grazer
+                        | Archetype::Hunter
+                        | Archetype::Harvester
+                        | Archetype::Reaper
+                )
             ) {
                 perception *= 1.18;
             }
@@ -213,19 +237,24 @@ pub fn step_particles(
                 perception *= 0.86;
             }
 
+            perception *= matrix_perception_factor(attraction, matrix_pressure, archetype);
+
             if d > perception {
                 continue;
             }
 
             if is_reaper && other_is_harvester {
                 let pressure_boost = if reaper_pressure_needed { 1.35 } else { 1.0 };
-                let chase = (1.0 - d / perception).max(0.0) * 3.1 * pressure_boost;
+                let matrix_hunt_boost = 1.0 + matrix_repulsion * 0.18 + matrix_pressure * 0.12;
+                let chase =
+                    (1.0 - d / perception).max(0.0) * 3.1 * pressure_boost * matrix_hunt_boost;
 
                 fx += (dx / d) * chase;
                 fy += (dy / d) * chase;
 
                 if d < 0.052 {
-                    let bite = 3.25 + particle.genome.volatility * 1.35;
+                    let bite =
+                        (3.25 + particle.genome.volatility * 1.35) * (1.0 + matrix_pressure * 0.08);
 
                     damage[other_idx] += bite;
 
@@ -245,7 +274,7 @@ pub fn step_particles(
             }
 
             if is_harvester && other_is_reaper {
-                let fear = (1.0 - d / perception).max(0.0) * 2.55;
+                let fear = (1.0 - d / perception).max(0.0) * 2.55 * (1.0 + matrix_repulsion * 0.22);
 
                 fx -= (dx / d) * fear;
                 fy -= (dy / d) * fear;
@@ -259,14 +288,14 @@ pub fn step_particles(
             let mut force = if d < MIN_DISTANCE {
                 -1.7
             } else {
-                attraction * predator_pressure * (1.0 - d / perception)
+                attraction * predator_pressure * pair_pressure * (1.0 - d / perception)
             };
 
             force *= particle.genome.volatility;
             force *= env.force_mult();
 
             if matches!(archetype, Some(Archetype::Hunter)) {
-                force *= 1.18;
+                force *= 1.18 + matrix_repulsion * 0.10;
             }
 
             if matches!(archetype, Some(Archetype::Reaper)) && !other_is_harvester {
@@ -289,7 +318,10 @@ pub fn step_particles(
                 substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.035);
             }
 
-            if matches!(archetype, Some(Archetype::Parasite)) && d < BOND_RADIUS && other.mass > particle.mass {
+            if matches!(archetype, Some(Archetype::Parasite))
+                && d < BOND_RADIUS
+                && other.mass > particle.mass
+            {
                 particle.energy += 0.012;
                 substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.025);
             }
@@ -299,8 +331,11 @@ pub fn step_particles(
             vx_avg /= local_density as f32;
             vy_avg /= local_density as f32;
 
-            particle.vx += (vx_avg - particle.vx) * 0.22;
-            particle.vy += (vy_avg - particle.vy) * 0.22;
+            let matrix_alignment =
+                (1.0 + matrix_attraction * 0.16 - matrix_repulsion * 0.08).clamp(0.82, 1.24);
+
+            particle.vx += (vx_avg - particle.vx) * 0.22 * matrix_alignment;
+            particle.vy += (vy_avg - particle.vy) * 0.22 * matrix_alignment;
 
             let orbit_boost = if matches!(archetype, Some(Archetype::Orbiter)) {
                 1.75
@@ -463,6 +498,94 @@ pub fn step_particles(
     report
 }
 
+fn matrix_pressure(rules: &RuleMatrix) -> f32 {
+    let mut total = 0.0;
+
+    for row in rules {
+        for value in row {
+            total += value.abs();
+        }
+    }
+
+    (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0, 1.0)
+}
+
+fn matrix_attraction(rules: &RuleMatrix) -> f32 {
+    let mut total = 0.0;
+
+    for row in rules {
+        for value in row {
+            if *value > 0.0 {
+                total += *value;
+            }
+        }
+    }
+
+    (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0, 1.0)
+}
+
+fn matrix_repulsion(rules: &RuleMatrix) -> f32 {
+    let mut total = 0.0;
+
+    for row in rules {
+        for value in row {
+            if *value < 0.0 {
+                total += value.abs();
+            }
+        }
+    }
+
+    (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0, 1.0)
+}
+
+fn matrix_pair_pressure(
+    attraction: f32,
+    a: Tribe,
+    b: Tribe,
+    pressure: f32,
+    attraction_total: f32,
+    repulsion_total: f32,
+) -> f32 {
+    let same_tribe = a.index() == b.index();
+    let predator_lane = (a.index() + 1) % TRIBE_COUNT == b.index();
+
+    let base = if attraction >= 0.0 {
+        1.0 + attraction.abs() * attraction_total * 0.34
+    } else {
+        1.0 + attraction.abs() * repulsion_total * 0.42
+    };
+
+    let identity = if same_tribe {
+        1.0 + pressure * 0.12
+    } else if predator_lane {
+        1.0 + repulsion_total * 0.18
+    } else {
+        1.0
+    };
+
+    (base * identity).clamp(0.72, 1.58)
+}
+
+fn matrix_perception_factor(attraction: f32, pressure: f32, archetype: Option<Archetype>) -> f32 {
+    let base = if attraction.abs() > 0.62 {
+        1.0 + pressure * 0.10
+    } else if attraction.abs() < 0.16 {
+        1.0 - pressure * 0.05
+    } else {
+        1.0
+    };
+
+    let archetype_mult = match archetype {
+        Some(Archetype::Hunter | Archetype::Reaper | Archetype::Parasite) => 1.0 + pressure * 0.05,
+        Some(Archetype::Architect | Archetype::Leviathan | Archetype::Mycelial) => {
+            1.0 - pressure * 0.025
+        }
+        _ => 1.0,
+    };
+
+    (base * archetype_mult).clamp(0.84, 1.18)
+}
+
 fn apply_signal_field(
     particle: &Particle,
     substrate: &CellularAutomata,
@@ -549,7 +672,11 @@ fn deposit_behavior_signal(
                 particle.x,
                 particle.y,
                 SignalKind::Hunger,
-                if low_substrate || harvester_overgrowth { 0.045 } else { 0.022 },
+                if low_substrate || harvester_overgrowth {
+                    0.045
+                } else {
+                    0.022
+                },
             );
         }
         Some(Archetype::Reaper) => {
@@ -615,8 +742,8 @@ fn apply_substrate(
     let kind = substrate.influence_at(particle.x, particle.y);
     let mut consumed = 0usize;
 
-    let is_harvester =
-        matches!(archetype, Some(Archetype::Harvester)) || particle.rare_trait == RareTrait::Devourer;
+    let is_harvester = matches!(archetype, Some(Archetype::Harvester))
+        || particle.rare_trait == RareTrait::Devourer;
 
     if is_harvester && kind != CellKind::Empty {
         let protected_regeneration = matches!(
@@ -636,7 +763,11 @@ fn apply_substrate(
         }
 
         let power = if particle.rare_trait == RareTrait::Devourer {
-            if low_substrate { 42.0 } else { 62.0 }
+            if low_substrate {
+                42.0
+            } else {
+                62.0
+            }
         } else if low_substrate {
             28.0
         } else {
@@ -649,7 +780,11 @@ fn apply_substrate(
             let gain = eaten.food_value();
 
             let gain_mult = if particle.rare_trait == RareTrait::Devourer {
-                if low_substrate { 0.82 } else { 1.08 }
+                if low_substrate {
+                    0.82
+                } else {
+                    1.08
+                }
             } else if low_substrate {
                 0.54
             } else {
@@ -739,8 +874,7 @@ fn apply_ecology(particle: &mut Particle, ecology: &Ecology) {
             ZoneKind::Mutagen => {
                 particle.genome.volatility =
                     (particle.genome.volatility + 0.00045 * effect).clamp(0.36, 1.95);
-                particle.genome.orbit =
-                    (particle.genome.orbit + 0.0003 * effect).clamp(0.0, 1.55);
+                particle.genome.orbit = (particle.genome.orbit + 0.0003 * effect).clamp(0.0, 1.55);
             }
             ZoneKind::Nest => {
                 particle.energy += 0.04 * effect;

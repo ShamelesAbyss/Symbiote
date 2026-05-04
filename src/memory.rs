@@ -91,14 +91,12 @@ impl MemoryBank {
     }
 
     pub fn harvester_resistance(&self) -> f32 {
-        let harvester_pressure =
-            self.peak_harvesters as f32 / self.peak_species.max(1) as f32;
+        let harvester_pressure = self.peak_harvesters as f32 / self.peak_species.max(1) as f32;
 
         let consumption_pressure =
             self.total_cells_consumed as f32 / self.total_reproductions.max(1) as f32;
 
-        (harvester_pressure * 0.72 + (consumption_pressure / 40.0) * 0.28)
-            .clamp(0.0, 1.0)
+        (harvester_pressure * 0.72 + (consumption_pressure / 40.0) * 0.28).clamp(0.0, 1.0)
     }
 
     pub fn reaper_urgency(&self) -> f32 {
@@ -119,7 +117,8 @@ impl MemoryBank {
         let population_peak = self.peak_population.max(1) as f32;
         let living_peak = self.peak_living_cells as f32;
 
-        let low_cell_history = (1.0 - (living_peak / population_peak).clamp(0.0, 1.0)).clamp(0.0, 1.0);
+        let low_cell_history =
+            (1.0 - (living_peak / population_peak).clamp(0.0, 1.0)).clamp(0.0, 1.0);
         let consumption = (self.total_cells_consumed as f32 / 1_200.0).clamp(0.0, 1.0);
 
         (low_cell_history * 0.55 + consumption * 0.45).clamp(0.0, 1.0)
@@ -129,8 +128,7 @@ impl MemoryBank {
         let extinction_pressure =
             self.total_extinctions as f32 / self.total_species_created.max(1) as f32;
 
-        let death_pressure =
-            self.total_deaths as f32 / self.total_births.max(1) as f32;
+        let death_pressure = self.total_deaths as f32 / self.total_births.max(1) as f32;
 
         (extinction_pressure * 0.68 + death_pressure.min(3.0) / 3.0 * 0.32).clamp(0.0, 1.0)
     }

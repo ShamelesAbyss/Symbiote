@@ -182,7 +182,10 @@ impl CellularAutomata {
         let density = living as f32 / total as f32;
         let recovery_mode = living < 150;
         let bloom_mode = living < 55;
-        let root_count = snapshot.iter().filter(|cell| cell.kind == CellKind::Root).count();
+        let root_count = snapshot
+            .iter()
+            .filter(|cell| cell.kind == CellKind::Root)
+            .count();
 
         for y in 0..self.height {
             for x in 0..self.width {
@@ -400,7 +403,9 @@ impl CellularAutomata {
         let deposit_allowed = match cell.kind {
             CellKind::Empty => true,
             CellKind::Dead => particle.energy > 80.0,
-            CellKind::Nutrient => matches!(archetype, Some(Archetype::Grazer | Archetype::Mycelial)),
+            CellKind::Nutrient => {
+                matches!(archetype, Some(Archetype::Grazer | Archetype::Mycelial))
+            }
             CellKind::Mutagen => particle.rare_trait != RareTrait::None,
             CellKind::Life | CellKind::Spore | CellKind::Nest => particle.energy > 125.0,
             CellKind::Root => false,
@@ -436,7 +441,12 @@ impl CellularAutomata {
             Some(Archetype::Reaper) => {
                 cell.signal.fear = (cell.signal.fear + 0.18).clamp(0.0, 1.0);
             }
-            Some(Archetype::Grazer | Archetype::Mycelial | Archetype::Architect | Archetype::Leviathan) => {
+            Some(
+                Archetype::Grazer
+                | Archetype::Mycelial
+                | Archetype::Architect
+                | Archetype::Leviathan,
+            ) => {
                 cell.signal.growth = (cell.signal.growth + 0.12).clamp(0.0, 1.0);
             }
             Some(Archetype::Hunter | Archetype::Parasite) => {
@@ -484,7 +494,9 @@ impl CellularAutomata {
         cell.signal.hunger = (cell.signal.hunger + 0.22).clamp(0.0, 1.0);
         cell.signal.danger = (cell.signal.danger + 0.06).clamp(0.0, 1.0);
 
-        if cell.energy <= 0.0 || matches!(eaten, CellKind::Life | CellKind::Nest | CellKind::Mutagen) {
+        if cell.energy <= 0.0
+            || matches!(eaten, CellKind::Life | CellKind::Nest | CellKind::Mutagen)
+        {
             if compost {
                 cell.kind = match eaten {
                     CellKind::Life | CellKind::Nest => CellKind::Dead,
@@ -531,7 +543,13 @@ impl CellularAutomata {
         }
     }
 
-    pub fn sample_screen(&self, sx: usize, sy: usize, screen_w: usize, screen_h: usize) -> CellKind {
+    pub fn sample_screen(
+        &self,
+        sx: usize,
+        sy: usize,
+        screen_w: usize,
+        screen_h: usize,
+    ) -> CellKind {
         if screen_w == 0 || screen_h == 0 {
             return CellKind::Empty;
         }
@@ -542,7 +560,13 @@ impl CellularAutomata {
         self.cells[self.idx(x, y)].kind
     }
 
-    pub fn sample_signal_screen(&self, sx: usize, sy: usize, screen_w: usize, screen_h: usize) -> Signal {
+    pub fn sample_signal_screen(
+        &self,
+        sx: usize,
+        sy: usize,
+        screen_w: usize,
+        screen_h: usize,
+    ) -> Signal {
         if screen_w == 0 || screen_h == 0 {
             return Signal::default();
         }
@@ -554,11 +578,17 @@ impl CellularAutomata {
     }
 
     pub fn living_cells(&self) -> usize {
-        self.cells.iter().filter(|cell| cell.kind.is_alive()).count()
+        self.cells
+            .iter()
+            .filter(|cell| cell.kind.is_alive())
+            .count()
     }
 
     pub fn protected_cells(&self) -> usize {
-        self.cells.iter().filter(|cell| cell.kind.is_protected()).count()
+        self.cells
+            .iter()
+            .filter(|cell| cell.kind.is_protected())
+            .count()
     }
 
     pub fn total_cells(&self) -> usize {

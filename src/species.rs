@@ -136,11 +136,8 @@ impl SpeciesBank {
                 species.rare_trait = rare_trait;
             }
 
-            species.archetype = derive_archetype(
-                species.genome,
-                species.rare_trait,
-                species.peak_size,
-            );
+            species.archetype =
+                derive_archetype(species.genome, species.rare_trait, species.peak_size);
 
             return species.id;
         }

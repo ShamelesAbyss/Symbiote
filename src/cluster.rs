@@ -35,7 +35,11 @@ impl Cluster {
         }
 
         if self.vx.abs() > self.vy.abs() {
-            if self.vx > 0.0 { '→' } else { '←' }
+            if self.vx > 0.0 {
+                '→'
+            } else {
+                '←'
+            }
         } else if self.vy > 0.0 {
             '↓'
         } else {
@@ -100,8 +104,10 @@ impl ClusterTracker {
                 current.species_id = old.species_id;
                 current.archetype = old.archetype;
                 current.age = old.age + 1;
-                current.stability = (old.stability * 0.9 + current.stability * 0.1).clamp(0.0, 100.0);
-                current.membrane = (old.membrane * 0.94 + current.membrane * 0.06).clamp(0.0, 100.0);
+                current.stability =
+                    (old.stability * 0.9 + current.stability * 0.1).clamp(0.0, 100.0);
+                current.membrane =
+                    (old.membrane * 0.94 + current.membrane * 0.06).clamp(0.0, 100.0);
                 current.last_seen = age;
 
                 if current.rare_trait == RareTrait::None && old.rare_trait != RareTrait::None {
@@ -128,7 +134,10 @@ impl ClusterTracker {
                 parent_species,
             );
 
-            let species = species_bank.species.iter().find(|species| species.id == species_id);
+            let species = species_bank
+                .species
+                .iter()
+                .find(|species| species.id == species_id);
             cluster.species_id = Some(species_id);
             cluster.archetype = species.map(|species| species.archetype);
 
@@ -200,7 +209,8 @@ fn detect_groups(particles: &[Particle]) -> Vec<Vec<usize>> {
                 let dx = particles[idx].x - particles[j].x;
                 let dy = particles[idx].y - particles[j].y;
                 let dist = (dx * dx + dy * dy).sqrt();
-                let link = 0.082 + particles[idx].genome.bonding * 0.019 + particles[idx].mass * 0.004;
+                let link =
+                    0.082 + particles[idx].genome.bonding * 0.019 + particles[idx].mass * 0.004;
 
                 if dist < link {
                     visited[j] = true;

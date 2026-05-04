@@ -51,9 +51,9 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
     let side = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(34),
-            Constraint::Percentage(23),
-            Constraint::Percentage(19),
+            Constraint::Percentage(36),
+            Constraint::Percentage(22),
+            Constraint::Percentage(18),
             Constraint::Percentage(24),
         ])
         .split(body[1]);
@@ -74,21 +74,32 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         Line::from(vec![
             Span::styled(
                 " ◉ SYMBIOTE ",
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "signal trails reaper ecology substrate ",
+                "adaptive matrix signal trails substrate ",
                 Style::default().fg(Color::Magenta),
             ),
-            Span::styled(pulse.repeat(12), Style::default().fg(env_color(app.environment))),
+            Span::styled(
+                pulse.repeat(12),
+                Style::default().fg(env_color(app.environment)),
+            ),
         ]),
         Line::from(vec![
             Span::styled(" age: ", Style::default().fg(Color::DarkGray)),
             Span::styled(format!("{}", app.age), Style::default().fg(Color::Green)),
             Span::styled(" | gen: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{}", app.generation), Style::default().fg(Color::Magenta)),
+            Span::styled(
+                format!("{}", app.generation),
+                Style::default().fg(Color::Magenta),
+            ),
             Span::styled(" | env: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(app.environment.name(), Style::default().fg(env_color(app.environment))),
+            Span::styled(
+                app.environment.name(),
+                Style::default().fg(env_color(app.environment)),
+            ),
             Span::styled(" | species: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{}", app.species_bank.active_count()),
@@ -99,10 +110,10 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 format!("{}", app.substrate.living_cells()),
                 Style::default().fg(Color::Green),
             ),
-            Span::styled(" | roots: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" | matrix: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                format!("{}", app.substrate.protected_cells()),
-                Style::default().fg(Color::Blue),
+                format!("{:.0}", app.matrix_pressure),
+                Style::default().fg(matrix_color(app.matrix_pressure)),
             ),
             Span::styled(" | eaten: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
@@ -117,7 +128,11 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
             Span::styled(" | ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 status,
-                Style::default().fg(if app.paused { Color::Yellow } else { Color::Green }),
+                Style::default().fg(if app.paused {
+                    Color::Yellow
+                } else {
+                    Color::Green
+                }),
             ),
         ]),
     ];
@@ -145,7 +160,12 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         if x >= 0 && y >= 0 && x < width as isize && y < height as isize {
             let archetype = particle
                 .species_id
-                .and_then(|id| app.species_bank.species.iter().find(|species| species.id == id))
+                .and_then(|id| {
+                    app.species_bank
+                        .species
+                        .iter()
+                        .find(|species| species.id == id)
+                })
                 .map(|species| species.archetype);
 
             let cell = &mut cells[y as usize][x as usize];
@@ -227,9 +247,13 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 let mut style = if cell.reaper {
                     Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
                 } else if cell.harvester {
-                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default().fg(tribe.color()).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(tribe.color())
+                        .add_modifier(Modifier::BOLD)
                 };
 
                 if cell.rare && !cell.reaper {
@@ -247,7 +271,11 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
     f.render_widget(
         Paragraph::new(lines)
-            .block(Block::default().borders(Borders::ALL).title(" ORGANISM FIELD "))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" ORGANISM FIELD "),
+            )
             .wrap(Wrap { trim: false }),
         area,
     );
@@ -372,36 +400,71 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         Tribe::Static,
     ];
 
-    let mut lines = vec![Line::from(Span::styled(
-        "Attraction Matrix",
-        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
-    ))];
+    let mut lines = vec![
+        Line::from(Span::styled(
+            "Adaptive Attraction Matrix",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(vec![
+            Span::styled("PRS ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                pressure_bar(app.matrix_pressure),
+                Style::default().fg(matrix_color(app.matrix_pressure)),
+            ),
+            Span::styled(
+                format!(" {:.0}", app.matrix_pressure),
+                Style::default().fg(matrix_color(app.matrix_pressure)),
+            ),
+            Span::styled(" | ATTR ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{:.0}", app.matrix_attraction),
+                Style::default().fg(Color::Green),
+            ),
+            Span::styled(" | REP ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{:.0}", app.matrix_repulsion),
+                Style::default().fg(Color::Red),
+            ),
+        ]),
+    ];
 
     for a in 0..6 {
         let mut spans = vec![Span::styled(
             format!("{} ", tribes[a].name()),
-            Style::default().fg(tribes[a].color()).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(tribes[a].color())
+                .add_modifier(Modifier::BOLD),
         )];
 
         for b in 0..6 {
             let value = app.rules[a][b];
 
-            let symbol = if value > 0.62 {
+            let symbol = if value > 0.72 {
+                "▓▓"
+            } else if value > 0.42 {
                 "++"
-            } else if value > 0.18 {
+            } else if value > 0.16 {
                 "+ "
-            } else if value < -0.62 {
+            } else if value < -0.72 {
+                "██"
+            } else if value < -0.42 {
                 "--"
-            } else if value < -0.18 {
+            } else if value < -0.16 {
                 "- "
             } else {
                 "· "
             };
 
-            let color = if value > 0.18 {
+            let color = if value > 0.42 {
                 Color::Green
-            } else if value < -0.18 {
+            } else if value > 0.16 {
+                Color::Cyan
+            } else if value < -0.42 {
                 Color::Red
+            } else if value < -0.16 {
+                Color::Magenta
             } else {
                 Color::DarkGray
             };
@@ -414,9 +477,10 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
     lines.push(Line::from(vec![
         Span::styled("Pop: ", Style::default().fg(Color::Yellow)),
-        Span::styled(format!("{}", app.particles.len()), Style::default().fg(Color::Green)),
-        Span::styled(" Zones: ", Style::default().fg(Color::Yellow)),
-        Span::styled(format!("{}", app.ecology.zones.len()), Style::default().fg(Color::Cyan)),
+        Span::styled(
+            format!("{}", app.particles.len()),
+            Style::default().fg(Color::Green),
+        ),
         Span::styled(" Cells: ", Style::default().fg(Color::Yellow)),
         Span::styled(
             format!("{}", app.substrate.living_cells()),
@@ -426,11 +490,6 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         Span::styled(
             format!("{}", app.substrate.protected_cells()),
             Style::default().fg(Color::Blue),
-        ),
-        Span::styled(" Eaten: ", Style::default().fg(Color::Yellow)),
-        Span::styled(
-            format!("{}", app.memory.total_cells_consumed),
-            Style::default().fg(Color::Cyan),
         ),
     ]));
 
@@ -444,7 +503,11 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
     f.render_widget(
         Paragraph::new(lines)
-            .block(Block::default().borders(Borders::ALL).title(" SYMBIOSIS RULES "))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" SYMBIOSIS RULES "),
+            )
             .wrap(Wrap { trim: true }),
         area,
     );
@@ -465,7 +528,10 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     ])];
 
     for cluster in app.clusters.clusters.iter().take(4) {
-        let archetype = cluster.archetype.map(|value| value.short()).unwrap_or("UNK");
+        let archetype = cluster
+            .archetype
+            .map(|value| value.short())
+            .unwrap_or("UNK");
 
         let archetype_color = if archetype == "RPR" {
             Color::Red
@@ -476,8 +542,14 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         };
 
         lines.push(Line::from(vec![
-            Span::styled(format!("#{} ", cluster.id), Style::default().fg(Color::DarkGray)),
-            Span::styled(cluster.direction_glyph().to_string(), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("#{} ", cluster.id),
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::styled(
+                cluster.direction_glyph().to_string(),
+                Style::default().fg(Color::Cyan),
+            ),
             Span::raw(" "),
             Span::styled(archetype, Style::default().fg(archetype_color)),
             Span::raw(" "),
@@ -485,7 +557,10 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 format!("{} ", cluster.size),
                 Style::default().fg(cluster.dominant.color()),
             ),
-            Span::styled(format!("a{}", cluster.age), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("a{}", cluster.age),
+                Style::default().fg(Color::Cyan),
+            ),
         ]));
     }
 
@@ -498,7 +573,12 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 }
 
 fn render_species(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
-    let extinct = app.species_bank.species.iter().filter(|species| species.extinct).count();
+    let extinct = app
+        .species_bank
+        .species
+        .iter()
+        .filter(|species| species.extinct)
+        .count();
 
     let harvesters = app
         .species_bank
@@ -559,8 +639,14 @@ fn render_species(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 format!("{} ", species.name),
                 Style::default().fg(species.dominant_tribe.color()),
             ),
-            Span::styled(species.archetype.short(), Style::default().fg(archetype_color)),
-            Span::styled(format!(" p{}", species.peak_size), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                species.archetype.short(),
+                Style::default().fg(archetype_color),
+            ),
+            Span::styled(
+                format!(" p{}", species.peak_size),
+                Style::default().fg(Color::Cyan),
+            ),
             Span::styled(format!(" {}", rare), Style::default().fg(Color::White)),
         ]));
     }
@@ -578,11 +664,20 @@ fn render_events(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         .events
         .iter()
         .rev()
-        .map(|event| ListItem::new(Line::from(Span::styled(event.clone(), Style::default().fg(Color::Cyan)))))
+        .map(|event| {
+            ListItem::new(Line::from(Span::styled(
+                event.clone(),
+                Style::default().fg(Color::Cyan),
+            )))
+        })
         .collect::<Vec<_>>();
 
     f.render_widget(
-        List::new(items).block(Block::default().borders(Borders::ALL).title(" EVOLUTION FEED ")),
+        List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" EVOLUTION FEED "),
+        ),
         area,
     );
 }
@@ -591,19 +686,31 @@ fn render_metrics(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
+            Constraint::Percentage(17),
+            Constraint::Percentage(17),
+            Constraint::Percentage(17),
+            Constraint::Percentage(17),
+            Constraint::Percentage(16),
+            Constraint::Percentage(16),
         ])
         .split(area);
 
     f.render_widget(metric("ENERGY", app.energy as u16, Color::Cyan), chunks[0]);
-    f.render_widget(metric("COHESION", app.cohesion as u16, Color::Green), chunks[1]);
+    f.render_widget(
+        metric("COHESION", app.cohesion as u16, Color::Green),
+        chunks[1],
+    );
     f.render_widget(metric("CHAOS", app.chaos as u16, Color::Magenta), chunks[2]);
     f.render_widget(metric("DRIFT", app.drift as u16, Color::Yellow), chunks[3]);
     f.render_widget(metric("POP", app.population as u16, Color::Red), chunks[4]);
+    f.render_widget(
+        metric(
+            "MATRIX",
+            app.matrix_pressure as u16,
+            matrix_color(app.matrix_pressure),
+        ),
+        chunks[5],
+    );
 }
 
 fn render_footer(f: &mut Frame<'_>, area: ratatui::layout::Rect) {
@@ -684,6 +791,25 @@ impl Cell {
         }
 
         Tribe::from_index(best)
+    }
+}
+
+fn pressure_bar(value: f32) -> String {
+    let filled = ((value.clamp(0.0, 100.0) / 100.0) * 8.0).round() as usize;
+    let empty = 8usize.saturating_sub(filled);
+
+    format!("{}{}", "█".repeat(filled), "░".repeat(empty))
+}
+
+fn matrix_color(value: f32) -> Color {
+    if value > 72.0 {
+        Color::Red
+    } else if value > 48.0 {
+        Color::Yellow
+    } else if value > 28.0 {
+        Color::Cyan
+    } else {
+        Color::Green
     }
 }
 
