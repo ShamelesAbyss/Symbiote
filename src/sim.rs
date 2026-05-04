@@ -1,6 +1,6 @@
 use crate::{
     app::{Environment, TRIBE_COUNT},
-    automata::{CellKind, CellularAutomata},
+    automata::{CellKind, CellularAutomata, SignalKind},
     ecology::{Ecology, ZoneKind},
     particle::{Genome, Particle, RareTrait, Tribe},
     species::Archetype,
@@ -19,6 +19,7 @@ const BOND_RADIUS: f32 = 0.105;
 const LOW_SUBSTRATE_RATIO: f32 = 0.035;
 const HARVESTER_BODY_PRESSURE_RATIO: f32 = 0.115;
 const HARVESTER_OVERGROWTH_RATIO: f32 = 0.18;
+const SIGNAL_FORCE_SCALE: f32 = 0.42;
 
 #[allow(dead_code)]
 #[derive(Default, Clone, Copy, Debug)]
@@ -130,6 +131,16 @@ pub fn step_particles(
         let is_harvester =
             matches!(archetype, Some(Archetype::Harvester)) || particle.rare_trait == RareTrait::Devourer;
 
+        apply_signal_field(
+            particle,
+            substrate,
+            archetype,
+            low_substrate,
+            reaper_pressure_needed,
+            &mut fx,
+            &mut fy,
+        );
+
         for (other_idx, other) in snapshot.iter().enumerate() {
             if idx == other_idx {
                 continue;
@@ -222,6 +233,9 @@ pub fn step_particles(
                     particle.health += bite * 0.48;
                     particle.mass += 0.0045;
 
+                    substrate.deposit_signal(particle.x, particle.y, SignalKind::Fear, 0.20);
+                    substrate.deposit_signal(other.x, other.y, SignalKind::Danger, 0.26);
+
                     if other.health <= bite + 1.0 {
                         report.harvesters_consumed += 1;
                     }
@@ -237,6 +251,7 @@ pub fn step_particles(
                 fy -= (dy / d) * fear;
 
                 particle.energy -= if low_substrate { 0.014 } else { 0.007 };
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Fear, 0.08);
 
                 continue;
             }
@@ -271,10 +286,12 @@ pub fn step_particles(
             {
                 particle.energy += 0.018;
                 particle.health += 0.012;
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.035);
             }
 
             if matches!(archetype, Some(Archetype::Parasite)) && d < BOND_RADIUS && other.mass > particle.mass {
                 particle.energy += 0.012;
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.025);
             }
         }
 
@@ -303,6 +320,15 @@ pub fn step_particles(
             archetype,
             low_substrate,
             harvester_overgrowth,
+        );
+
+        deposit_behavior_signal(
+            particle,
+            substrate,
+            archetype,
+            low_substrate,
+            harvester_overgrowth,
+            reaper_pressure_needed,
         );
 
         let mass_drag = (1.0 + particle.mass * 0.13).clamp(1.0, 2.0);
@@ -335,12 +361,14 @@ pub fn step_particles(
             particle.health += 0.14;
             particle.energy += 0.028;
             particle.mass += 0.014;
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.018);
         }
 
         if hostile_density >= 3 {
             particle.health -= 0.21;
             particle.energy -= 0.026;
             particle.mass -= 0.012;
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.035);
         }
 
         if local_density == 0 {
@@ -352,6 +380,7 @@ pub fn step_particles(
         if particle.cluster_id.is_some() {
             particle.health += 0.035;
             particle.energy += 0.012;
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.012);
         }
 
         if env == Environment::Bloom {
@@ -371,14 +400,18 @@ pub fn step_particles(
                 particle.health -= 0.034;
                 particle.mass -= 0.012;
                 particle.genome.fertility = (particle.genome.fertility - 0.00025).clamp(0.2, 2.4);
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.08);
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.025);
             } else {
                 particle.energy -= 0.008;
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.035);
             }
 
             if harvester_overgrowth {
                 particle.energy -= 0.026;
                 particle.health -= 0.018;
                 particle.genome.hunger = (particle.genome.hunger + 0.00008).clamp(0.005, 0.04);
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.06);
             }
         }
 
@@ -388,20 +421,24 @@ pub fn step_particles(
             particle.energy -= 0.018 * starvation_relief;
             particle.health -= 0.006 * starvation_relief;
             particle.mass = (particle.mass + 0.002).clamp(0.45, 7.0);
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Fear, 0.052);
         }
 
         if particle.rare_trait == RareTrait::Radiant {
             particle.energy += 0.015;
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.012);
         }
 
         if particle.rare_trait == RareTrait::Voracious {
             particle.energy -= 0.01;
             particle.health += 0.008;
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.03);
         }
 
         if particle.rare_trait == RareTrait::Devourer {
             particle.energy -= if low_substrate { 0.035 } else { 0.012 };
             particle.health += if low_substrate { 0.0 } else { 0.004 };
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.06);
         }
 
         particle.energy -= particle.genome.metabolism * env.hunger_mult();
@@ -424,6 +461,127 @@ pub fn step_particles(
     }
 
     report
+}
+
+fn apply_signal_field(
+    particle: &Particle,
+    substrate: &CellularAutomata,
+    archetype: Option<Archetype>,
+    low_substrate: bool,
+    reaper_pressure_needed: bool,
+    fx: &mut f32,
+    fy: &mut f32,
+) {
+    let signal = substrate.signal_at(particle.x, particle.y);
+
+    let mut seek = 0.0;
+    let mut avoid = 0.0;
+
+    match archetype {
+        Some(Archetype::Harvester) => {
+            seek += signal.hunger * if low_substrate { 0.55 } else { 0.92 };
+            seek += signal.growth * 0.42;
+            avoid += signal.fear * 1.15;
+            avoid += signal.danger * 0.55;
+        }
+        Some(Archetype::Reaper) => {
+            seek += signal.hunger * if reaper_pressure_needed { 1.28 } else { 0.68 };
+            seek += signal.fear * 0.25;
+            avoid += signal.growth * 0.15;
+            avoid += signal.danger * 0.18;
+        }
+        Some(Archetype::Grazer | Archetype::Mycelial) => {
+            seek += signal.growth * 0.86;
+            avoid += signal.danger * 0.82;
+            avoid += signal.fear * 0.42;
+        }
+        Some(Archetype::Hunter | Archetype::Parasite) => {
+            seek += signal.danger * 0.34;
+            seek += signal.hunger * 0.26;
+            avoid += signal.fear * 0.22;
+        }
+        Some(Archetype::Architect | Archetype::Leviathan) => {
+            seek += signal.growth * 0.54;
+            avoid += signal.danger * 0.38;
+        }
+        Some(Archetype::Phantom) => {
+            seek += signal.fear * 0.34;
+            seek += signal.danger * 0.28;
+            avoid += signal.growth * 0.18;
+        }
+        Some(Archetype::Swarmer | Archetype::Orbiter) | None => {
+            seek += signal.growth * 0.32;
+            avoid += signal.danger * 0.36;
+            avoid += signal.fear * 0.24;
+        }
+    }
+
+    if particle.rare_trait == RareTrait::Devourer {
+        seek += signal.hunger * 0.42;
+        avoid += signal.fear * 0.35;
+    }
+
+    if particle.health < 32.0 || particle.energy < 25.0 {
+        avoid += signal.danger * 0.7;
+        avoid += signal.fear * 0.25;
+        seek += signal.growth * 0.28;
+    }
+
+    let field = (seek - avoid).clamp(-1.0, 1.0);
+    let curl_x = ((particle.y * 17.0 + particle.x * 9.0).sin()) * field * SIGNAL_FORCE_SCALE;
+    let curl_y = ((particle.x * 19.0 - particle.y * 7.0).cos()) * field * SIGNAL_FORCE_SCALE;
+
+    *fx += curl_x;
+    *fy += curl_y;
+}
+
+fn deposit_behavior_signal(
+    particle: &Particle,
+    substrate: &mut CellularAutomata,
+    archetype: Option<Archetype>,
+    low_substrate: bool,
+    harvester_overgrowth: bool,
+    reaper_pressure_needed: bool,
+) {
+    match archetype {
+        Some(Archetype::Harvester) => {
+            substrate.deposit_signal(
+                particle.x,
+                particle.y,
+                SignalKind::Hunger,
+                if low_substrate || harvester_overgrowth { 0.045 } else { 0.022 },
+            );
+        }
+        Some(Archetype::Reaper) => {
+            substrate.deposit_signal(
+                particle.x,
+                particle.y,
+                SignalKind::Fear,
+                if reaper_pressure_needed { 0.042 } else { 0.026 },
+            );
+        }
+        Some(Archetype::Grazer | Archetype::Mycelial) => {
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.018);
+        }
+        Some(Archetype::Hunter | Archetype::Parasite) => {
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.018);
+        }
+        Some(Archetype::Architect | Archetype::Leviathan) => {
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.025);
+        }
+        Some(Archetype::Phantom) => {
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Fear, 0.012);
+        }
+        _ => {}
+    }
+
+    if particle.health < 24.0 {
+        substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.04);
+    }
+
+    if particle.energy > 110.0 && particle.cluster_id.is_some() {
+        substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.025);
+    }
 }
 
 fn predator_factor(a: Tribe, b: Tribe, archetype: Option<Archetype>) -> f32 {
@@ -471,6 +629,7 @@ fn apply_substrate(
 
             if low_substrate {
                 particle.health -= 0.014;
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.045);
             }
 
             return consumed;
@@ -501,9 +660,12 @@ fn apply_substrate(
             particle.health += gain * 0.115;
             particle.mass += gain * 0.00165;
 
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.18);
+
             if harvester_overgrowth {
                 particle.energy -= 0.018;
                 particle.health -= 0.012;
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.035);
             }
 
             consumed += 1;

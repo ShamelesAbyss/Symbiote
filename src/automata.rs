@@ -56,12 +56,83 @@ impl CellKind {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
+pub struct Signal {
+    #[serde(default)]
+    pub hunger: f32,
+    #[serde(default)]
+    pub fear: f32,
+    #[serde(default)]
+    pub growth: f32,
+    #[serde(default)]
+    pub danger: f32,
+}
+
+impl Signal {
+    pub fn strongest(self) -> Option<(SignalKind, f32)> {
+        let mut kind = SignalKind::Hunger;
+        let mut value = self.hunger;
+
+        if self.fear > value {
+            kind = SignalKind::Fear;
+            value = self.fear;
+        }
+
+        if self.growth > value {
+            kind = SignalKind::Growth;
+            value = self.growth;
+        }
+
+        if self.danger > value {
+            kind = SignalKind::Danger;
+            value = self.danger;
+        }
+
+        if value > 0.08 {
+            Some((kind, value))
+        } else {
+            None
+        }
+    }
+
+    fn decay(&mut self, recovery_mode: bool) {
+        let slow = if recovery_mode { 0.972 } else { 0.955 };
+        let fast = if recovery_mode { 0.94 } else { 0.925 };
+
+        self.hunger = (self.hunger * slow - 0.002).max(0.0);
+        self.fear = (self.fear * fast - 0.002).max(0.0);
+        self.growth = (self.growth * slow - 0.0015).max(0.0);
+        self.danger = (self.danger * fast - 0.0025).max(0.0);
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+pub enum SignalKind {
+    Hunger,
+    Fear,
+    Growth,
+    Danger,
+}
+
+impl SignalKind {
+    pub fn glyph(self) -> char {
+        match self {
+            Self::Hunger => '∿',
+            Self::Fear => '!',
+            Self::Growth => '∙',
+            Self::Danger => '×',
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Cell {
     pub kind: CellKind,
     pub energy: f32,
     pub age: u16,
     pub tribe_hint: usize,
+    #[serde(default)]
+    pub signal: Signal,
 }
 
 impl Default for Cell {
@@ -71,6 +142,7 @@ impl Default for Cell {
             energy: 0.0,
             age: 0,
             tribe_hint: 0,
+            signal: Signal::default(),
         }
     }
 }
@@ -124,6 +196,7 @@ impl CellularAutomata {
                 let root_neighbors = self.kind_neighbors(&snapshot, x, y, CellKind::Root);
 
                 let mut next = cell;
+                next.signal.decay(recovery_mode);
 
                 match cell.kind {
                     CellKind::Empty => {
@@ -167,9 +240,11 @@ impl CellularAutomata {
                         } else if neighbors < 2 || neighbors > 3 {
                             next.kind = CellKind::Dead;
                             next.energy = 18.0;
+                            next.signal.danger = (next.signal.danger + 0.22).clamp(0.0, 1.0);
                         } else if neighbors == 3 && nutrient_neighbors > 2 {
                             next.kind = CellKind::Spore;
                             next.energy = (cell.energy + 3.0).min(85.0);
+                            next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else {
                             next.energy = (cell.energy + nutrient_neighbors as f32 * 0.55 - 1.05)
                                 .clamp(0.0, 85.0);
@@ -177,26 +252,33 @@ impl CellularAutomata {
                             if next.energy <= 0.0 {
                                 next.kind = CellKind::Dead;
                                 next.energy = 12.0;
+                                next.signal.danger = (next.signal.danger + 0.16).clamp(0.0, 1.0);
                             }
                         }
                     }
                     CellKind::Spore => {
+                        next.signal.growth = (next.signal.growth + 0.012).clamp(0.0, 1.0);
+
                         if root_neighbors > 0 && recovery_mode && nutrient_neighbors > 0 {
                             next.kind = CellKind::Life;
                             next.energy = 36.0;
                         } else if neighbors < 2 || neighbors > 4 {
                             next.kind = CellKind::Dead;
                             next.energy = 14.0;
+                            next.signal.danger = (next.signal.danger + 0.14).clamp(0.0, 1.0);
                         } else {
                             next.energy = (cell.energy - 0.85).max(0.0);
 
                             if next.energy <= 0.0 {
                                 next.kind = CellKind::Dead;
                                 next.energy = 8.0;
+                                next.signal.danger = (next.signal.danger + 0.12).clamp(0.0, 1.0);
                             }
                         }
                     }
                     CellKind::Nutrient => {
+                        next.signal.growth = (next.signal.growth + 0.006).clamp(0.0, 1.0);
+
                         if root_neighbors > 0 && recovery_mode && neighbors >= 1 {
                             next.kind = CellKind::Spore;
                             next.energy = 38.0;
@@ -218,18 +300,23 @@ impl CellularAutomata {
                         }
                     }
                     CellKind::Dead => {
+                        next.signal.danger = (next.signal.danger + 0.006).clamp(0.0, 1.0);
+
                         let decay = if recovery_mode { 0.10 } else { 0.30 };
                         next.energy = (cell.energy - decay).max(0.0);
 
                         if root_neighbors > 0 && recovery_mode {
                             next.kind = CellKind::Nutrient;
                             next.energy = 30.0;
+                            next.signal.growth = (next.signal.growth + 0.12).clamp(0.0, 1.0);
                         } else if nutrient_neighbors >= 2 && neighbors >= 2 {
                             next.kind = CellKind::Nutrient;
                             next.energy = 32.0;
+                            next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else if recovery_mode && dead_neighbors >= 2 && density < 0.06 {
                             next.kind = CellKind::Nutrient;
                             next.energy = 24.0;
+                            next.signal.growth = (next.signal.growth + 0.06).clamp(0.0, 1.0);
                         } else if next.energy <= 0.0 || dead_neighbors > 5 {
                             next.kind = CellKind::Empty;
                             next.age = 0;
@@ -239,9 +326,11 @@ impl CellularAutomata {
                         if root_neighbors > 0 && recovery_mode {
                             next.kind = CellKind::Spore;
                             next.energy = 38.0;
+                            next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else if neighbors == 3 {
                             next.kind = CellKind::Spore;
                             next.energy = 42.0;
+                            next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else {
                             next.energy = (cell.energy - 0.18).max(0.0);
 
@@ -252,9 +341,12 @@ impl CellularAutomata {
                         }
                     }
                     CellKind::Nest => {
+                        next.signal.growth = (next.signal.growth + 0.018).clamp(0.0, 1.0);
+
                         if neighbors > 4 {
                             next.kind = CellKind::Dead;
                             next.energy = 20.0;
+                            next.signal.danger = (next.signal.danger + 0.20).clamp(0.0, 1.0);
                         } else if recovery_mode && neighbors >= 1 {
                             next.energy = (cell.energy + 0.12).min(90.0);
                         } else {
@@ -268,6 +360,8 @@ impl CellularAutomata {
                     }
                     CellKind::Root => {
                         let seed_roll = hash(self.seed ^ self.cycle ^ 0xBEEF, x, y) % 10_000;
+
+                        next.signal.growth = (next.signal.growth + 0.02).clamp(0.0, 1.0);
 
                         if root_neighbors > 4 {
                             next.kind = CellKind::Nutrient;
@@ -334,6 +428,46 @@ impl CellularAutomata {
         cell.kind = desired;
         cell.energy = (cell.energy + particle.energy * 0.055).clamp(0.0, 85.0);
         cell.tribe_hint = particle.tribe.index();
+
+        match archetype {
+            Some(Archetype::Harvester) => {
+                cell.signal.hunger = (cell.signal.hunger + 0.16).clamp(0.0, 1.0);
+            }
+            Some(Archetype::Reaper) => {
+                cell.signal.fear = (cell.signal.fear + 0.18).clamp(0.0, 1.0);
+            }
+            Some(Archetype::Grazer | Archetype::Mycelial | Archetype::Architect | Archetype::Leviathan) => {
+                cell.signal.growth = (cell.signal.growth + 0.12).clamp(0.0, 1.0);
+            }
+            Some(Archetype::Hunter | Archetype::Parasite) => {
+                cell.signal.danger = (cell.signal.danger + 0.10).clamp(0.0, 1.0);
+            }
+            _ => {}
+        }
+    }
+
+    pub fn deposit_signal(&mut self, x: f32, y: f32, kind: SignalKind, amount: f32) {
+        let Some((gx, gy)) = self.world_to_grid(x, y) else {
+            return;
+        };
+
+        let idx = self.idx(gx, gy);
+        let cell = &mut self.cells[idx];
+
+        match kind {
+            SignalKind::Hunger => {
+                cell.signal.hunger = (cell.signal.hunger + amount).clamp(0.0, 1.0);
+            }
+            SignalKind::Fear => {
+                cell.signal.fear = (cell.signal.fear + amount).clamp(0.0, 1.0);
+            }
+            SignalKind::Growth => {
+                cell.signal.growth = (cell.signal.growth + amount).clamp(0.0, 1.0);
+            }
+            SignalKind::Danger => {
+                cell.signal.danger = (cell.signal.danger + amount).clamp(0.0, 1.0);
+            }
+        }
     }
 
     pub fn consume_at(&mut self, x: f32, y: f32, power: f32, compost: bool) -> Option<CellKind> {
@@ -347,6 +481,8 @@ impl CellularAutomata {
 
         let eaten = cell.kind;
         cell.energy -= power;
+        cell.signal.hunger = (cell.signal.hunger + 0.22).clamp(0.0, 1.0);
+        cell.signal.danger = (cell.signal.danger + 0.06).clamp(0.0, 1.0);
 
         if cell.energy <= 0.0 || matches!(eaten, CellKind::Life | CellKind::Nest | CellKind::Mutagen) {
             if compost {
@@ -387,6 +523,14 @@ impl CellularAutomata {
         }
     }
 
+    pub fn signal_at(&self, x: f32, y: f32) -> Signal {
+        if let Some((gx, gy)) = self.world_to_grid(x, y) {
+            self.cells[self.idx(gx, gy)].signal
+        } else {
+            Signal::default()
+        }
+    }
+
     pub fn sample_screen(&self, sx: usize, sy: usize, screen_w: usize, screen_h: usize) -> CellKind {
         if screen_w == 0 || screen_h == 0 {
             return CellKind::Empty;
@@ -396,6 +540,17 @@ impl CellularAutomata {
         let y = (sy * self.height / screen_h).min(self.height.saturating_sub(1));
 
         self.cells[self.idx(x, y)].kind
+    }
+
+    pub fn sample_signal_screen(&self, sx: usize, sy: usize, screen_w: usize, screen_h: usize) -> Signal {
+        if screen_w == 0 || screen_h == 0 {
+            return Signal::default();
+        }
+
+        let x = (sx * self.width / screen_w).min(self.width.saturating_sub(1));
+        let y = (sy * self.height / screen_h).min(self.height.saturating_sub(1));
+
+        self.cells[self.idx(x, y)].signal
     }
 
     pub fn living_cells(&self) -> usize {
@@ -422,6 +577,7 @@ impl CellularAutomata {
                         energy: 34.0,
                         age: 0,
                         tribe_hint: n % 6,
+                        signal: Signal::default(),
                     }
                 } else if n < 100 {
                     Cell {
@@ -429,6 +585,10 @@ impl CellularAutomata {
                         energy: 48.0,
                         age: 0,
                         tribe_hint: n % 6,
+                        signal: Signal {
+                            growth: 0.08,
+                            ..Signal::default()
+                        },
                     }
                 } else if n < 122 {
                     Cell {
@@ -436,6 +596,10 @@ impl CellularAutomata {
                         energy: 36.0,
                         age: 0,
                         tribe_hint: n % 6,
+                        signal: Signal {
+                            growth: 0.06,
+                            ..Signal::default()
+                        },
                     }
                 } else if n < 128 {
                     Cell {
@@ -443,6 +607,7 @@ impl CellularAutomata {
                         energy: 55.0,
                         age: 0,
                         tribe_hint: n % 6,
+                        signal: Signal::default(),
                     }
                 } else if n < 138 {
                     Cell {
@@ -450,6 +615,10 @@ impl CellularAutomata {
                         energy: 95.0,
                         age: 0,
                         tribe_hint: n % 6,
+                        signal: Signal {
+                            growth: 0.14,
+                            ..Signal::default()
+                        },
                     }
                 } else {
                     Cell::default()
@@ -549,8 +718,10 @@ fn wrap(value: isize, max: usize) -> usize {
 
 fn hash(seed: u64, x: usize, y: usize) -> usize {
     let mut value = seed as usize;
+
     value ^= x.wrapping_mul(374_761_393);
     value ^= y.wrapping_mul(668_265_263);
     value = (value ^ (value >> 13)).wrapping_mul(1_274_126_177);
+
     value ^ (value >> 16)
 }

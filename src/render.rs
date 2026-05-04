@@ -1,6 +1,6 @@
 use crate::{
     app::{App, Environment},
-    automata::CellKind,
+    automata::{CellKind, SignalKind},
     particle::Tribe,
     species::Archetype,
 };
@@ -77,7 +77,7 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "reaper ecology substrate ",
+                "signal trails reaper ecology substrate ",
                 Style::default().fg(Color::Magenta),
             ),
             Span::styled(pulse.repeat(12), Style::default().fg(env_color(app.environment))),
@@ -135,6 +135,7 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let mut cells: Vec<Vec<Cell>> = vec![vec![Cell::default(); width]; height];
 
     draw_substrate(&mut cells, app, width, height);
+    draw_signal_trails(&mut cells, app, width, height);
     draw_ecology_zones(&mut cells, app, width, height);
 
     for particle in &app.particles {
@@ -191,6 +192,9 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 spans.push(Span::styled(glyph.to_string(), Style::default().fg(color)));
             } else if cell.count == 0 && cell.substrate.is_some() {
                 let (glyph, color) = cell.substrate.unwrap();
+                spans.push(Span::styled(glyph.to_string(), Style::default().fg(color)));
+            } else if cell.count == 0 && cell.signal.is_some() {
+                let (glyph, color) = cell.signal.unwrap();
                 spans.push(Span::styled(glyph.to_string(), Style::default().fg(color)));
             } else if cell.count == 0 {
                 spans.push(Span::styled(
@@ -270,6 +274,23 @@ fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usiz
             };
 
             cells[y][x].substrate = Some((kind.glyph(), color));
+        }
+    }
+}
+
+fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
+    for y in 0..height {
+        for x in 0..width {
+            if cells[y][x].substrate.is_some() {
+                continue;
+            }
+
+            let signal = app.substrate.sample_signal_screen(x, y, width, height);
+
+            if let Some((kind, value)) = signal.strongest() {
+                let color = signal_color(kind, value);
+                cells[y][x].signal = Some((kind.glyph(), color));
+            }
         }
     }
 }
@@ -411,6 +432,14 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
             format!("{}", app.memory.total_cells_consumed),
             Style::default().fg(Color::Cyan),
         ),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled("Signals: ", Style::default().fg(Color::DarkGray)),
+        Span::styled("∿ hunger ", Style::default().fg(Color::Yellow)),
+        Span::styled("! fear ", Style::default().fg(Color::Red)),
+        Span::styled("∙ growth ", Style::default().fg(Color::Green)),
+        Span::styled("× danger", Style::default().fg(Color::Magenta)),
     ]));
 
     f.render_widget(
@@ -620,6 +649,7 @@ struct Cell {
     reaper: bool,
     zone: Option<(char, Color)>,
     substrate: Option<(char, Color)>,
+    signal: Option<(char, Color)>,
 }
 
 impl Default for Cell {
@@ -638,6 +668,7 @@ impl Default for Cell {
             reaper: false,
             zone: None,
             substrate: None,
+            signal: None,
         }
     }
 }
@@ -653,6 +684,39 @@ impl Cell {
         }
 
         Tribe::from_index(best)
+    }
+}
+
+fn signal_color(kind: SignalKind, value: f32) -> Color {
+    match kind {
+        SignalKind::Hunger => {
+            if value > 0.55 {
+                Color::Yellow
+            } else {
+                Color::DarkGray
+            }
+        }
+        SignalKind::Fear => {
+            if value > 0.55 {
+                Color::Red
+            } else {
+                Color::DarkGray
+            }
+        }
+        SignalKind::Growth => {
+            if value > 0.55 {
+                Color::Green
+            } else {
+                Color::DarkGray
+            }
+        }
+        SignalKind::Danger => {
+            if value > 0.55 {
+                Color::Magenta
+            } else {
+                Color::DarkGray
+            }
+        }
     }
 }
 
