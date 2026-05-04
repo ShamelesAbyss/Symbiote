@@ -41,9 +41,7 @@ fn main() -> Result<()> {
                     KeyCode::Char('q') => break,
                     KeyCode::Char(' ') => app.paused = !app.paused,
                     KeyCode::Char('r') => app.reset_particles(),
-                    KeyCode::Char('m') => app.force_mutation(),
                     KeyCode::Char('n') => app.randomize_world(),
-                    KeyCode::Char('e') => app.toggle_evolution(),
                     KeyCode::Char('+') | KeyCode::Char('=') => app.speed_up(),
                     KeyCode::Char('-') => app.slow_down(),
                     _ => {}

@@ -2,8 +2,8 @@ use crate::{
     cluster::{ClusterEvents, ClusterTracker},
     ecology::Ecology,
     memory::MemoryBank,
-    particle::{Genome, Particle, Tribe},
-    sim::{build_rule_matrix, child_from, mutate_rules, step_particles, RuleMatrix},
+    particle::{Genome, Particle, RareTrait, Tribe},
+    sim::{build_rule_matrix, child_from, fused_child, mutate_rules, step_particles, RuleMatrix},
     species::{Archetype, SpeciesBank},
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -79,7 +79,6 @@ struct EcosystemState {
     seed: u64,
     age: u64,
     generation: u64,
-    evolution_enabled: bool,
     tick_ms: u64,
     environment: Environment,
     events: Vec<String>,
@@ -96,7 +95,6 @@ pub struct App {
     pub age: u64,
     pub generation: u64,
     pub paused: bool,
-    pub evolution_enabled: bool,
     pub tick_ms: u64,
     pub energy: f32,
     pub cohesion: f32,
@@ -129,7 +127,6 @@ impl App {
             age: 0,
             generation: 0,
             paused: false,
-            evolution_enabled: true,
             tick_ms: 22,
             energy: 0.0,
             cohesion: 0.0,
@@ -141,9 +138,8 @@ impl App {
         };
 
         app.reset_particles();
-        app.push_event("symbiote organism awakened");
-        app.push_event("species lineage engine online");
-        app.push_event("spatial ecology seeded");
+        app.push_event("native reproduction engine online");
+        app.push_event("stable ecology zones seeded");
         app
     }
 
@@ -161,6 +157,10 @@ impl App {
         self.age += 1;
 
         self.ecology.tick(self.seed, self.age, self.environment);
+
+        if self.age % 32 == 0 {
+            self.native_reproduction();
+        }
 
         if self.age % 24 == 0 {
             let before_species = self.species_bank.species.len();
@@ -181,22 +181,18 @@ impl App {
             self.shift_environment();
         }
 
-        if self.evolution_enabled && self.age % 90 == 0 {
-            self.evolve_population();
-        }
-
-        if self.evolution_enabled && self.age % 280 == 0 {
+        if self.age % 280 == 0 {
             let intensity = match self.environment {
-                Environment::Calm => 0.035,
-                Environment::Bloom => 0.025,
-                Environment::Hunger => 0.075,
-                Environment::Storm => 0.1,
-                Environment::Drift => 0.04,
+                Environment::Calm => 0.018,
+                Environment::Bloom => 0.014,
+                Environment::Hunger => 0.035,
+                Environment::Storm => 0.052,
+                Environment::Drift => 0.022,
             };
 
             mutate_rules(&mut self.rules, self.seed ^ self.age, intensity);
             self.generation += 1;
-            self.push_event("symbiosis matrix adapted");
+            self.push_event("matrix drifted through native mutation");
         }
 
         self.measure();
@@ -204,6 +200,99 @@ impl App {
 
         if self.age % 600 == 0 {
             self.save_all();
+        }
+    }
+
+    fn native_reproduction(&mut self) {
+        if self.particles.len() >= MAX_PARTICLES {
+            return;
+        }
+
+        let mut rng = StdRng::seed_from_u64(self.seed ^ self.age ^ self.generation);
+        let snapshot = self.particles.clone();
+        let mut children = Vec::new();
+
+        for parent in snapshot.iter() {
+            if self.particles.len() + children.len() >= MAX_PARTICLES {
+                break;
+            }
+
+            let clustered_bonus = if parent.cluster_id.is_some() { 0.18 } else { 0.0 };
+            let rare_bonus = if parent.rare_trait != RareTrait::None { 0.12 } else { 0.0 };
+            let threshold = 115.0 - parent.genome.fertility * 13.0 - clustered_bonus * 20.0;
+
+            if parent.energy < threshold || parent.health < 48.0 || parent.age < 180 {
+                continue;
+            }
+
+            let chance = (0.018 + parent.genome.fertility * 0.018 + clustered_bonus + rare_bonus)
+                .clamp(0.01, 0.38);
+
+            if !rng.gen_bool(chance as f64) {
+                continue;
+            }
+
+            let maybe_partner = snapshot
+                .iter()
+                .find(|other| {
+                    other.species_id != parent.species_id
+                        && other.energy > 95.0
+                        && dist(parent.x, parent.y, other.x, other.y) < 0.14
+                })
+                .copied();
+
+            let child = if let Some(partner) = maybe_partner {
+                self.memory.total_fusions += 1;
+                fused_child(*parent, partner, rng.gen())
+            } else {
+                child_from(*parent, rng.gen())
+            };
+
+            self.species_bank.record_birth(parent.species_id);
+            children.push(child);
+        }
+
+        if !children.is_empty() {
+            let amount = children.len();
+
+            for child in children {
+                self.particles.push(child);
+            }
+
+            self.memory.total_reproductions += amount as u64;
+
+            if amount > 4 {
+                self.push_event(&format!("native reproduction bloom: {}", amount));
+            }
+        }
+
+        self.apply_selection_pressure(&mut rng);
+    }
+
+    fn apply_selection_pressure(&mut self, rng: &mut StdRng) {
+        let before = self.particles.len();
+
+        self.particles.retain(|p| {
+            let old_age_pressure = if p.age > 18_000 { 0.08 } else { 0.0 };
+            let energy_score = (p.energy / 130.0).clamp(0.0, 1.0);
+            let health_score = (p.health / 100.0).clamp(0.0, 1.0);
+            let clustered_bonus = if p.cluster_id.is_some() { 0.18 } else { 0.0 };
+            let rare_bonus = if p.rare_trait != RareTrait::None { 0.04 } else { 0.0 };
+
+            let survival = (energy_score * 0.44 + health_score * 0.44 + clustered_bonus + rare_bonus - old_age_pressure)
+                .clamp(0.02, 0.995);
+
+            p.energy > 0.0 && p.health > 0.0 && rng.gen_bool(survival as f64)
+        });
+
+        while self.particles.len() < MIN_PARTICLES {
+            self.particles.push(random_particle(rng));
+        }
+
+        let after = self.particles.len();
+
+        if after < before {
+            self.memory.total_deaths += (before - after) as u64;
         }
     }
 
@@ -226,9 +315,11 @@ impl App {
                 tribe,
                 age: 0,
                 health: rng.gen_range(58.0..100.0),
+                energy: rng.gen_range(60.0..110.0),
                 mass: rng.gen_range(0.65..1.5),
                 cluster_id: None,
                 species_id: None,
+                rare_trait: RareTrait::None,
                 genome: Genome {
                     perception: rng.gen_range(0.17..0.31),
                     hunger: rng.gen_range(0.009..0.023),
@@ -236,6 +327,8 @@ impl App {
                     volatility: rng.gen_range(0.64..1.35),
                     orbit: rng.gen_range(0.0..0.82),
                     membrane: rng.gen_range(0.0..0.98),
+                    metabolism: rng.gen_range(0.008..0.024),
+                    fertility: rng.gen_range(0.65..1.35),
                 },
             });
         }
@@ -248,13 +341,6 @@ impl App {
         self.save_all();
     }
 
-    pub fn force_mutation(&mut self) {
-        mutate_rules(&mut self.rules, self.seed ^ self.age ^ 0xB10B10, 0.24);
-        self.evolve_population();
-        self.generation += 1;
-        self.push_event("manual mutation injected");
-    }
-
     pub fn randomize_world(&mut self) {
         self.save_all();
         self.seed = now_seed();
@@ -263,16 +349,6 @@ impl App {
         self.events.clear();
         self.reset_particles();
         self.push_event("new symbiote seed generated");
-    }
-
-    pub fn toggle_evolution(&mut self) {
-        self.evolution_enabled = !self.evolution_enabled;
-
-        if self.evolution_enabled {
-            self.push_event("evolution resumed");
-        } else {
-            self.push_event("evolution paused, motion continues");
-        }
     }
 
     pub fn speed_up(&mut self) {
@@ -321,7 +397,6 @@ impl App {
             age: state.age,
             generation: state.generation,
             paused: false,
-            evolution_enabled: state.evolution_enabled,
             tick_ms: state.tick_ms,
             energy: 0.0,
             cohesion: 0.0,
@@ -349,7 +424,6 @@ impl App {
             seed: self.seed,
             age: self.age,
             generation: self.generation,
-            evolution_enabled: self.evolution_enabled,
             tick_ms: self.tick_ms,
             environment: self.environment,
             events: self.events.iter().cloned().collect(),
@@ -363,10 +437,6 @@ impl App {
         if events.births > 0 {
             self.memory.total_births += events.births as u64;
             self.push_event(&format!("{} organism cluster(s) formed", events.births));
-        }
-
-        if events.deaths > 0 {
-            self.memory.total_deaths += events.deaths as u64;
         }
 
         if events.merges > 0 {
@@ -399,55 +469,6 @@ impl App {
         };
 
         self.push_event(&format!("environment shifted: {}", self.environment.name()));
-    }
-
-    fn evolve_population(&mut self) {
-        let mut rng = StdRng::seed_from_u64(self.seed ^ self.age ^ self.generation);
-        let before = self.particles.len();
-
-        self.particles.retain(|p| {
-            let clustered_bonus = if p.cluster_id.is_some() { 0.22 } else { 0.0 };
-            let survival = ((p.health / 118.0) + clustered_bonus).clamp(0.05, 0.985);
-            p.health > 0.0 && p.age < 13000 && rng.gen_bool(survival as f64)
-        });
-
-        let survivors = self.particles.clone();
-
-        for parent in survivors {
-            if self.particles.len() >= MAX_PARTICLES {
-                break;
-            }
-
-            let cluster_bonus = if parent.cluster_id.is_some() { 0.04 } else { 0.0 };
-
-            let reproduction_chance = match self.environment {
-                Environment::Bloom => 0.12,
-                Environment::Calm => 0.06,
-                Environment::Drift => 0.045,
-                Environment::Hunger => 0.026,
-                Environment::Storm => 0.018,
-            } + cluster_bonus;
-
-            let mature = parent.age > 140;
-            let healthy = parent.health > 44.0;
-
-            if mature && healthy && rng.gen_bool(reproduction_chance) {
-                let child = child_from(parent, rng.gen());
-                self.particles.push(child);
-            }
-        }
-
-        while self.particles.len() < MIN_PARTICLES {
-            self.particles.push(random_particle(&mut rng));
-        }
-
-        let after = self.particles.len();
-
-        if after > before {
-            self.push_event(&format!("population bloomed {} -> {}", before, after));
-        } else if after < before {
-            self.push_event(&format!("selection culled {} -> {}", before, after));
-        }
     }
 
     fn measure(&mut self) {
@@ -493,10 +514,20 @@ impl App {
         self.memory.peak_clusters = self.memory.peak_clusters.max(self.clusters.clusters.len());
         self.memory.peak_species = self.memory.peak_species.max(self.species_bank.active_count());
 
-        let mut counts = [0usize; 6];
+        let mut rare_count = 0usize;
+
+        for p in &self.particles {
+            if p.rare_trait != RareTrait::None {
+                rare_count += 1;
+            }
+        }
+
+        self.memory.peak_rare_lifeforms = self.memory.peak_rare_lifeforms.max(rare_count);
+
+        let mut counts = [0usize; 9];
 
         for species in self.species_bank.species.iter().filter(|s| !s.extinct) {
-            counts[species.archetype as usize] += 1;
+            counts[species.archetype.index()] += 1;
         }
 
         let archetypes = [
@@ -506,10 +537,13 @@ impl App {
             Archetype::Orbiter,
             Archetype::Parasite,
             Archetype::Architect,
+            Archetype::Leviathan,
+            Archetype::Mycelial,
+            Archetype::Phantom,
         ];
 
         let mut best = 0;
-        for i in 1..6 {
+        for i in 1..9 {
             if counts[i] > counts[best] {
                 best = i;
             }
@@ -549,9 +583,11 @@ fn random_particle(rng: &mut StdRng) -> Particle {
         tribe: Tribe::from_index(rng.gen_range(0..TRIBE_COUNT)),
         age: 0,
         health: rng.gen_range(60.0..100.0),
+        energy: rng.gen_range(60.0..110.0),
         mass: rng.gen_range(0.65..1.5),
         cluster_id: None,
         species_id: None,
+        rare_trait: RareTrait::None,
         genome: Genome {
             perception: rng.gen_range(0.17..0.31),
             hunger: rng.gen_range(0.009..0.023),
@@ -559,8 +595,16 @@ fn random_particle(rng: &mut StdRng) -> Particle {
             volatility: rng.gen_range(0.64..1.35),
             orbit: rng.gen_range(0.0..0.82),
             membrane: rng.gen_range(0.0..0.98),
+            metabolism: rng.gen_range(0.008..0.024),
+            fertility: rng.gen_range(0.65..1.35),
         },
     }
+}
+
+fn dist(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
+    let dx = ax - bx;
+    let dy = ay - by;
+    (dx * dx + dy * dy).sqrt()
 }
 
 fn hash(seed: u64, x: usize, y: usize) -> usize {

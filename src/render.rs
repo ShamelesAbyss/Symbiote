@@ -65,14 +65,13 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
 
 fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let status = if app.paused { "paused" } else { "alive" };
-    let evo = if app.evolution_enabled { "evolving" } else { "motion only" };
     let pulse = ["░", "▒", "▓", "█", "▓", "▒"][(app.age as usize / 4) % 6];
 
     let lines = vec![
         Line::from(vec![
             Span::styled(" ◉ SYMBIOTE ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            Span::styled("persistent artificial ecosystem ", Style::default().fg(Color::Magenta)),
-            Span::styled(pulse.repeat(14), Style::default().fg(env_color(app.environment))),
+            Span::styled("self-reproducing artificial ecosystem ", Style::default().fg(Color::Magenta)),
+            Span::styled(pulse.repeat(12), Style::default().fg(env_color(app.environment))),
         ]),
         Line::from(vec![
             Span::styled(" age: ", Style::default().fg(Color::DarkGray)),
@@ -85,8 +84,6 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
             Span::styled(format!("{}", app.species_bank.active_count()), Style::default().fg(Color::Yellow)),
             Span::styled(" | ", Style::default().fg(Color::DarkGray)),
             Span::styled(status, Style::default().fg(if app.paused { Color::Yellow } else { Color::Green })),
-            Span::styled(" | ", Style::default().fg(Color::DarkGray)),
-            Span::styled(evo, Style::default().fg(Color::Cyan)),
         ]),
     ];
 
@@ -113,10 +110,15 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
             cell.count += 1;
             cell.tribe_counts[p.tribe.index()] += 1;
             cell.health += p.health;
+            cell.energy += p.energy;
             cell.mass += p.mass;
 
             if p.cluster_id.is_some() {
                 cell.clustered += 1;
+            }
+
+            if !p.rare_trait.short().is_empty() {
+                cell.rare = true;
             }
         }
     }
@@ -144,7 +146,9 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 let avg_health = cell.health / cell.count as f32;
                 let avg_mass = cell.mass / cell.count as f32;
 
-                let glyph = if cell.clustered > 0 && avg_mass > 3.8 {
+                let glyph = if cell.rare {
+                    '✦'
+                } else if cell.clustered > 0 && avg_mass > 3.8 {
                     '█'
                 } else if cell.clustered > 0 && cell.count >= 5 {
                     '⬤'
@@ -158,7 +162,9 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
                 let mut style = Style::default().fg(tribe.color()).add_modifier(Modifier::BOLD);
 
-                if avg_health < 24.0 {
+                if cell.rare {
+                    style = style.fg(Color::White).add_modifier(Modifier::BOLD);
+                } else if avg_health < 24.0 {
                     style = style.fg(Color::DarkGray);
                 }
 
@@ -186,6 +192,7 @@ fn draw_ecology_zones(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
             "dead" => Color::Red,
             "turbulent" => Color::Yellow,
             "mutagen" => Color::Magenta,
+            "nest" => Color::Cyan,
             _ => Color::DarkGray,
         };
 
@@ -252,12 +259,10 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         Tribe::Static,
     ];
 
-    let mut lines = vec![
-        Line::from(Span::styled(
-            "Attraction Matrix",
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
-        )),
-    ];
+    let mut lines = vec![Line::from(Span::styled(
+        "Attraction Matrix",
+        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+    ))];
 
     for a in 0..6 {
         let mut spans = vec![Span::styled(
@@ -310,14 +315,12 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 }
 
 fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
-    let mut lines = vec![
-        Line::from(vec![
-            Span::styled("Clusters: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{}", app.clusters.clusters.len()), Style::default().fg(Color::Green)),
-            Span::styled(" Peak: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{}", app.memory.peak_clusters), Style::default().fg(Color::Yellow)),
-        ]),
-    ];
+    let mut lines = vec![Line::from(vec![
+        Span::styled("Clusters: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", app.clusters.clusters.len()), Style::default().fg(Color::Green)),
+        Span::styled(" Peak: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", app.memory.peak_clusters), Style::default().fg(Color::Yellow)),
+    ])];
 
     for cluster in app.clusters.clusters.iter().take(4) {
         let archetype = cluster.archetype.map(|a| a.short()).unwrap_or("UNK");
@@ -345,15 +348,18 @@ fn render_species(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let mut lines = vec![Line::from(vec![
         Span::styled("Active: ", Style::default().fg(Color::DarkGray)),
         Span::styled(format!("{}", app.species_bank.active_count()), Style::default().fg(Color::Green)),
-        Span::styled(" Extinct: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(format!("{}", app.species_bank.extinct_count()), Style::default().fg(Color::Red)),
+        Span::styled(" Rare: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", app.memory.peak_rare_lifeforms), Style::default().fg(Color::White)),
     ])];
 
     for species in app.species_bank.species.iter().rev().filter(|s| !s.extinct).take(3) {
+        let rare = species.rare_trait.short();
+
         lines.push(Line::from(vec![
             Span::styled(format!("{} ", species.name), Style::default().fg(species.dominant_tribe.color())),
             Span::styled(species.archetype.short(), Style::default().fg(Color::Magenta)),
             Span::styled(format!(" p{}", species.peak_size), Style::default().fg(Color::Cyan)),
+            Span::styled(format!(" {}", rare), Style::default().fg(Color::White)),
         ]));
     }
 
@@ -405,7 +411,7 @@ fn render_footer(f: &mut Frame<'_>, area: ratatui::layout::Rect) {
             Style::default().fg(Color::Black).bg(Color::Green).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            " space pause | e evolution | r reset | m mutate | n new | +/- speed | q quit ",
+            " space pause | r restart | n new ecosystem | +/- speed | q save+quit ",
             Style::default().fg(Color::Gray),
         ),
     ]);
@@ -428,10 +434,12 @@ struct Cell {
     count: usize,
     tribe_counts: [usize; 6],
     health: f32,
+    energy: f32,
     mass: f32,
     clustered: usize,
     membrane: bool,
     trail: bool,
+    rare: bool,
     zone: Option<(char, Color)>,
 }
 
@@ -441,10 +449,12 @@ impl Default for Cell {
             count: 0,
             tribe_counts: [0; 6],
             health: 0.0,
+            energy: 0.0,
             mass: 0.0,
             clustered: 0,
             membrane: false,
             trail: false,
+            rare: false,
             zone: None,
         }
     }

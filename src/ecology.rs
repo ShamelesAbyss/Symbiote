@@ -7,6 +7,7 @@ pub enum ZoneKind {
     Dead,
     Turbulent,
     Mutagen,
+    Nest,
 }
 
 impl ZoneKind {
@@ -16,6 +17,7 @@ impl ZoneKind {
             Self::Dead => '×',
             Self::Turbulent => '∴',
             Self::Mutagen => '*',
+            Self::Nest => '◎',
         }
     }
 
@@ -25,6 +27,7 @@ impl ZoneKind {
             Self::Dead => "dead",
             Self::Turbulent => "turbulent",
             Self::Mutagen => "mutagen",
+            Self::Nest => "nest",
         }
     }
 }
@@ -53,7 +56,7 @@ impl Ecology {
             next_id: 1,
         };
 
-        for i in 0..8 {
+        for i in 0..9 {
             ecology.spawn_zone(seed, i);
         }
 
@@ -64,21 +67,21 @@ impl Ecology {
         for zone in &mut self.zones {
             zone.age += 1;
 
-            let pulse = ((age as f32 / 180.0) + zone.id as f32).sin() * 0.00045;
-            zone.radius = (zone.radius + pulse).clamp(0.12, 0.42);
+            let pulse = ((age as f32 / 900.0) + zone.id as f32).sin() * 0.00008;
+            zone.radius = (zone.radius + pulse).clamp(0.14, 0.46);
         }
 
-        self.zones.retain(|z| z.age < 3600);
+        self.zones.retain(|z| z.age < 24_000);
 
         let spawn_rate = match env {
-            Environment::Bloom => 180,
-            Environment::Storm => 240,
-            Environment::Hunger => 320,
-            Environment::Drift => 300,
-            Environment::Calm => 420,
+            Environment::Bloom => 2600,
+            Environment::Storm => 3200,
+            Environment::Hunger => 4200,
+            Environment::Drift => 3800,
+            Environment::Calm => 5200,
         };
 
-        if age % spawn_rate == 0 && self.zones.len() < 14 {
+        if age % spawn_rate == 0 && self.zones.len() < 16 {
             self.spawn_zone(seed ^ age, age as usize);
         }
     }
@@ -87,16 +90,17 @@ impl Ecology {
         let roll = hash(seed, salt, 99) % 100;
 
         let kind = match roll {
-            0..=34 => ZoneKind::Nutrient,
-            35..=54 => ZoneKind::Turbulent,
-            55..=74 => ZoneKind::Mutagen,
+            0..=32 => ZoneKind::Nutrient,
+            33..=47 => ZoneKind::Turbulent,
+            48..=61 => ZoneKind::Mutagen,
+            62..=78 => ZoneKind::Nest,
             _ => ZoneKind::Dead,
         };
 
         let x = normalized(hash(seed, salt, 1));
         let y = normalized(hash(seed, salt, 2));
-        let radius = 0.14 + (hash(seed, salt, 3) % 22) as f32 / 100.0;
-        let strength = 0.45 + (hash(seed, salt, 4) % 55) as f32 / 100.0;
+        let radius = 0.16 + (hash(seed, salt, 3) % 25) as f32 / 100.0;
+        let strength = 0.5 + (hash(seed, salt, 4) % 50) as f32 / 100.0;
 
         self.zones.push(EcologyZone {
             id: self.next_id,
