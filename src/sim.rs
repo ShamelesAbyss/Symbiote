@@ -15,6 +15,12 @@ const FORCE_SCALE: f32 = 0.00122;
 const WALL_FORCE: f32 = 0.017;
 const BOND_RADIUS: f32 = 0.105;
 
+#[derive(Default)]
+pub struct StepReport {
+    pub cells_consumed: usize,
+    pub harvesters_consumed: usize,
+}
+
 pub fn build_rule_matrix(seed: u64) -> RuleMatrix {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut matrix = [[0.0; TRIBE_COUNT]; TRIBE_COUNT];
@@ -47,11 +53,21 @@ pub fn step_particles(
     ecology: &Ecology,
     substrate: &mut CellularAutomata,
     archetypes: &[Option<Archetype>],
-) -> usize {
+) -> StepReport {
     let snapshot = particles.to_vec();
-    let mut consumed_cells = 0usize;
+    let snapshot_archetypes = snapshot
+        .iter()
+        .map(|particle| {
+            particle
+                .species_id
+                .and_then(|id| archetypes.get(id as usize).copied().flatten())
+        })
+        .collect::<Vec<_>>();
 
-    for particle in particles.iter_mut() {
+    let mut report = StepReport::default();
+    let mut damage = vec![0.0f32; particles.len()];
+
+    for (idx, particle) in particles.iter_mut().enumerate() {
         let mut fx = 0.0;
         let mut fy = 0.0;
 
@@ -65,11 +81,20 @@ pub fn step_particles(
         let mut orbit_x = 0.0;
         let mut orbit_y = 0.0;
 
-        let archetype = particle
-            .species_id
-            .and_then(|id| archetypes.get(id as usize).copied().flatten());
+        let archetype = snapshot_archetypes[idx];
+        let is_reaper = matches!(archetype, Some(Archetype::Reaper));
+        let is_harvester = matches!(archetype, Some(Archetype::Harvester)) || particle.rare_trait == RareTrait::Devourer;
 
-        for other in &snapshot {
+        for (other_idx, other) in snapshot.iter().enumerate() {
+            if idx == other_idx {
+                continue;
+            }
+
+            let other_archetype = snapshot_archetypes[other_idx];
+            let other_is_harvester =
+                matches!(other_archetype, Some(Archetype::Harvester)) || other.rare_trait == RareTrait::Devourer;
+            let other_is_reaper = matches!(other_archetype, Some(Archetype::Reaper));
+
             let dx = other.x - particle.x;
             let dy = other.y - particle.y;
             let d2 = dx * dx + dy * dy;
@@ -98,6 +123,7 @@ pub fn step_particles(
                     Some(Archetype::Architect) => 1.55,
                     Some(Archetype::Leviathan) => 1.7,
                     Some(Archetype::Harvester) => 0.96,
+                    Some(Archetype::Reaper) => 0.55,
                     Some(Archetype::Parasite) => 0.82,
                     _ => 1.0,
                 };
@@ -113,11 +139,39 @@ pub fn step_particles(
 
             let mut perception = particle.genome.perception * env.perception_mult();
 
-            if matches!(archetype, Some(Archetype::Grazer | Archetype::Hunter | Archetype::Harvester)) {
-                perception *= 1.15;
+            if matches!(archetype, Some(Archetype::Grazer | Archetype::Hunter | Archetype::Harvester | Archetype::Reaper)) {
+                perception *= 1.18;
             }
 
             if d > perception {
+                continue;
+            }
+
+            if is_reaper && other_is_harvester {
+                let chase = (1.0 - d / perception).max(0.0) * 3.1;
+                fx += (dx / d) * chase;
+                fy += (dy / d) * chase;
+
+                if d < 0.045 {
+                    let bite = 2.8 + particle.genome.volatility * 1.2;
+                    damage[other_idx] += bite;
+                    particle.energy += bite * 1.9;
+                    particle.health += bite * 0.45;
+                    particle.mass += 0.004;
+
+                    if other.health <= bite + 1.0 {
+                        report.harvesters_consumed += 1;
+                    }
+                }
+
+                continue;
+            }
+
+            if is_harvester && other_is_reaper {
+                let fear = (1.0 - d / perception).max(0.0) * 2.2;
+                fx -= (dx / d) * fear;
+                fy -= (dy / d) * fear;
+                particle.energy -= 0.006;
                 continue;
             }
 
@@ -132,6 +186,10 @@ pub fn step_particles(
 
             if matches!(archetype, Some(Archetype::Hunter)) {
                 force *= 1.18;
+            }
+
+            if matches!(archetype, Some(Archetype::Reaper)) && !other_is_harvester {
+                force *= 0.35;
             }
 
             fx += (dx / d) * force;
@@ -165,7 +223,7 @@ pub fn step_particles(
         }
 
         apply_ecology(particle, ecology);
-        consumed_cells += apply_substrate(particle, substrate, archetype);
+        report.cells_consumed += apply_substrate(particle, substrate, archetype);
 
         let mass_drag = (1.0 + particle.mass * 0.13).clamp(1.0, 2.0);
 
@@ -229,6 +287,12 @@ pub fn step_particles(
             particle.genome.perception = (particle.genome.perception + 0.00002).clamp(0.1, 0.38);
         }
 
+        if matches!(archetype, Some(Archetype::Reaper)) {
+            particle.energy -= 0.018;
+            particle.health -= 0.006;
+            particle.mass = (particle.mass + 0.002).clamp(0.45, 7.0);
+        }
+
         if particle.rare_trait == RareTrait::Radiant {
             particle.energy += 0.015;
         }
@@ -252,7 +316,17 @@ pub fn step_particles(
         particle.age = particle.age.saturating_add(1);
     }
 
-    consumed_cells
+    for (idx, amount) in damage.into_iter().enumerate() {
+        if amount > 0.0 {
+            if let Some(particle) = particles.get_mut(idx) {
+                particle.health -= amount;
+                particle.energy -= amount * 1.4;
+                particle.mass = (particle.mass - amount * 0.002).clamp(0.45, 7.0);
+            }
+        }
+    }
+
+    report
 }
 
 fn predator_factor(a: Tribe, b: Tribe, archetype: Option<Archetype>) -> f32 {
@@ -267,7 +341,7 @@ fn predator_factor(a: Tribe, b: Tribe, archetype: Option<Archetype>) -> f32 {
         1.0
     };
 
-    if matches!(archetype, Some(Archetype::Hunter)) {
+    if matches!(archetype, Some(Archetype::Hunter | Archetype::Reaper)) {
         base * 1.24
     } else if matches!(archetype, Some(Archetype::Grazer | Archetype::Harvester)) {
         base * 0.86
@@ -287,14 +361,15 @@ fn apply_substrate(
     let is_harvester = matches!(archetype, Some(Archetype::Harvester)) || particle.rare_trait == RareTrait::Devourer;
 
     if is_harvester && kind != CellKind::Empty {
-        let power = if particle.rare_trait == RareTrait::Devourer { 90.0 } else { 55.0 };
+        let power = if particle.rare_trait == RareTrait::Devourer { 84.0 } else { 48.0 };
+        let compost = true;
 
-        if let Some(eaten) = substrate.consume_at(particle.x, particle.y, power) {
+        if let Some(eaten) = substrate.consume_at(particle.x, particle.y, power, compost) {
             let gain = eaten.food_value();
 
-            particle.energy += gain * if particle.rare_trait == RareTrait::Devourer { 1.45 } else { 1.0 };
-            particle.health += gain * 0.22;
-            particle.mass += gain * 0.003;
+            particle.energy += gain * if particle.rare_trait == RareTrait::Devourer { 1.35 } else { 0.95 };
+            particle.health += gain * 0.18;
+            particle.mass += gain * 0.0025;
             consumed += 1;
         }
 
@@ -315,8 +390,8 @@ fn apply_substrate(
             particle.health += 0.02;
         }
         CellKind::Dead => {
-            particle.energy -= 0.035;
-            particle.health -= 0.025;
+            particle.energy -= 0.02;
+            particle.health -= 0.015;
         }
         CellKind::Mutagen => {
             particle.genome.volatility = (particle.genome.volatility + 0.00055).clamp(0.36, 1.95);

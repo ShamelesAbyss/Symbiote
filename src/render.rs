@@ -2,6 +2,7 @@ use crate::{
     app::{App, Environment},
     automata::CellKind,
     particle::Tribe,
+    species::Archetype,
 };
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -71,7 +72,7 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let lines = vec![
         Line::from(vec![
             Span::styled(" ◉ SYMBIOTE ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            Span::styled("harvester cellular ecosystem ", Style::default().fg(Color::Magenta)),
+            Span::styled("reaper ecology substrate ", Style::default().fg(Color::Magenta)),
             Span::styled(pulse.repeat(12), Style::default().fg(env_color(app.environment))),
         ]),
         Line::from(vec![
@@ -87,6 +88,8 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
             Span::styled(format!("{}", app.substrate.living_cells()), Style::default().fg(Color::Green)),
             Span::styled(" | eaten: ", Style::default().fg(Color::DarkGray)),
             Span::styled(format!("{}", app.memory.total_cells_consumed), Style::default().fg(Color::Cyan)),
+            Span::styled(" | reaped: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{}", app.memory.total_harvesters_consumed), Style::default().fg(Color::Red)),
             Span::styled(" | ", Style::default().fg(Color::DarkGray)),
             Span::styled(status, Style::default().fg(if app.paused { Color::Yellow } else { Color::Green })),
         ]),
@@ -112,6 +115,11 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         let y = (((particle.y + 1.2) / 2.4) * height as f32) as isize;
 
         if x >= 0 && y >= 0 && x < width as isize && y < height as isize {
+            let archetype = particle
+                .species_id
+                .and_then(|id| app.species_bank.species.iter().find(|species| species.id == id))
+                .map(|species| species.archetype);
+
             let cell = &mut cells[y as usize][x as usize];
             cell.count += 1;
             cell.tribe_counts[particle.tribe.index()] += 1;
@@ -125,6 +133,14 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
             if !particle.rare_trait.short().is_empty() {
                 cell.rare = true;
+            }
+
+            if archetype == Some(Archetype::Harvester) {
+                cell.harvester = true;
+            }
+
+            if archetype == Some(Archetype::Reaper) {
+                cell.reaper = true;
             }
         }
     }
@@ -155,7 +171,11 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 let avg_health = cell.health / cell.count as f32;
                 let avg_mass = cell.mass / cell.count as f32;
 
-                let glyph = if cell.rare {
+                let glyph = if cell.reaper {
+                    'Ω'
+                } else if cell.harvester {
+                    '♻'
+                } else if cell.rare {
                     '✦'
                 } else if cell.clustered > 0 && avg_mass > 3.8 {
                     '█'
@@ -169,11 +189,17 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                     '•'
                 };
 
-                let mut style = Style::default().fg(tribe.color()).add_modifier(Modifier::BOLD);
+                let mut style = if cell.reaper {
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+                } else if cell.harvester {
+                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(tribe.color()).add_modifier(Modifier::BOLD)
+                };
 
-                if cell.rare {
+                if cell.rare && !cell.reaper {
                     style = style.fg(Color::White).add_modifier(Modifier::BOLD);
-                } else if avg_health < 24.0 {
+                } else if avg_health < 24.0 && !cell.reaper {
                     style = style.fg(Color::DarkGray);
                 }
 
@@ -361,12 +387,19 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
     for cluster in app.clusters.clusters.iter().take(4) {
         let archetype = cluster.archetype.map(|value| value.short()).unwrap_or("UNK");
+        let archetype_color = if archetype == "RPR" {
+            Color::Red
+        } else if archetype == "HRV" {
+            Color::Green
+        } else {
+            Color::Magenta
+        };
 
         lines.push(Line::from(vec![
             Span::styled(format!("#{} ", cluster.id), Style::default().fg(Color::DarkGray)),
             Span::styled(cluster.direction_glyph().to_string(), Style::default().fg(Color::Cyan)),
             Span::raw(" "),
-            Span::styled(archetype, Style::default().fg(if archetype == "HRV" { Color::Green } else { Color::Magenta })),
+            Span::styled(archetype, Style::default().fg(archetype_color)),
             Span::raw(" "),
             Span::styled(format!("{} ", cluster.size), Style::default().fg(cluster.dominant.color())),
             Span::styled(format!("a{}", cluster.age), Style::default().fg(Color::Cyan)),
@@ -387,7 +420,13 @@ fn render_species(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         .species_bank
         .species
         .iter()
-        .filter(|species| !species.extinct && species.archetype.short() == "HRV")
+        .filter(|species| !species.extinct && species.archetype == Archetype::Harvester)
+        .count();
+    let reapers = app
+        .species_bank
+        .species
+        .iter()
+        .filter(|species| !species.extinct && species.archetype == Archetype::Reaper)
         .count();
 
     let mut lines = vec![Line::from(vec![
@@ -395,19 +434,30 @@ fn render_species(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         Span::styled(format!("{}", app.species_bank.active_count()), Style::default().fg(Color::Green)),
         Span::styled(" HRV: ", Style::default().fg(Color::DarkGray)),
         Span::styled(format!("{}", harvesters), Style::default().fg(Color::Green)),
-        Span::styled(" Extinct: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(format!("{}", extinct), Style::default().fg(Color::Red)),
+        Span::styled(" RPR: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", reapers), Style::default().fg(Color::Red)),
     ])];
+
+    lines.push(Line::from(vec![
+        Span::styled("Extinct: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", extinct), Style::default().fg(Color::Red)),
+        Span::styled(" Reaped: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", app.memory.total_harvesters_consumed), Style::default().fg(Color::Red)),
+    ]));
 
     for species in app.species_bank.species.iter().rev().filter(|species| !species.extinct).take(3) {
         let rare = species.rare_trait.short();
+        let archetype_color = if species.archetype == Archetype::Reaper {
+            Color::Red
+        } else if species.archetype == Archetype::Harvester {
+            Color::Green
+        } else {
+            Color::Magenta
+        };
 
         lines.push(Line::from(vec![
             Span::styled(format!("{} ", species.name), Style::default().fg(species.dominant_tribe.color())),
-            Span::styled(
-                species.archetype.short(),
-                Style::default().fg(if species.archetype.short() == "HRV" { Color::Green } else { Color::Magenta }),
-            ),
+            Span::styled(species.archetype.short(), Style::default().fg(archetype_color)),
             Span::styled(format!(" p{}", species.peak_size), Style::default().fg(Color::Cyan)),
             Span::styled(format!(" {}", rare), Style::default().fg(Color::White)),
         ]));
@@ -490,6 +540,8 @@ struct Cell {
     membrane: bool,
     trail: bool,
     rare: bool,
+    harvester: bool,
+    reaper: bool,
     zone: Option<(char, Color)>,
     substrate: Option<(char, Color)>,
 }
@@ -506,6 +558,8 @@ impl Default for Cell {
             membrane: false,
             trail: false,
             rare: false,
+            harvester: false,
+            reaper: false,
             zone: None,
             substrate: None,
         }

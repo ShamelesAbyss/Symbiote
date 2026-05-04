@@ -142,15 +142,15 @@ impl App {
         };
 
         app.reset_particles();
-        app.push_event("native reproduction engine online");
-        app.push_event("harvester ecology online");
+        app.push_event("regenerative substrate online");
+        app.push_event("reaper ecology online");
         app
     }
 
     pub fn step(&mut self) {
         let archetype_lookup = self.build_archetype_lookup();
 
-        let consumed = step_particles(
+        let report = step_particles(
             &mut self.particles,
             &self.rules,
             self.environment,
@@ -159,12 +159,17 @@ impl App {
             &archetype_lookup,
         );
 
-        if consumed > 0 {
-            self.memory.total_cells_consumed += consumed as u64;
+        if report.cells_consumed > 0 {
+            self.memory.total_cells_consumed += report.cells_consumed as u64;
 
-            if consumed >= 12 && self.age % 120 == 0 {
-                self.push_event(&format!("harvesters consumed {} substrate cells", consumed));
+            if report.cells_consumed >= 12 && self.age % 120 == 0 {
+                self.push_event(&format!("harvesters consumed {} substrate cells", report.cells_consumed));
             }
+        }
+
+        if report.harvesters_consumed > 0 {
+            self.memory.total_harvesters_consumed += report.harvesters_consumed as u64;
+            self.push_event(&format!("reaper consumed {} harvester(s)", report.harvesters_consumed));
         }
 
         self.age += 1;
@@ -251,6 +256,13 @@ impl App {
             self.substrate.living_cells() as f32 / self.substrate.total_cells() as f32
         };
 
+        let active_harvesters = self
+            .species_bank
+            .species
+            .iter()
+            .filter(|species| !species.extinct && species.archetype == Archetype::Harvester)
+            .count();
+
         for parent in snapshot.iter() {
             if self.particles.len() + children.len() >= MAX_PARTICLES {
                 break;
@@ -296,6 +308,16 @@ impl App {
                 if substrate_density > 0.14 && rng.gen_bool(0.06) {
                     child.rare_trait = RareTrait::Devourer;
                 }
+            }
+
+            if active_harvesters >= 3 && substrate_density < 0.045 && rng.gen_bool(0.09) {
+                child.genome.volatility = rng.gen_range(1.73..1.92);
+                child.genome.perception = rng.gen_range(0.315..0.38);
+                child.genome.hunger = rng.gen_range(0.022..0.036);
+                child.genome.fertility = rng.gen_range(0.55..1.18);
+                child.genome.bonding = rng.gen_range(0.55..1.15);
+                child.mass = (child.mass + rng.gen_range(0.4..1.2)).clamp(0.45, 7.0);
+                child.species_id = None;
             }
 
             self.species_bank.record_birth(parent.species_id);
@@ -577,13 +599,14 @@ impl App {
 
         self.memory.peak_rare_lifeforms = self.memory.peak_rare_lifeforms.max(rare_count);
 
-        let mut counts = [0usize; 10];
+        let mut counts = [0usize; 11];
 
         for species in self.species_bank.species.iter().filter(|species| !species.extinct) {
             counts[species.archetype.index()] += 1;
         }
 
         self.memory.peak_harvesters = self.memory.peak_harvesters.max(counts[Archetype::Harvester.index()]);
+        self.memory.peak_reapers = self.memory.peak_reapers.max(counts[Archetype::Reaper.index()]);
 
         let archetypes = [
             Archetype::Swarmer,
@@ -596,11 +619,12 @@ impl App {
             Archetype::Mycelial,
             Archetype::Phantom,
             Archetype::Harvester,
+            Archetype::Reaper,
         ];
 
         let mut best = 0;
 
-        for i in 1..10 {
+        for i in 1..11 {
             if counts[i] > counts[best] {
                 best = i;
             }

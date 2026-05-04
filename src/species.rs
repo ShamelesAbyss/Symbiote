@@ -13,6 +13,7 @@ pub enum Archetype {
     Mycelial,
     Phantom,
     Harvester,
+    Reaper,
 }
 
 impl Archetype {
@@ -28,6 +29,7 @@ impl Archetype {
             Self::Mycelial => "Mycelial",
             Self::Phantom => "Phantom",
             Self::Harvester => "Harvester",
+            Self::Reaper => "Reaper",
         }
     }
 
@@ -43,6 +45,7 @@ impl Archetype {
             Self::Mycelial => "MYC",
             Self::Phantom => "PHM",
             Self::Harvester => "HRV",
+            Self::Reaper => "RPR",
         }
     }
 
@@ -58,6 +61,7 @@ impl Archetype {
             Self::Mycelial => 7,
             Self::Phantom => 8,
             Self::Harvester => 9,
+            Self::Reaper => 10,
         }
     }
 }
@@ -198,7 +202,9 @@ impl SpeciesBank {
 }
 
 pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> Archetype {
-    if rare_trait == RareTrait::Devourer {
+    if genome.volatility > 1.72 && genome.perception > 0.31 && genome.hunger > 0.021 && genome.fertility < 1.25 {
+        Archetype::Reaper
+    } else if rare_trait == RareTrait::Devourer {
         Archetype::Harvester
     } else if rare_trait == RareTrait::Voidborne {
         Archetype::Phantom
