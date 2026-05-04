@@ -45,10 +45,11 @@ pub fn step_particles(
     rules: &RuleMatrix,
     env: Environment,
     ecology: &Ecology,
-    substrate: &CellularAutomata,
+    substrate: &mut CellularAutomata,
     archetypes: &[Option<Archetype>],
-) {
+) -> usize {
     let snapshot = particles.to_vec();
+    let mut consumed_cells = 0usize;
 
     for particle in particles.iter_mut() {
         let mut fx = 0.0;
@@ -96,6 +97,7 @@ pub fn step_particles(
                     Some(Archetype::Swarmer) => 1.35,
                     Some(Archetype::Architect) => 1.55,
                     Some(Archetype::Leviathan) => 1.7,
+                    Some(Archetype::Harvester) => 0.96,
                     Some(Archetype::Parasite) => 0.82,
                     _ => 1.0,
                 };
@@ -111,7 +113,7 @@ pub fn step_particles(
 
             let mut perception = particle.genome.perception * env.perception_mult();
 
-            if matches!(archetype, Some(Archetype::Grazer | Archetype::Hunter)) {
+            if matches!(archetype, Some(Archetype::Grazer | Archetype::Hunter | Archetype::Harvester)) {
                 perception *= 1.15;
             }
 
@@ -163,7 +165,7 @@ pub fn step_particles(
         }
 
         apply_ecology(particle, ecology);
-        apply_substrate(particle, substrate);
+        consumed_cells += apply_substrate(particle, substrate, archetype);
 
         let mass_drag = (1.0 + particle.mass * 0.13).clamp(1.0, 2.0);
 
@@ -223,6 +225,10 @@ pub fn step_particles(
             particle.mass += 0.002;
         }
 
+        if matches!(archetype, Some(Archetype::Harvester)) {
+            particle.genome.perception = (particle.genome.perception + 0.00002).clamp(0.1, 0.38);
+        }
+
         if particle.rare_trait == RareTrait::Radiant {
             particle.energy += 0.015;
         }
@@ -230,6 +236,11 @@ pub fn step_particles(
         if particle.rare_trait == RareTrait::Voracious {
             particle.energy -= 0.01;
             particle.health += 0.008;
+        }
+
+        if particle.rare_trait == RareTrait::Devourer {
+            particle.energy -= 0.006;
+            particle.health += 0.006;
         }
 
         particle.energy -= particle.genome.metabolism * env.hunger_mult();
@@ -240,6 +251,8 @@ pub fn step_particles(
         particle.mass = particle.mass.clamp(0.45, 7.0);
         particle.age = particle.age.saturating_add(1);
     }
+
+    consumed_cells
 }
 
 fn predator_factor(a: Tribe, b: Tribe, archetype: Option<Archetype>) -> f32 {
@@ -256,15 +269,39 @@ fn predator_factor(a: Tribe, b: Tribe, archetype: Option<Archetype>) -> f32 {
 
     if matches!(archetype, Some(Archetype::Hunter)) {
         base * 1.24
-    } else if matches!(archetype, Some(Archetype::Grazer)) {
+    } else if matches!(archetype, Some(Archetype::Grazer | Archetype::Harvester)) {
         base * 0.86
     } else {
         base
     }
 }
 
-fn apply_substrate(particle: &mut Particle, substrate: &CellularAutomata) {
-    match substrate.influence_at(particle.x, particle.y) {
+fn apply_substrate(
+    particle: &mut Particle,
+    substrate: &mut CellularAutomata,
+    archetype: Option<Archetype>,
+) -> usize {
+    let kind = substrate.influence_at(particle.x, particle.y);
+    let mut consumed = 0usize;
+
+    let is_harvester = matches!(archetype, Some(Archetype::Harvester)) || particle.rare_trait == RareTrait::Devourer;
+
+    if is_harvester && kind != CellKind::Empty {
+        let power = if particle.rare_trait == RareTrait::Devourer { 90.0 } else { 55.0 };
+
+        if let Some(eaten) = substrate.consume_at(particle.x, particle.y, power) {
+            let gain = eaten.food_value();
+
+            particle.energy += gain * if particle.rare_trait == RareTrait::Devourer { 1.45 } else { 1.0 };
+            particle.health += gain * 0.22;
+            particle.mass += gain * 0.003;
+            consumed += 1;
+        }
+
+        return consumed;
+    }
+
+    match kind {
         CellKind::Life => {
             particle.energy += 0.018;
             particle.health += 0.012;
@@ -291,6 +328,8 @@ fn apply_substrate(particle: &mut Particle, substrate: &CellularAutomata) {
         }
         CellKind::Empty => {}
     }
+
+    consumed
 }
 
 fn apply_ecology(particle: &mut Particle, ecology: &Ecology) {
@@ -441,7 +480,9 @@ pub fn mutate_genome(mut genome: Genome, rng: &mut StdRng) -> Genome {
 }
 
 fn roll_rare_trait(rng: &mut StdRng, genome: Genome, mass: f32) -> RareTrait {
-    if mass > 5.6 && genome.membrane > 1.1 {
+    if genome.perception > 0.32 && genome.fertility > 1.65 && rng.gen_bool(0.28) {
+        RareTrait::Devourer
+    } else if mass > 5.6 && genome.membrane > 1.1 {
         RareTrait::ElderCore
     } else if genome.fertility > 1.9 && genome.bonding > 1.7 {
         RareTrait::SporeKing

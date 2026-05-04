@@ -221,7 +221,7 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
     let mut vx = 0.0;
     let mut vy = 0.0;
     let mut tribe_counts = [0usize; 6];
-    let mut rare_counts = [0usize; 7];
+    let mut rare_counts = [0usize; 8];
     let mut membrane = 0.0;
 
     let mut genome = Genome {
@@ -295,7 +295,7 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
 
     let mut best_rare = 0;
 
-    for i in 1..7 {
+    for i in 1..8 {
         if rare_counts[i] > rare_counts[best_rare] {
             best_rare = i;
         }
@@ -332,6 +332,7 @@ fn rare_index(rare_trait: RareTrait) -> usize {
         RareTrait::Voidborne => 4,
         RareTrait::SymbioticCore => 5,
         RareTrait::SporeKing => 6,
+        RareTrait::Devourer => 7,
     }
 }
 
@@ -343,6 +344,7 @@ fn rare_from_index(index: usize) -> RareTrait {
         4 => RareTrait::Voidborne,
         5 => RareTrait::SymbioticCore,
         6 => RareTrait::SporeKing,
+        7 => RareTrait::Devourer,
         _ => RareTrait::None,
     }
 }

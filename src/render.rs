@@ -71,7 +71,7 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let lines = vec![
         Line::from(vec![
             Span::styled(" ◉ SYMBIOTE ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            Span::styled("balanced cellular ecosystem ", Style::default().fg(Color::Magenta)),
+            Span::styled("harvester cellular ecosystem ", Style::default().fg(Color::Magenta)),
             Span::styled(pulse.repeat(12), Style::default().fg(env_color(app.environment))),
         ]),
         Line::from(vec![
@@ -85,6 +85,8 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
             Span::styled(format!("{}", app.species_bank.active_count()), Style::default().fg(Color::Yellow)),
             Span::styled(" | cells: ", Style::default().fg(Color::DarkGray)),
             Span::styled(format!("{}", app.substrate.living_cells()), Style::default().fg(Color::Green)),
+            Span::styled(" | eaten: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{}", app.memory.total_cells_consumed), Style::default().fg(Color::Cyan)),
             Span::styled(" | ", Style::default().fg(Color::DarkGray)),
             Span::styled(status, Style::default().fg(if app.paused { Color::Yellow } else { Color::Green })),
         ]),
@@ -337,6 +339,8 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         Span::styled(format!("{}", app.ecology.zones.len()), Style::default().fg(Color::Cyan)),
         Span::styled(" Cells: ", Style::default().fg(Color::Yellow)),
         Span::styled(format!("{}", app.substrate.living_cells()), Style::default().fg(Color::Green)),
+        Span::styled(" Eaten: ", Style::default().fg(Color::Yellow)),
+        Span::styled(format!("{}", app.memory.total_cells_consumed), Style::default().fg(Color::Cyan)),
     ]));
 
     f.render_widget(
@@ -362,7 +366,7 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
             Span::styled(format!("#{} ", cluster.id), Style::default().fg(Color::DarkGray)),
             Span::styled(cluster.direction_glyph().to_string(), Style::default().fg(Color::Cyan)),
             Span::raw(" "),
-            Span::styled(archetype, Style::default().fg(Color::Magenta)),
+            Span::styled(archetype, Style::default().fg(if archetype == "HRV" { Color::Green } else { Color::Magenta })),
             Span::raw(" "),
             Span::styled(format!("{} ", cluster.size), Style::default().fg(cluster.dominant.color())),
             Span::styled(format!("a{}", cluster.age), Style::default().fg(Color::Cyan)),
@@ -379,10 +383,18 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
 fn render_species(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let extinct = app.species_bank.species.iter().filter(|species| species.extinct).count();
+    let harvesters = app
+        .species_bank
+        .species
+        .iter()
+        .filter(|species| !species.extinct && species.archetype.short() == "HRV")
+        .count();
 
     let mut lines = vec![Line::from(vec![
         Span::styled("Active: ", Style::default().fg(Color::DarkGray)),
         Span::styled(format!("{}", app.species_bank.active_count()), Style::default().fg(Color::Green)),
+        Span::styled(" HRV: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", harvesters), Style::default().fg(Color::Green)),
         Span::styled(" Extinct: ", Style::default().fg(Color::DarkGray)),
         Span::styled(format!("{}", extinct), Style::default().fg(Color::Red)),
     ])];
@@ -392,7 +404,10 @@ fn render_species(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
         lines.push(Line::from(vec![
             Span::styled(format!("{} ", species.name), Style::default().fg(species.dominant_tribe.color())),
-            Span::styled(species.archetype.short(), Style::default().fg(Color::Magenta)),
+            Span::styled(
+                species.archetype.short(),
+                Style::default().fg(if species.archetype.short() == "HRV" { Color::Green } else { Color::Magenta }),
+            ),
             Span::styled(format!(" p{}", species.peak_size), Style::default().fg(Color::Cyan)),
             Span::styled(format!(" {}", rare), Style::default().fg(Color::White)),
         ]));

@@ -12,6 +12,7 @@ pub enum Archetype {
     Leviathan,
     Mycelial,
     Phantom,
+    Harvester,
 }
 
 impl Archetype {
@@ -26,6 +27,7 @@ impl Archetype {
             Self::Leviathan => "Leviathan",
             Self::Mycelial => "Mycelial",
             Self::Phantom => "Phantom",
+            Self::Harvester => "Harvester",
         }
     }
 
@@ -40,6 +42,7 @@ impl Archetype {
             Self::Leviathan => "LEV",
             Self::Mycelial => "MYC",
             Self::Phantom => "PHM",
+            Self::Harvester => "HRV",
         }
     }
 
@@ -54,6 +57,7 @@ impl Archetype {
             Self::Leviathan => 6,
             Self::Mycelial => 7,
             Self::Phantom => 8,
+            Self::Harvester => 9,
         }
     }
 }
@@ -194,12 +198,16 @@ impl SpeciesBank {
 }
 
 pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> Archetype {
-    if rare_trait == RareTrait::Voidborne {
+    if rare_trait == RareTrait::Devourer {
+        Archetype::Harvester
+    } else if rare_trait == RareTrait::Voidborne {
         Archetype::Phantom
     } else if rare_trait == RareTrait::SporeKing {
         Archetype::Mycelial
     } else if rare_trait == RareTrait::ElderCore || size > 72 {
         Archetype::Leviathan
+    } else if genome.perception > 0.27 && genome.fertility > 1.42 && genome.hunger < 0.017 {
+        Archetype::Harvester
     } else if genome.orbit > 0.95 {
         Archetype::Orbiter
     } else if genome.membrane > 1.1 && genome.bonding > 1.35 {

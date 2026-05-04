@@ -66,6 +66,7 @@ pub enum RareTrait {
     Voidborne,
     SymbioticCore,
     SporeKing,
+    Devourer,
 }
 
 impl RareTrait {
@@ -78,6 +79,7 @@ impl RareTrait {
             Self::Voidborne => "VOI",
             Self::SymbioticCore => "SYM",
             Self::SporeKing => "SPK",
+            Self::Devourer => "DEV",
         }
     }
 }

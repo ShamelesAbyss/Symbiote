@@ -31,6 +31,18 @@ impl CellKind {
     pub fn is_alive(self) -> bool {
         matches!(self, Self::Life | Self::Spore | Self::Nest)
     }
+
+    pub fn food_value(self) -> f32 {
+        match self {
+            Self::Life => 14.0,
+            Self::Nutrient => 22.0,
+            Self::Spore => 18.0,
+            Self::Nest => 26.0,
+            Self::Mutagen => 10.0,
+            Self::Dead => 5.0,
+            Self::Empty => 0.0,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -221,6 +233,7 @@ impl CellularAutomata {
                 Some(Archetype::Architect) | Some(Archetype::Leviathan) => CellKind::Nest,
                 Some(Archetype::Mycelial) => CellKind::Spore,
                 Some(Archetype::Phantom) => CellKind::Mutagen,
+                Some(Archetype::Harvester) => CellKind::Nutrient,
                 _ => CellKind::Life,
             }
         };
@@ -228,6 +241,27 @@ impl CellularAutomata {
         cell.kind = desired;
         cell.energy = (cell.energy + particle.energy * 0.055).clamp(0.0, 80.0);
         cell.tribe_hint = particle.tribe.index();
+    }
+
+    pub fn consume_at(&mut self, x: f32, y: f32, power: f32) -> Option<CellKind> {
+        let (gx, gy) = self.world_to_grid(x, y)?;
+        let idx = self.idx(gx, gy);
+        let cell = &mut self.cells[idx];
+
+        if cell.kind == CellKind::Empty {
+            return None;
+        }
+
+        let eaten = cell.kind;
+        cell.energy -= power;
+
+        if cell.energy <= 0.0 || matches!(eaten, CellKind::Life | CellKind::Spore | CellKind::Nutrient) {
+            cell.kind = CellKind::Empty;
+            cell.energy = 0.0;
+            cell.age = 0;
+        }
+
+        Some(eaten)
     }
 
     pub fn influence_at(&self, x: f32, y: f32) -> CellKind {
@@ -251,6 +285,10 @@ impl CellularAutomata {
 
     pub fn living_cells(&self) -> usize {
         self.cells.iter().filter(|cell| cell.kind.is_alive()).count()
+    }
+
+    pub fn total_cells(&self) -> usize {
+        self.cells.len()
     }
 
     fn seed_initial_life(&mut self) {

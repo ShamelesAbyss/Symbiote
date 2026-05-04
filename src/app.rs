@@ -143,21 +143,29 @@ impl App {
 
         app.reset_particles();
         app.push_event("native reproduction engine online");
-        app.push_event("balanced cellular substrate online");
+        app.push_event("harvester ecology online");
         app
     }
 
     pub fn step(&mut self) {
         let archetype_lookup = self.build_archetype_lookup();
 
-        step_particles(
+        let consumed = step_particles(
             &mut self.particles,
             &self.rules,
             self.environment,
             &self.ecology,
-            &self.substrate,
+            &mut self.substrate,
             &archetype_lookup,
         );
+
+        if consumed > 0 {
+            self.memory.total_cells_consumed += consumed as u64;
+
+            if consumed >= 12 && self.age % 120 == 0 {
+                self.push_event(&format!("harvesters consumed {} substrate cells", consumed));
+            }
+        }
 
         self.age += 1;
 
@@ -237,6 +245,12 @@ impl App {
         let snapshot = self.particles.clone();
         let mut children = Vec::new();
 
+        let substrate_density = if self.substrate.total_cells() == 0 {
+            0.0
+        } else {
+            self.substrate.living_cells() as f32 / self.substrate.total_cells() as f32
+        };
+
         for parent in snapshot.iter() {
             if self.particles.len() + children.len() >= MAX_PARTICLES {
                 break;
@@ -266,12 +280,23 @@ impl App {
                 })
                 .copied();
 
-            let child = if let Some(partner) = maybe_partner {
+            let mut child = if let Some(partner) = maybe_partner {
                 self.memory.total_fusions += 1;
                 fused_child(*parent, partner, rng.gen())
             } else {
                 child_from(*parent, rng.gen())
             };
+
+            if substrate_density > 0.09 && rng.gen_bool((substrate_density * 1.8).clamp(0.02, 0.22) as f64) {
+                child.genome.perception = (child.genome.perception + rng.gen_range(0.025..0.07)).clamp(0.1, 0.38);
+                child.genome.fertility = (child.genome.fertility + rng.gen_range(0.12..0.32)).clamp(0.2, 2.4);
+                child.genome.hunger = (child.genome.hunger - rng.gen_range(0.001..0.006)).clamp(0.005, 0.04);
+                child.species_id = None;
+
+                if substrate_density > 0.14 && rng.gen_bool(0.06) {
+                    child.rare_trait = RareTrait::Devourer;
+                }
+            }
 
             self.species_bank.record_birth(parent.species_id);
             children.push(child);
@@ -552,11 +577,13 @@ impl App {
 
         self.memory.peak_rare_lifeforms = self.memory.peak_rare_lifeforms.max(rare_count);
 
-        let mut counts = [0usize; 9];
+        let mut counts = [0usize; 10];
 
         for species in self.species_bank.species.iter().filter(|species| !species.extinct) {
             counts[species.archetype.index()] += 1;
         }
+
+        self.memory.peak_harvesters = self.memory.peak_harvesters.max(counts[Archetype::Harvester.index()]);
 
         let archetypes = [
             Archetype::Swarmer,
@@ -568,11 +595,12 @@ impl App {
             Archetype::Leviathan,
             Archetype::Mycelial,
             Archetype::Phantom,
+            Archetype::Harvester,
         ];
 
         let mut best = 0;
 
-        for i in 1..9 {
+        for i in 1..10 {
             if counts[i] > counts[best] {
                 best = i;
             }
