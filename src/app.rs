@@ -7,6 +7,7 @@ use crate::{
     sim::{build_rule_matrix, child_from, fused_child, mutate_rules, step_particles, RuleMatrix},
     species::{Archetype, SpeciesBank},
 };
+
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fs, path::Path};
@@ -163,13 +164,30 @@ impl App {
             self.memory.total_cells_consumed += report.cells_consumed as u64;
 
             if report.cells_consumed >= 12 && self.age % 120 == 0 {
-                self.push_event(&format!("harvesters consumed {} substrate cells", report.cells_consumed));
+                self.push_event(&format!(
+                    "harvesters consumed {} substrate cells",
+                    report.cells_consumed
+                ));
             }
         }
 
         if report.harvesters_consumed > 0 {
             self.memory.total_harvesters_consumed += report.harvesters_consumed as u64;
-            self.push_event(&format!("reaper consumed {} harvester(s)", report.harvesters_consumed));
+            self.push_event(&format!(
+                "reaper consumed {} harvester(s)",
+                report.harvesters_consumed
+            ));
+        }
+
+        if report.harvester_particles >= 15 && self.age % 180 == 0 {
+            self.push_event(&format!(
+                "harvester pressure rising: {} bodies",
+                report.harvester_particles
+            ));
+        }
+
+        if report.reaper_particles > 0 && self.age % 240 == 0 {
+            self.push_event(&format!("reaper pressure active: {}", report.reaper_particles));
         }
 
         self.age += 1;
@@ -190,14 +208,19 @@ impl App {
 
         if self.age % 24 == 0 {
             let before_species = self.species_bank.species.len();
+
             let cluster_events =
                 self.clusters
                     .update(&mut self.particles, &mut self.species_bank, self.age);
+
             let after_species = self.species_bank.species.len();
 
             if after_species > before_species {
                 self.memory.total_species_created += (after_species - before_species) as u64;
-                self.push_event(&format!("{} new species emerged", after_species - before_species));
+                self.push_event(&format!(
+                    "{} new species emerged",
+                    after_species - before_species
+                ));
             }
 
             self.process_cluster_events(cluster_events);
@@ -248,6 +271,7 @@ impl App {
 
         let mut rng = StdRng::seed_from_u64(self.seed ^ self.age ^ self.generation);
         let snapshot = self.particles.clone();
+        let archetype_lookup = self.build_archetype_lookup();
         let mut children = Vec::new();
 
         let substrate_density = if self.substrate.total_cells() == 0 {
@@ -256,12 +280,19 @@ impl App {
             self.substrate.living_cells() as f32 / self.substrate.total_cells() as f32
         };
 
-        let active_harvesters = self
-            .species_bank
-            .species
+        let active_harvester_particles = snapshot
             .iter()
-            .filter(|species| !species.extinct && species.archetype == Archetype::Harvester)
+            .filter(|particle| {
+                particle.rare_trait == RareTrait::Devourer
+                    || particle
+                        .species_id
+                        .and_then(|id| archetype_lookup.get(id as usize).copied().flatten())
+                        == Some(Archetype::Harvester)
+            })
             .count();
+
+        let harvester_body_ratio =
+            active_harvester_particles as f32 / snapshot.len().max(1) as f32;
 
         for parent in snapshot.iter() {
             if self.particles.len() + children.len() >= MAX_PARTICLES {
@@ -270,6 +301,7 @@ impl App {
 
             let clustered_bonus = if parent.cluster_id.is_some() { 0.18 } else { 0.0 };
             let rare_bonus = if parent.rare_trait != RareTrait::None { 0.12 } else { 0.0 };
+
             let threshold = 115.0 - parent.genome.fertility * 13.0 - clustered_bonus * 20.0;
 
             if parent.energy < threshold || parent.health < 48.0 || parent.age < 180 {
@@ -277,7 +309,8 @@ impl App {
             }
 
             let chance =
-                (0.018 + parent.genome.fertility * 0.018 + clustered_bonus + rare_bonus).clamp(0.01, 0.38);
+                (0.018 + parent.genome.fertility * 0.018 + clustered_bonus + rare_bonus)
+                    .clamp(0.01, 0.38);
 
             if !rng.gen_bool(chance as f64) {
                 continue;
@@ -299,24 +332,44 @@ impl App {
                 child_from(*parent, rng.gen())
             };
 
-            if substrate_density > 0.09 && rng.gen_bool((substrate_density * 1.8).clamp(0.02, 0.22) as f64) {
-                child.genome.perception = (child.genome.perception + rng.gen_range(0.025..0.07)).clamp(0.1, 0.38);
-                child.genome.fertility = (child.genome.fertility + rng.gen_range(0.12..0.32)).clamp(0.2, 2.4);
-                child.genome.hunger = (child.genome.hunger - rng.gen_range(0.001..0.006)).clamp(0.005, 0.04);
+            if substrate_density > 0.09
+                && rng.gen_bool((substrate_density * 0.95).clamp(0.01, 0.12) as f64)
+            {
+                child.genome.perception =
+                    (child.genome.perception + rng.gen_range(0.004..0.024)).clamp(0.1, 0.38);
+                child.genome.fertility =
+                    (child.genome.fertility + rng.gen_range(0.025..0.11)).clamp(0.2, 2.4);
+                child.genome.hunger =
+                    (child.genome.hunger + rng.gen_range(-0.0004..0.0009)).clamp(0.005, 0.04);
+                child.genome.metabolism =
+                    (child.genome.metabolism + rng.gen_range(-0.0004..0.0008)).clamp(0.004, 0.05);
                 child.species_id = None;
-
-                if substrate_density > 0.14 && rng.gen_bool(0.06) {
-                    child.rare_trait = RareTrait::Devourer;
-                }
             }
 
-            if active_harvesters >= 3 && substrate_density < 0.045 && rng.gen_bool(0.09) {
-                child.genome.volatility = rng.gen_range(1.73..1.92);
-                child.genome.perception = rng.gen_range(0.315..0.38);
-                child.genome.hunger = rng.gen_range(0.022..0.036);
-                child.genome.fertility = rng.gen_range(0.55..1.18);
+            if child.genome.perception > 0.295
+                && child.genome.fertility > 1.35
+                && child.genome.hunger < 0.018
+            {
+                child.genome.hunger =
+                    (child.genome.hunger + rng.gen_range(0.0008..0.0022)).clamp(0.005, 0.04);
+                child.genome.fertility =
+                    (child.genome.fertility - rng.gen_range(0.018..0.05)).clamp(0.2, 2.4);
+                child.genome.metabolism =
+                    (child.genome.metabolism + rng.gen_range(0.0003..0.0012)).clamp(0.004, 0.05);
+                child.species_id = None;
+            }
+
+            if (active_harvester_particles >= 15 || harvester_body_ratio > 0.11)
+                && substrate_density < 0.08
+                && rng.gen_bool(0.15)
+            {
+                child.genome.volatility = rng.gen_range(1.70..1.92);
+                child.genome.perception = rng.gen_range(0.305..0.38);
+                child.genome.hunger = rng.gen_range(0.021..0.036);
+                child.genome.fertility = rng.gen_range(0.50..1.18);
                 child.genome.bonding = rng.gen_range(0.55..1.15);
-                child.mass = (child.mass + rng.gen_range(0.4..1.2)).clamp(0.45, 7.0);
+                child.mass = (child.mass + rng.gen_range(0.35..1.2)).clamp(0.45, 7.0);
+                child.rare_trait = RareTrait::None;
                 child.species_id = None;
             }
 
@@ -352,7 +405,8 @@ impl App {
             let rare_bonus = if particle.rare_trait != RareTrait::None { 0.04 } else { 0.0 };
 
             let survival =
-                (energy_score * 0.44 + health_score * 0.44 + clustered_bonus + rare_bonus - old_age_pressure)
+                (energy_score * 0.44 + health_score * 0.44 + clustered_bonus + rare_bonus
+                    - old_age_pressure)
                     .clamp(0.02, 0.995);
 
             particle.energy > 0.0 && particle.health > 0.0 && rng.gen_bool(survival as f64)
@@ -518,13 +572,15 @@ impl App {
         if events.merges > 0 {
             self.memory.total_merges += events.merges as u64;
             self.push_event("clusters merged into a larger body");
-            self.memory.note(format!("[{}] merge event detected", self.age));
+            self.memory
+                .note(format!("[{}] merge event detected", self.age));
         }
 
         if events.splits > 0 {
             self.memory.total_splits += events.splits as u64;
             self.push_event("cluster split into daughter forms");
-            self.memory.note(format!("[{}] split event detected", self.age));
+            self.memory
+                .note(format!("[{}] split event detected", self.age));
         }
 
         if events.extinctions > 0 {
@@ -579,7 +635,8 @@ impl App {
         self.cohesion = ((1.4 - spread) * 80.0).clamp(0.0, 100.0);
         self.chaos = (self.energy * 0.72 + spread * 22.0).clamp(0.0, 100.0);
         self.drift = ((cx.abs() + cy.abs()) * 55.0).clamp(0.0, 100.0);
-        self.population = ((self.particles.len() as f32 / MAX_PARTICLES as f32) * 100.0).clamp(0.0, 100.0);
+        self.population =
+            ((self.particles.len() as f32 / MAX_PARTICLES as f32) * 100.0).clamp(0.0, 100.0);
     }
 
     fn update_memory(&mut self) {
@@ -589,7 +646,8 @@ impl App {
         self.memory.peak_population = self.memory.peak_population.max(self.particles.len());
         self.memory.peak_clusters = self.memory.peak_clusters.max(self.clusters.clusters.len());
         self.memory.peak_species = self.memory.peak_species.max(self.species_bank.active_count());
-        self.memory.peak_living_cells = self.memory.peak_living_cells.max(self.substrate.living_cells());
+        self.memory.peak_living_cells =
+            self.memory.peak_living_cells.max(self.substrate.living_cells());
 
         let rare_count = self
             .particles
@@ -605,8 +663,10 @@ impl App {
             counts[species.archetype.index()] += 1;
         }
 
-        self.memory.peak_harvesters = self.memory.peak_harvesters.max(counts[Archetype::Harvester.index()]);
-        self.memory.peak_reapers = self.memory.peak_reapers.max(counts[Archetype::Reaper.index()]);
+        self.memory.peak_harvesters =
+            self.memory.peak_harvesters.max(counts[Archetype::Harvester.index()]);
+        self.memory.peak_reapers =
+            self.memory.peak_reapers.max(counts[Archetype::Reaper.index()]);
 
         let archetypes = [
             Archetype::Swarmer,
@@ -641,8 +701,10 @@ impl App {
         }
 
         for cluster in &self.clusters.clusters {
-            self.memory.strongest_cluster_size = self.memory.strongest_cluster_size.max(cluster.size);
-            self.memory.strongest_cluster_age = self.memory.strongest_cluster_age.max(cluster.age);
+            self.memory.strongest_cluster_size =
+                self.memory.strongest_cluster_size.max(cluster.size);
+            self.memory.strongest_cluster_age =
+                self.memory.strongest_cluster_age.max(cluster.age);
         }
     }
 
@@ -690,9 +752,11 @@ fn dist(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
 
 fn hash(seed: u64, x: usize, y: usize) -> usize {
     let mut value = seed as usize;
+
     value ^= x.wrapping_mul(374_761_393);
     value ^= y.wrapping_mul(668_265_263);
     value = (value ^ (value >> 13)).wrapping_mul(1_274_126_177);
+
     value ^ (value >> 16)
 }
 

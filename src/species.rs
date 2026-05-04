@@ -131,11 +131,16 @@ impl SpeciesBank {
             species.peak_size = species.peak_size.max(size);
             species.sightings += 1;
             species.genome = blend_genome(species.genome, genome);
-            species.archetype = derive_archetype(species.genome, species.rare_trait, species.peak_size);
 
             if species.rare_trait == RareTrait::None && rare_trait != RareTrait::None {
                 species.rare_trait = rare_trait;
             }
+
+            species.archetype = derive_archetype(
+                species.genome,
+                species.rare_trait,
+                species.peak_size,
+            );
 
             return species.id;
         }
@@ -202,17 +207,30 @@ impl SpeciesBank {
 }
 
 pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> Archetype {
-    if genome.volatility > 1.72 && genome.perception > 0.31 && genome.hunger > 0.021 && genome.fertility < 1.25 {
+    // Reaper checked first so the predator counter can appear before Harvesters dominate.
+    if genome.volatility > 1.54
+        && genome.perception > 0.295
+        && genome.hunger > 0.019
+        && genome.fertility < 1.45
+    {
         Archetype::Reaper
-    } else if rare_trait == RareTrait::Devourer {
-        Archetype::Harvester
     } else if rare_trait == RareTrait::Voidborne {
         Archetype::Phantom
     } else if rare_trait == RareTrait::SporeKing {
         Archetype::Mycelial
-    } else if rare_trait == RareTrait::ElderCore || size > 72 {
+    } else if rare_trait == RareTrait::ElderCore || size > 78 {
         Archetype::Leviathan
-    } else if genome.perception > 0.27 && genome.fertility > 1.42 && genome.hunger < 0.017 {
+    } else if rare_trait == RareTrait::Devourer
+        && genome.perception > 0.315
+        && genome.fertility > 1.45
+        && genome.hunger < 0.016
+    {
+        Archetype::Harvester
+    } else if genome.perception > 0.345
+        && genome.fertility > 1.68
+        && genome.hunger < 0.012
+        && genome.metabolism < 0.023
+    {
         Archetype::Harvester
     } else if genome.orbit > 0.95 {
         Archetype::Orbiter

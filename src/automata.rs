@@ -13,6 +13,7 @@ pub enum CellKind {
     Mutagen,
     Nest,
     Spore,
+    Root,
 }
 
 impl CellKind {
@@ -25,21 +26,31 @@ impl CellKind {
             Self::Mutagen => '*',
             Self::Nest => '◎',
             Self::Spore => '░',
+            Self::Root => '╋',
         }
     }
 
     pub fn is_alive(self) -> bool {
-        matches!(self, Self::Life | Self::Spore | Self::Nest)
+        matches!(self, Self::Life | Self::Spore | Self::Nest | Self::Root)
+    }
+
+    pub fn is_protected(self) -> bool {
+        matches!(self, Self::Root)
+    }
+
+    pub fn is_regenerative(self) -> bool {
+        matches!(self, Self::Dead | Self::Nutrient | Self::Spore | Self::Root)
     }
 
     pub fn food_value(self) -> f32 {
         match self {
-            Self::Life => 14.0,
-            Self::Nutrient => 22.0,
-            Self::Spore => 18.0,
-            Self::Nest => 26.0,
-            Self::Mutagen => 10.0,
-            Self::Dead => 5.0,
+            Self::Life => 11.0,
+            Self::Nutrient => 0.0,
+            Self::Spore => 0.0,
+            Self::Nest => 18.0,
+            Self::Mutagen => 7.0,
+            Self::Dead => 0.0,
+            Self::Root => 0.0,
             Self::Empty => 0.0,
         }
     }
@@ -97,17 +108,21 @@ impl CellularAutomata {
         let living = snapshot.iter().filter(|cell| cell.kind.is_alive()).count();
         let total = snapshot.len().max(1);
         let density = living as f32 / total as f32;
-        let recovery_mode = living < 120;
-        let bloom_mode = living < 40;
+        let recovery_mode = living < 150;
+        let bloom_mode = living < 55;
+        let root_count = snapshot.iter().filter(|cell| cell.kind == CellKind::Root).count();
 
         for y in 0..self.height {
             for x in 0..self.width {
                 let idx = self.idx(x, y);
                 let cell = snapshot[idx];
+
                 let neighbors = self.alive_neighbors(&snapshot, x, y);
                 let nutrient_neighbors = self.kind_neighbors(&snapshot, x, y, CellKind::Nutrient);
                 let dead_neighbors = self.kind_neighbors(&snapshot, x, y, CellKind::Dead);
                 let spore_neighbors = self.kind_neighbors(&snapshot, x, y, CellKind::Spore);
+                let root_neighbors = self.kind_neighbors(&snapshot, x, y, CellKind::Root);
+
                 let mut next = cell;
 
                 match cell.kind {
@@ -119,49 +134,61 @@ impl CellularAutomata {
                             next.energy = 30.0 + nutrient_neighbors as f32 * 5.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
-                        } else if recovery_mode && nutrient_neighbors >= 1 && spore_neighbors >= 1 {
+                        } else if recovery_mode && root_neighbors > 0 && nutrient_neighbors > 0 {
                             next.kind = CellKind::Life;
-                            next.energy = 26.0;
+                            next.energy = 31.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
-                        } else if bloom_mode && seed_roll < 18 {
+                        } else if recovery_mode && nutrient_neighbors >= 1 && spore_neighbors >= 1 {
+                            next.kind = CellKind::Life;
+                            next.energy = 27.0;
+                            next.age = 0;
+                            next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
+                        } else if bloom_mode && seed_roll < 24 {
                             next.kind = CellKind::Nutrient;
-                            next.energy = 36.0;
+                            next.energy = 38.0;
                             next.age = 0;
                             next.tribe_hint = seed_roll % 6;
-                        } else if recovery_mode && seed_roll < 8 {
+                        } else if recovery_mode && seed_roll < 10 {
                             next.kind = CellKind::Spore;
-                            next.energy = 28.0;
+                            next.energy = 30.0;
                             next.age = 0;
                             next.tribe_hint = seed_roll % 6;
+                        } else if root_count < total / 48 && root_neighbors > 0 && seed_roll < 7 {
+                            next.kind = CellKind::Root;
+                            next.energy = 95.0;
+                            next.age = 0;
+                            next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
                         }
                     }
                     CellKind::Life => {
-                        if neighbors < 2 || neighbors > 3 {
+                        if root_neighbors > 0 && recovery_mode && neighbors >= 1 && neighbors <= 4 {
+                            next.energy = (cell.energy + 0.35).min(85.0);
+                        } else if neighbors < 2 || neighbors > 3 {
                             next.kind = CellKind::Dead;
-                            next.energy = 16.0;
+                            next.energy = 18.0;
                         } else if neighbors == 3 && nutrient_neighbors > 2 {
                             next.kind = CellKind::Spore;
                             next.energy = (cell.energy + 3.0).min(85.0);
                         } else {
-                            next.energy =
-                                (cell.energy + nutrient_neighbors as f32 * 0.55 - 1.05).clamp(0.0, 85.0);
+                            next.energy = (cell.energy + nutrient_neighbors as f32 * 0.55 - 1.05)
+                                .clamp(0.0, 85.0);
 
                             if next.energy <= 0.0 {
                                 next.kind = CellKind::Dead;
-                                next.energy = 10.0;
+                                next.energy = 12.0;
                             }
                         }
                     }
                     CellKind::Spore => {
-                        if neighbors < 2 || neighbors > 4 {
+                        if root_neighbors > 0 && recovery_mode && nutrient_neighbors > 0 {
+                            next.kind = CellKind::Life;
+                            next.energy = 36.0;
+                        } else if neighbors < 2 || neighbors > 4 {
                             next.kind = CellKind::Dead;
                             next.energy = 14.0;
-                        } else if recovery_mode && nutrient_neighbors > 0 {
-                            next.kind = CellKind::Life;
-                            next.energy = 34.0;
                         } else {
-                            next.energy = (cell.energy - 0.9).max(0.0);
+                            next.energy = (cell.energy - 0.85).max(0.0);
 
                             if next.energy <= 0.0 {
                                 next.kind = CellKind::Dead;
@@ -170,7 +197,10 @@ impl CellularAutomata {
                         }
                     }
                     CellKind::Nutrient => {
-                        if neighbors == 3 && cell.energy > 28.0 {
+                        if root_neighbors > 0 && recovery_mode && neighbors >= 1 {
+                            next.kind = CellKind::Spore;
+                            next.energy = 38.0;
+                        } else if neighbors == 3 && cell.energy > 28.0 {
                             next.kind = CellKind::Life;
                             next.energy = 42.0;
                             next.age = 0;
@@ -188,10 +218,13 @@ impl CellularAutomata {
                         }
                     }
                     CellKind::Dead => {
-                        let decay = if recovery_mode { 0.14 } else { 0.34 };
+                        let decay = if recovery_mode { 0.10 } else { 0.30 };
                         next.energy = (cell.energy - decay).max(0.0);
 
-                        if nutrient_neighbors >= 2 && neighbors >= 2 {
+                        if root_neighbors > 0 && recovery_mode {
+                            next.kind = CellKind::Nutrient;
+                            next.energy = 30.0;
+                        } else if nutrient_neighbors >= 2 && neighbors >= 2 {
                             next.kind = CellKind::Nutrient;
                             next.energy = 32.0;
                         } else if recovery_mode && dead_neighbors >= 2 && density < 0.06 {
@@ -203,7 +236,10 @@ impl CellularAutomata {
                         }
                     }
                     CellKind::Mutagen => {
-                        if neighbors == 3 {
+                        if root_neighbors > 0 && recovery_mode {
+                            next.kind = CellKind::Spore;
+                            next.energy = 38.0;
+                        } else if neighbors == 3 {
                             next.kind = CellKind::Spore;
                             next.energy = 42.0;
                         } else {
@@ -230,6 +266,20 @@ impl CellularAutomata {
                             }
                         }
                     }
+                    CellKind::Root => {
+                        let seed_roll = hash(self.seed ^ self.cycle ^ 0xBEEF, x, y) % 10_000;
+
+                        if root_neighbors > 4 {
+                            next.kind = CellKind::Nutrient;
+                            next.energy = 44.0;
+                        } else {
+                            next.energy = (cell.energy + 0.02).clamp(65.0, 100.0);
+
+                            if root_count < total / 42 && root_neighbors >= 1 && seed_roll < 5 {
+                                next.energy = 100.0;
+                            }
+                        }
+                    }
                 }
 
                 if next.kind != CellKind::Empty {
@@ -249,12 +299,17 @@ impl CellularAutomata {
         let idx = self.idx(x, y);
         let cell = &mut self.cells[idx];
 
+        if cell.kind.is_protected() {
+            return;
+        }
+
         let deposit_allowed = match cell.kind {
             CellKind::Empty => true,
             CellKind::Dead => particle.energy > 80.0,
             CellKind::Nutrient => matches!(archetype, Some(Archetype::Grazer | Archetype::Mycelial)),
             CellKind::Mutagen => particle.rare_trait != RareTrait::None,
             CellKind::Life | CellKind::Spore | CellKind::Nest => particle.energy > 125.0,
+            CellKind::Root => false,
         };
 
         if !deposit_allowed {
@@ -286,28 +341,33 @@ impl CellularAutomata {
         let idx = self.idx(gx, gy);
         let cell = &mut self.cells[idx];
 
-        if cell.kind == CellKind::Empty {
+        if cell.kind == CellKind::Empty || cell.kind.is_protected() || cell.kind.is_regenerative() {
             return None;
         }
 
         let eaten = cell.kind;
         cell.energy -= power;
 
-        if cell.energy <= 0.0 || matches!(eaten, CellKind::Life | CellKind::Spore | CellKind::Nutrient) {
+        if cell.energy <= 0.0 || matches!(eaten, CellKind::Life | CellKind::Nest | CellKind::Mutagen) {
             if compost {
                 cell.kind = match eaten {
-                    CellKind::Life | CellKind::Spore | CellKind::Nest => CellKind::Dead,
-                    CellKind::Nutrient => CellKind::Spore,
+                    CellKind::Life | CellKind::Nest => CellKind::Dead,
                     CellKind::Mutagen => CellKind::Nutrient,
-                    CellKind::Dead => CellKind::Nutrient,
+                    CellKind::Spore => CellKind::Spore,
+                    CellKind::Nutrient => CellKind::Nutrient,
+                    CellKind::Dead => CellKind::Dead,
+                    CellKind::Root => CellKind::Root,
                     CellKind::Empty => CellKind::Empty,
                 };
+
                 cell.energy = match cell.kind {
-                    CellKind::Dead => 18.0,
-                    CellKind::Spore => 20.0,
-                    CellKind::Nutrient => 24.0,
+                    CellKind::Dead => 22.0,
+                    CellKind::Spore => 22.0,
+                    CellKind::Nutrient => 28.0,
+                    CellKind::Root => 95.0,
                     _ => 0.0,
                 };
+
                 cell.age = 0;
             } else {
                 cell.kind = CellKind::Empty;
@@ -342,6 +402,10 @@ impl CellularAutomata {
         self.cells.iter().filter(|cell| cell.kind.is_alive()).count()
     }
 
+    pub fn protected_cells(&self) -> usize {
+        self.cells.iter().filter(|cell| cell.kind.is_protected()).count()
+    }
+
     pub fn total_cells(&self) -> usize {
         self.cells.len()
     }
@@ -352,31 +416,38 @@ impl CellularAutomata {
                 let n = hash(self.seed, x, y) % 10_000;
                 let idx = self.idx(x, y);
 
-                self.cells[idx] = if n < 70 {
+                self.cells[idx] = if n < 55 {
                     Cell {
                         kind: CellKind::Life,
                         energy: 34.0,
                         age: 0,
                         tribe_hint: n % 6,
                     }
-                } else if n < 105 {
+                } else if n < 100 {
                     Cell {
                         kind: CellKind::Nutrient,
                         energy: 48.0,
                         age: 0,
                         tribe_hint: n % 6,
                     }
-                } else if n < 118 {
+                } else if n < 122 {
                     Cell {
                         kind: CellKind::Spore,
                         energy: 36.0,
                         age: 0,
                         tribe_hint: n % 6,
                     }
-                } else if n < 124 {
+                } else if n < 128 {
                     Cell {
                         kind: CellKind::Mutagen,
                         energy: 55.0,
+                        age: 0,
+                        tribe_hint: n % 6,
+                    }
+                } else if n < 138 {
+                    Cell {
+                        kind: CellKind::Root,
+                        energy: 95.0,
                         age: 0,
                         tribe_hint: n % 6,
                     }
