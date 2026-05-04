@@ -1,8 +1,10 @@
 use crate::{
     cluster::{ClusterEvents, ClusterTracker},
+    ecology::Ecology,
     memory::MemoryBank,
     particle::{Genome, Particle, Tribe},
     sim::{build_rule_matrix, child_from, mutate_rules, step_particles, RuleMatrix},
+    species::{Archetype, SpeciesBank},
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -71,6 +73,8 @@ struct EcosystemState {
     particles: Vec<Particle>,
     rules: RuleMatrix,
     clusters: ClusterTracker,
+    species_bank: SpeciesBank,
+    ecology: Ecology,
     memory: MemoryBank,
     seed: u64,
     age: u64,
@@ -85,6 +89,8 @@ pub struct App {
     pub particles: Vec<Particle>,
     pub rules: RuleMatrix,
     pub clusters: ClusterTracker,
+    pub species_bank: SpeciesBank,
+    pub ecology: Ecology,
     pub memory: MemoryBank,
     pub seed: u64,
     pub age: u64,
@@ -116,6 +122,8 @@ impl App {
             particles: Vec::new(),
             rules: build_rule_matrix(seed),
             clusters: ClusterTracker::new(),
+            species_bank: SpeciesBank::new(),
+            ecology: Ecology::new(seed),
             memory: MemoryBank::load_or_new(seed),
             seed,
             age: 0,
@@ -134,16 +142,38 @@ impl App {
 
         app.reset_particles();
         app.push_event("symbiote organism awakened");
-        app.push_event("persistent ecosystem memory online");
+        app.push_event("species lineage engine online");
+        app.push_event("spatial ecology seeded");
         app
     }
 
     pub fn step(&mut self) {
-        step_particles(&mut self.particles, &self.rules, self.environment);
+        let archetype_lookup = self.build_archetype_lookup();
+
+        step_particles(
+            &mut self.particles,
+            &self.rules,
+            self.environment,
+            &self.ecology,
+            &archetype_lookup,
+        );
+
         self.age += 1;
 
+        self.ecology.tick(self.seed, self.age, self.environment);
+
         if self.age % 24 == 0 {
-            let cluster_events = self.clusters.update(&mut self.particles, self.age);
+            let before_species = self.species_bank.species.len();
+            let cluster_events =
+                self.clusters
+                    .update(&mut self.particles, &mut self.species_bank, self.age);
+            let after_species = self.species_bank.species.len();
+
+            if after_species > before_species {
+                self.memory.total_species_created += (after_species - before_species) as u64;
+                self.push_event(&format!("{} new species emerged", after_species - before_species));
+            }
+
             self.process_cluster_events(cluster_events);
         }
 
@@ -182,6 +212,8 @@ impl App {
 
         self.particles.clear();
         self.clusters = ClusterTracker::new();
+        self.species_bank = SpeciesBank::new();
+        self.ecology = Ecology::new(self.seed ^ self.age);
 
         for i in 0..PARTICLE_COUNT {
             let tribe = Tribe::from_index(i % TRIBE_COUNT);
@@ -196,6 +228,7 @@ impl App {
                 health: rng.gen_range(58.0..100.0),
                 mass: rng.gen_range(0.65..1.5),
                 cluster_id: None,
+                species_id: None,
                 genome: Genome {
                     perception: rng.gen_range(0.17..0.31),
                     hunger: rng.gen_range(0.009..0.023),
@@ -256,6 +289,19 @@ impl App {
         let _ = self.memory.save();
     }
 
+    fn build_archetype_lookup(&self) -> Vec<Option<Archetype>> {
+        let max_id = self.species_bank.next_id as usize + 1;
+        let mut lookup = vec![None; max_id];
+
+        for species in &self.species_bank.species {
+            if let Some(slot) = lookup.get_mut(species.id as usize) {
+                *slot = Some(species.archetype);
+            }
+        }
+
+        lookup
+    }
+
     fn load_ecosystem() -> Option<Self> {
         if !Path::new(ECOSYSTEM_PATH).exists() {
             return None;
@@ -268,6 +314,8 @@ impl App {
             particles: state.particles,
             rules: state.rules,
             clusters: state.clusters,
+            species_bank: state.species_bank,
+            ecology: state.ecology,
             memory: state.memory,
             seed: state.seed,
             age: state.age,
@@ -295,6 +343,8 @@ impl App {
                 clusters: self.clusters.clusters.clone(),
                 next_id: self.clusters.next_id,
             },
+            species_bank: self.species_bank.clone(),
+            ecology: self.ecology.clone(),
             memory: self.memory.clone(),
             seed: self.seed,
             age: self.age,
@@ -329,6 +379,11 @@ impl App {
             self.memory.total_splits += events.splits as u64;
             self.push_event("cluster split into daughter forms");
             self.memory.note(format!("[{}] split event detected", self.age));
+        }
+
+        if events.extinctions > 0 {
+            self.memory.total_extinctions += events.extinctions as u64;
+            self.push_event(&format!("{} species went extinct", events.extinctions));
         }
     }
 
@@ -436,6 +491,39 @@ impl App {
         self.memory.highest_generation = self.memory.highest_generation.max(self.generation);
         self.memory.peak_population = self.memory.peak_population.max(self.particles.len());
         self.memory.peak_clusters = self.memory.peak_clusters.max(self.clusters.clusters.len());
+        self.memory.peak_species = self.memory.peak_species.max(self.species_bank.active_count());
+
+        let mut counts = [0usize; 6];
+
+        for species in self.species_bank.species.iter().filter(|s| !s.extinct) {
+            counts[species.archetype as usize] += 1;
+        }
+
+        let archetypes = [
+            Archetype::Swarmer,
+            Archetype::Hunter,
+            Archetype::Grazer,
+            Archetype::Orbiter,
+            Archetype::Parasite,
+            Archetype::Architect,
+        ];
+
+        let mut best = 0;
+        for i in 1..6 {
+            if counts[i] > counts[best] {
+                best = i;
+            }
+        }
+
+        self.memory.dominant_archetype = archetypes[best].name().to_string();
+
+        if let Some(zone) = self.ecology.zones.iter().max_by(|a, b| {
+            a.strength
+                .partial_cmp(&b.strength)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        }) {
+            self.memory.richest_zone = zone.kind.name().to_string();
+        }
 
         for cluster in &self.clusters.clusters {
             self.memory.strongest_cluster_size = self.memory.strongest_cluster_size.max(cluster.size);
@@ -463,6 +551,7 @@ fn random_particle(rng: &mut StdRng) -> Particle {
         health: rng.gen_range(60.0..100.0),
         mass: rng.gen_range(0.65..1.5),
         cluster_id: None,
+        species_id: None,
         genome: Genome {
             perception: rng.gen_range(0.17..0.31),
             hunger: rng.gen_range(0.009..0.023),

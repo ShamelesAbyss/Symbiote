@@ -1,9 +1,14 @@
-use crate::particle::{Particle, Tribe};
+use crate::{
+    particle::{Genome, Particle, Tribe},
+    species::{Archetype, SpeciesBank},
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Cluster {
     pub id: u64,
+    pub species_id: Option<u64>,
+    pub archetype: Option<Archetype>,
     pub age: u64,
     pub size: usize,
     pub x: f32,
@@ -12,6 +17,7 @@ pub struct Cluster {
     pub vy: f32,
     pub radius: f32,
     pub dominant: Tribe,
+    pub avg_genome: Genome,
     pub stability: f32,
     pub membrane: f32,
     pub last_seen: u64,
@@ -51,7 +57,12 @@ impl ClusterTracker {
         }
     }
 
-    pub fn update(&mut self, particles: &mut [Particle], age: u64) -> ClusterEvents {
+    pub fn update(
+        &mut self,
+        particles: &mut [Particle],
+        species_bank: &mut SpeciesBank,
+        age: u64,
+    ) -> ClusterEvents {
         for p in particles.iter_mut() {
             p.cluster_id = None;
         }
@@ -74,15 +85,19 @@ impl ClusterTracker {
                 let dy = existing.y - measured.y;
                 let dist = (dx * dx + dy * dy).sqrt();
 
-                if dist < 0.26 && dist < best_dist {
+                if dist < 0.28 && dist < best_dist {
                     best_match = Some(existing.clone());
                     best_dist = dist;
                 }
             }
 
+            let parent_species = best_match.as_ref().and_then(|c| c.species_id);
+
             let mut cluster = if let Some(old) = best_match {
                 let mut c = measured;
                 c.id = old.id;
+                c.species_id = old.species_id;
+                c.archetype = old.archetype;
                 c.age = old.age + 1;
                 c.stability = (old.stability * 0.9 + c.stability * 0.1).clamp(0.0, 100.0);
                 c.membrane = (old.membrane * 0.94 + c.membrane * 0.06).clamp(0.0, 100.0);
@@ -98,6 +113,18 @@ impl ClusterTracker {
                 c
             };
 
+            let species_id = species_bank.assign_or_create(
+                cluster.dominant,
+                cluster.avg_genome,
+                cluster.size,
+                age,
+                parent_species,
+            );
+
+            let species = species_bank.species.iter().find(|s| s.id == species_id);
+            cluster.species_id = Some(species_id);
+            cluster.archetype = species.map(|s| s.archetype);
+
             if cluster.age > 50 && cluster.size > 14 {
                 cluster.membrane = (cluster.membrane + 1.2).min(100.0);
             }
@@ -109,6 +136,7 @@ impl ClusterTracker {
             for &idx in &group {
                 if let Some(p) = particles.get_mut(idx) {
                     p.cluster_id = Some(cluster.id);
+                    p.species_id = Some(species_id);
                     p.mass = (p.mass + 0.004 * cluster.size as f32).clamp(0.55, 6.5);
                 }
             }
@@ -128,6 +156,7 @@ impl ClusterTracker {
         }
 
         self.clusters = next_clusters;
+        events.extinctions += species_bank.mark_extinctions(age);
         events
     }
 }
@@ -138,6 +167,7 @@ pub struct ClusterEvents {
     pub deaths: usize,
     pub merges: usize,
     pub splits: usize,
+    pub extinctions: usize,
 }
 
 fn detect_groups(particles: &[Particle]) -> Vec<Vec<usize>> {
@@ -187,6 +217,15 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
     let mut tribe_counts = [0usize; 6];
     let mut membrane = 0.0;
 
+    let mut genome = Genome {
+        perception: 0.0,
+        hunger: 0.0,
+        bonding: 0.0,
+        volatility: 0.0,
+        orbit: 0.0,
+        membrane: 0.0,
+    };
+
     for &idx in indices {
         let p = particles[idx];
         x += p.x;
@@ -195,6 +234,13 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
         vy += p.vy;
         membrane += p.genome.membrane;
         tribe_counts[p.tribe.index()] += 1;
+
+        genome.perception += p.genome.perception;
+        genome.hunger += p.genome.hunger;
+        genome.bonding += p.genome.bonding;
+        genome.volatility += p.genome.volatility;
+        genome.orbit += p.genome.orbit;
+        genome.membrane += p.genome.membrane;
     }
 
     let count = indices.len() as f32;
@@ -203,6 +249,13 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
     vx /= count;
     vy /= count;
     membrane = (membrane / count * 74.0).clamp(0.0, 100.0);
+
+    genome.perception /= count;
+    genome.hunger /= count;
+    genome.bonding /= count;
+    genome.volatility /= count;
+    genome.orbit /= count;
+    genome.membrane /= count;
 
     let mut radius = 0.0;
 
@@ -227,6 +280,8 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
 
     Cluster {
         id: 0,
+        species_id: None,
+        archetype: None,
         age: 0,
         size: indices.len(),
         x,
@@ -235,6 +290,7 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
         vy,
         radius,
         dominant: Tribe::from_index(best),
+        avg_genome: genome,
         stability,
         membrane,
         last_seen: 0,

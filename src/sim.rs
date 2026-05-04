@@ -1,6 +1,8 @@
 use crate::{
     app::{Environment, TRIBE_COUNT},
+    ecology::{Ecology, ZoneKind},
     particle::{Genome, Particle, Tribe},
+    species::Archetype,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -37,7 +39,13 @@ pub fn mutate_rules(rules: &mut RuleMatrix, seed: u64, intensity: f32) {
     }
 }
 
-pub fn step_particles(particles: &mut [Particle], rules: &RuleMatrix, env: Environment) {
+pub fn step_particles(
+    particles: &mut [Particle],
+    rules: &RuleMatrix,
+    env: Environment,
+    ecology: &Ecology,
+    archetypes: &[Option<Archetype>],
+) {
     let snapshot = particles.to_vec();
 
     for p in particles.iter_mut() {
@@ -54,6 +62,10 @@ pub fn step_particles(particles: &mut [Particle], rules: &RuleMatrix, env: Envir
         let mut orbit_x = 0.0;
         let mut orbit_y = 0.0;
 
+        let archetype = p
+            .species_id
+            .and_then(|id| archetypes.get(id as usize).copied().flatten());
+
         for other in &snapshot {
             let dx = other.x - p.x;
             let dy = other.y - p.y;
@@ -65,7 +77,7 @@ pub fn step_particles(particles: &mut [Particle], rules: &RuleMatrix, env: Envir
 
             let d = d2.sqrt();
             let attraction = rules[p.tribe.index()][other.tribe.index()];
-            let predator_pressure = predator_factor(p.tribe, other.tribe);
+            let predator_pressure = predator_factor(p.tribe, other.tribe, archetype);
 
             if d < BOND_RADIUS {
                 local_density += 1;
@@ -78,7 +90,14 @@ pub fn step_particles(particles: &mut [Particle], rules: &RuleMatrix, env: Envir
                     hostile_density += 1;
                 }
 
-                let bond = (1.0 - d / BOND_RADIUS) * p.genome.bonding;
+                let bond_mult = match archetype {
+                    Some(Archetype::Swarmer) => 1.35,
+                    Some(Archetype::Architect) => 1.55,
+                    Some(Archetype::Parasite) => 0.82,
+                    _ => 1.0,
+                };
+
+                let bond = (1.0 - d / BOND_RADIUS) * p.genome.bonding * bond_mult;
 
                 fx += dx * bond * 0.62;
                 fy += dy * bond * 0.62;
@@ -87,7 +106,11 @@ pub fn step_particles(particles: &mut [Particle], rules: &RuleMatrix, env: Envir
                 orbit_y += dx / d;
             }
 
-            let perception = p.genome.perception * env.perception_mult();
+            let mut perception = p.genome.perception * env.perception_mult();
+
+            if matches!(archetype, Some(Archetype::Grazer)) {
+                perception *= 1.15;
+            }
 
             if d > perception {
                 continue;
@@ -102,6 +125,10 @@ pub fn step_particles(particles: &mut [Particle], rules: &RuleMatrix, env: Envir
             force *= p.genome.volatility;
             force *= env.force_mult();
 
+            if matches!(archetype, Some(Archetype::Hunter)) {
+                force *= 1.18;
+            }
+
             fx += (dx / d) * force;
             fy += (dy / d) * force;
         }
@@ -113,10 +140,17 @@ pub fn step_particles(particles: &mut [Particle], rules: &RuleMatrix, env: Envir
             p.vx += (vx_avg - p.vx) * 0.22;
             p.vy += (vy_avg - p.vy) * 0.22;
 
-            p.vx += orbit_x * p.genome.orbit * 0.00042;
-            p.vy += orbit_y * p.genome.orbit * 0.00042;
+            let orbit_boost = if matches!(archetype, Some(Archetype::Orbiter)) {
+                1.75
+            } else {
+                1.0
+            };
+
+            p.vx += orbit_x * p.genome.orbit * orbit_boost * 0.00042;
+            p.vy += orbit_y * p.genome.orbit * orbit_boost * 0.00042;
         }
 
+        apply_ecology(p, ecology);
         let mass_drag = (1.0 + p.mass * 0.13).clamp(1.0, 2.0);
 
         p.vx = (p.vx + fx * FORCE_SCALE) * FRICTION / mass_drag;
@@ -166,6 +200,10 @@ pub fn step_particles(particles: &mut [Particle], rules: &RuleMatrix, env: Envir
             p.health += 0.035;
         }
 
+        if matches!(archetype, Some(Archetype::Architect)) {
+            p.mass += 0.002;
+        }
+
         p.health -= p.genome.hunger * env.hunger_mult();
         p.health = p.health.clamp(0.0, 100.0);
         p.mass = p.mass.clamp(0.45, 7.0);
@@ -173,16 +211,57 @@ pub fn step_particles(particles: &mut [Particle], rules: &RuleMatrix, env: Envir
     }
 }
 
-fn predator_factor(a: Tribe, b: Tribe) -> f32 {
+fn predator_factor(a: Tribe, b: Tribe, archetype: Option<Archetype>) -> f32 {
     let ai = a.index();
     let bi = b.index();
 
-    if (ai + 1) % TRIBE_COUNT == bi {
+    let base = if (ai + 1) % TRIBE_COUNT == bi {
         -1.35
     } else if (bi + 1) % TRIBE_COUNT == ai {
         1.22
     } else {
         1.0
+    };
+
+    if matches!(archetype, Some(Archetype::Hunter)) {
+        base * 1.24
+    } else if matches!(archetype, Some(Archetype::Grazer)) {
+        base * 0.86
+    } else {
+        base
+    }
+}
+
+fn apply_ecology(p: &mut Particle, ecology: &Ecology) {
+    for zone in &ecology.zones {
+        let dx = zone.x - p.x;
+        let dy = zone.y - p.y;
+        let dist = (dx * dx + dy * dy).sqrt();
+
+        if dist > zone.radius {
+            continue;
+        }
+
+        let effect = (1.0 - dist / zone.radius) * zone.strength;
+
+        match zone.kind {
+            ZoneKind::Nutrient => {
+                p.health += 0.12 * effect;
+                p.mass += 0.006 * effect;
+            }
+            ZoneKind::Dead => {
+                p.health -= 0.18 * effect;
+                p.mass -= 0.006 * effect;
+            }
+            ZoneKind::Turbulent => {
+                p.vx += (p.y * 33.0).sin() * 0.001 * effect;
+                p.vy -= (p.x * 29.0).cos() * 0.001 * effect;
+            }
+            ZoneKind::Mutagen => {
+                p.genome.volatility = (p.genome.volatility + 0.0009 * effect).clamp(0.36, 1.95);
+                p.genome.orbit = (p.genome.orbit + 0.0006 * effect).clamp(0.0, 1.55);
+            }
+        }
     }
 }
 
@@ -225,6 +304,7 @@ pub fn child_from(parent: Particle, seed: u64) -> Particle {
 
     if rng.gen_bool(0.022) {
         child.tribe = Tribe::from_index(rng.gen_range(0..TRIBE_COUNT));
+        child.species_id = None;
     }
 
     child

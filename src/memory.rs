@@ -11,12 +11,17 @@ pub struct MemoryBank {
     pub highest_generation: u64,
     pub peak_population: usize,
     pub peak_clusters: usize,
+    pub peak_species: usize,
+    pub total_species_created: u64,
+    pub total_extinctions: u64,
     pub total_births: u64,
     pub total_deaths: u64,
     pub total_merges: u64,
     pub total_splits: u64,
     pub strongest_cluster_size: usize,
     pub strongest_cluster_age: u64,
+    pub dominant_archetype: String,
+    pub richest_zone: String,
     pub notes: Vec<String>,
 }
 
@@ -28,12 +33,17 @@ impl MemoryBank {
             highest_generation: 0,
             peak_population: 0,
             peak_clusters: 0,
+            peak_species: 0,
+            total_species_created: 0,
+            total_extinctions: 0,
             total_births: 0,
             total_deaths: 0,
             total_merges: 0,
             total_splits: 0,
             strongest_cluster_size: 0,
             strongest_cluster_age: 0,
+            dominant_archetype: "unknown".to_string(),
+            richest_zone: "unknown".to_string(),
             notes: Vec::new(),
         }
     }
@@ -59,7 +69,7 @@ impl MemoryBank {
     pub fn note(&mut self, text: String) {
         self.notes.push(text);
 
-        if self.notes.len() > 24 {
+        if self.notes.len() > 32 {
             self.notes.remove(0);
         }
     }

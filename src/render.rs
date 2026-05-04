@@ -46,12 +46,18 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
 
     let side = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(48), Constraint::Percentage(24), Constraint::Percentage(28)])
+        .constraints([
+            Constraint::Percentage(34),
+            Constraint::Percentage(23),
+            Constraint::Percentage(19),
+            Constraint::Percentage(24),
+        ])
         .split(body[1]);
 
     render_rules(f, side[0], app);
     render_clusters(f, side[1], app);
-    render_events(f, side[2], app);
+    render_species(f, side[2], app);
+    render_events(f, side[3], app);
 
     render_metrics(f, root[2], app);
     render_footer(f, root[3]);
@@ -65,18 +71,18 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let lines = vec![
         Line::from(vec![
             Span::styled(" ◉ SYMBIOTE ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            Span::styled("living terminal petri dish ", Style::default().fg(Color::Magenta)),
-            Span::styled(pulse.repeat(16), Style::default().fg(env_color(app.environment))),
+            Span::styled("persistent artificial ecosystem ", Style::default().fg(Color::Magenta)),
+            Span::styled(pulse.repeat(14), Style::default().fg(env_color(app.environment))),
         ]),
         Line::from(vec![
-            Span::styled(" seed: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(short_seed(app.seed), Style::default().fg(Color::Yellow)),
-            Span::styled(" | age: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" age: ", Style::default().fg(Color::DarkGray)),
             Span::styled(format!("{}", app.age), Style::default().fg(Color::Green)),
             Span::styled(" | gen: ", Style::default().fg(Color::DarkGray)),
             Span::styled(format!("{}", app.generation), Style::default().fg(Color::Magenta)),
             Span::styled(" | env: ", Style::default().fg(Color::DarkGray)),
             Span::styled(app.environment.name(), Style::default().fg(env_color(app.environment))),
+            Span::styled(" | species: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{}", app.species_bank.active_count()), Style::default().fg(Color::Yellow)),
             Span::styled(" | ", Style::default().fg(Color::DarkGray)),
             Span::styled(status, Style::default().fg(if app.paused { Color::Yellow } else { Color::Green })),
             Span::styled(" | ", Style::default().fg(Color::DarkGray)),
@@ -95,6 +101,8 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let height = area.height.saturating_sub(2) as usize;
 
     let mut cells: Vec<Vec<Cell>> = vec![vec![Cell::default(); width]; height];
+
+    draw_ecology_zones(&mut cells, app, width, height);
 
     for p in &app.particles {
         let x = (((p.x + 1.2) / 2.4) * width as f32) as isize;
@@ -126,6 +134,9 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 spans.push(Span::styled("·", Style::default().fg(Color::Cyan)));
             } else if cell.membrane {
                 spans.push(Span::styled("○", Style::default().fg(Color::Gray)));
+            } else if cell.count == 0 && cell.zone.is_some() {
+                let (glyph, color) = cell.zone.unwrap();
+                spans.push(Span::styled(glyph.to_string(), Style::default().fg(color)));
             } else if cell.count == 0 {
                 spans.push(Span::styled(background_glyph(app.environment), Style::default().fg(Color::DarkGray)));
             } else {
@@ -164,6 +175,24 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
             .wrap(Wrap { trim: false }),
         area,
     );
+}
+
+fn draw_ecology_zones(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
+    for zone in &app.ecology.zones {
+        let x = (((zone.x + 1.2) / 2.4) * width as f32) as i32;
+        let y = (((zone.y + 1.2) / 2.4) * height as f32) as i32;
+        let color = match zone.kind.name() {
+            "nutrient" => Color::Green,
+            "dead" => Color::Red,
+            "turbulent" => Color::Yellow,
+            "mutagen" => Color::Magenta,
+            _ => Color::DarkGray,
+        };
+
+        if x >= 0 && y >= 0 && x < width as i32 && y < height as i32 {
+            cells[y as usize][x as usize].zone = Some((zone.kind.glyph(), color));
+        }
+    }
 }
 
 fn draw_cluster_membranes(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
@@ -228,7 +257,6 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
             "Attraction Matrix",
             Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
         )),
-        Line::from(""),
     ];
 
     for a in 0..6 {
@@ -266,10 +294,11 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         lines.push(Line::from(spans));
     }
 
-    lines.push(Line::from(""));
     lines.push(Line::from(vec![
-        Span::styled("Population: ", Style::default().fg(Color::Yellow)),
+        Span::styled("Pop: ", Style::default().fg(Color::Yellow)),
         Span::styled(format!("{}", app.particles.len()), Style::default().fg(Color::Green)),
+        Span::styled(" Zones: ", Style::default().fg(Color::Yellow)),
+        Span::styled(format!("{}", app.ecology.zones.len()), Style::default().fg(Color::Cyan)),
     ]));
 
     f.render_widget(
@@ -283,29 +312,54 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let mut lines = vec![
         Line::from(vec![
-            Span::styled("Active: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Clusters: ", Style::default().fg(Color::DarkGray)),
             Span::styled(format!("{}", app.clusters.clusters.len()), Style::default().fg(Color::Green)),
-        ]),
-        Line::from(vec![
-            Span::styled("Peak:   ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Peak: ", Style::default().fg(Color::DarkGray)),
             Span::styled(format!("{}", app.memory.peak_clusters), Style::default().fg(Color::Yellow)),
         ]),
     ];
 
     for cluster in app.clusters.clusters.iter().take(4) {
+        let archetype = cluster.archetype.map(|a| a.short()).unwrap_or("UNK");
+
         lines.push(Line::from(vec![
             Span::styled(format!("#{} ", cluster.id), Style::default().fg(Color::DarkGray)),
             Span::styled(cluster.direction_glyph().to_string(), Style::default().fg(Color::Cyan)),
             Span::raw(" "),
+            Span::styled(archetype, Style::default().fg(Color::Magenta)),
+            Span::raw(" "),
             Span::styled(format!("{} ", cluster.size), Style::default().fg(cluster.dominant.color())),
             Span::styled(format!("a{}", cluster.age), Style::default().fg(Color::Cyan)),
-            Span::styled(format!(" s{:.0}", cluster.stability), Style::default().fg(Color::Green)),
         ]));
     }
 
     f.render_widget(
         Paragraph::new(lines)
             .block(Block::default().borders(Borders::ALL).title(" CLUSTERS "))
+            .wrap(Wrap { trim: true }),
+        area,
+    );
+}
+
+fn render_species(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
+    let mut lines = vec![Line::from(vec![
+        Span::styled("Active: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", app.species_bank.active_count()), Style::default().fg(Color::Green)),
+        Span::styled(" Extinct: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", app.species_bank.extinct_count()), Style::default().fg(Color::Red)),
+    ])];
+
+    for species in app.species_bank.species.iter().rev().filter(|s| !s.extinct).take(3) {
+        lines.push(Line::from(vec![
+            Span::styled(format!("{} ", species.name), Style::default().fg(species.dominant_tribe.color())),
+            Span::styled(species.archetype.short(), Style::default().fg(Color::Magenta)),
+            Span::styled(format!(" p{}", species.peak_size), Style::default().fg(Color::Cyan)),
+        ]));
+    }
+
+    f.render_widget(
+        Paragraph::new(lines)
+            .block(Block::default().borders(Borders::ALL).title(" SPECIES "))
             .wrap(Wrap { trim: true }),
         area,
     );
@@ -378,6 +432,7 @@ struct Cell {
     clustered: usize,
     membrane: bool,
     trail: bool,
+    zone: Option<(char, Color)>,
 }
 
 impl Default for Cell {
@@ -390,6 +445,7 @@ impl Default for Cell {
             clustered: 0,
             membrane: false,
             trail: false,
+            zone: None,
         }
     }
 }
@@ -425,15 +481,5 @@ fn background_glyph(env: Environment) -> &'static str {
         Environment::Hunger => " ",
         Environment::Storm => "∴",
         Environment::Drift => "˙",
-    }
-}
-
-fn short_seed(seed: u64) -> String {
-    let text = seed.to_string();
-
-    if text.len() <= 10 {
-        text
-    } else {
-        format!("{}…{}", &text[..5], &text[text.len() - 4..])
     }
 }

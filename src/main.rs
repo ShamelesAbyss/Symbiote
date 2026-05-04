@@ -1,9 +1,11 @@
 mod app;
 mod cluster;
+mod ecology;
 mod memory;
 mod particle;
 mod render;
 mod sim;
+mod species;
 
 use anyhow::Result;
 use app::App;

@@ -1,7 +1,7 @@
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Tribe {
     Blood,
     Moss,
@@ -78,5 +78,6 @@ pub struct Particle {
     pub health: f32,
     pub mass: f32,
     pub cluster_id: Option<u64>,
+    pub species_id: Option<u64>,
     pub genome: Genome,
 }
