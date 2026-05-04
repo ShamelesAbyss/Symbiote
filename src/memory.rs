@@ -89,4 +89,59 @@ impl MemoryBank {
             self.notes.remove(0);
         }
     }
+
+    pub fn harvester_resistance(&self) -> f32 {
+        let harvester_pressure =
+            self.peak_harvesters as f32 / self.peak_species.max(1) as f32;
+
+        let consumption_pressure =
+            self.total_cells_consumed as f32 / self.total_reproductions.max(1) as f32;
+
+        (harvester_pressure * 0.72 + (consumption_pressure / 40.0) * 0.28)
+            .clamp(0.0, 1.0)
+    }
+
+    pub fn reaper_urgency(&self) -> f32 {
+        let harvester_peak = self.peak_harvesters as f32;
+        let reaper_peak = self.peak_reapers as f32;
+
+        if harvester_peak <= 0.0 {
+            return 0.0;
+        }
+
+        let imbalance = ((harvester_peak - reaper_peak * 1.8) / harvester_peak).clamp(0.0, 1.0);
+        let consumption = (self.total_cells_consumed as f32 / 900.0).clamp(0.0, 1.0);
+
+        (imbalance * 0.75 + consumption * 0.25).clamp(0.0, 1.0)
+    }
+
+    pub fn substrate_recovery_bias(&self) -> f32 {
+        let population_peak = self.peak_population.max(1) as f32;
+        let living_peak = self.peak_living_cells as f32;
+
+        let low_cell_history = (1.0 - (living_peak / population_peak).clamp(0.0, 1.0)).clamp(0.0, 1.0);
+        let consumption = (self.total_cells_consumed as f32 / 1_200.0).clamp(0.0, 1.0);
+
+        (low_cell_history * 0.55 + consumption * 0.45).clamp(0.0, 1.0)
+    }
+
+    pub fn mutation_pressure(&self) -> f32 {
+        let extinction_pressure =
+            self.total_extinctions as f32 / self.total_species_created.max(1) as f32;
+
+        let death_pressure =
+            self.total_deaths as f32 / self.total_births.max(1) as f32;
+
+        (extinction_pressure * 0.68 + death_pressure.min(3.0) / 3.0 * 0.32).clamp(0.0, 1.0)
+    }
+
+    pub fn adaptive_summary(&self) -> String {
+        format!(
+            "memory pressure hrv:{:.2} rpr:{:.2} regen:{:.2} mut:{:.2}",
+            self.harvester_resistance(),
+            self.reaper_urgency(),
+            self.substrate_recovery_bias(),
+            self.mutation_pressure(),
+        )
+    }
 }

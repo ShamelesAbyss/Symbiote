@@ -145,6 +145,7 @@ impl App {
         app.reset_particles();
         app.push_event("regenerative substrate online");
         app.push_event("reaper ecology online");
+        app.push_event("adaptive ecosystem memory online");
         app
     }
 
@@ -190,6 +191,10 @@ impl App {
             self.push_event(&format!("reaper pressure active: {}", report.reaper_particles));
         }
 
+        if self.age > 0 && self.age % 720 == 0 {
+            self.push_event(&self.memory.adaptive_summary());
+        }
+
         self.age += 1;
 
         self.ecology.tick(self.seed, self.age, self.environment);
@@ -199,6 +204,10 @@ impl App {
         }
 
         if self.age % 12 == 0 {
+            self.substrate.tick();
+        }
+
+        if self.memory.substrate_recovery_bias() > 0.52 && self.age % 48 == 0 {
             self.substrate.tick();
         }
 
@@ -231,7 +240,7 @@ impl App {
         }
 
         if self.age % 280 == 0 {
-            let intensity = match self.environment {
+            let base_intensity = match self.environment {
                 Environment::Calm => 0.018,
                 Environment::Bloom => 0.014,
                 Environment::Hunger => 0.035,
@@ -239,9 +248,12 @@ impl App {
                 Environment::Drift => 0.022,
             };
 
+            let adaptive_mutation = 1.0 + self.memory.mutation_pressure() * 0.42;
+            let intensity = (base_intensity * adaptive_mutation).clamp(0.008, 0.074);
+
             mutate_rules(&mut self.rules, self.seed ^ self.age, intensity);
             self.generation += 1;
-            self.push_event("matrix drifted through native mutation");
+            self.push_event("matrix drifted through adaptive memory");
         }
 
         self.measure();
@@ -294,6 +306,11 @@ impl App {
         let harvester_body_ratio =
             active_harvester_particles as f32 / snapshot.len().max(1) as f32;
 
+        let harvester_resistance = self.memory.harvester_resistance();
+        let reaper_urgency = self.memory.reaper_urgency();
+        let recovery_bias = self.memory.substrate_recovery_bias();
+        let mutation_pressure = self.memory.mutation_pressure();
+
         for parent in snapshot.iter() {
             if self.particles.len() + children.len() >= MAX_PARTICLES {
                 break;
@@ -301,15 +318,19 @@ impl App {
 
             let clustered_bonus = if parent.cluster_id.is_some() { 0.18 } else { 0.0 };
             let rare_bonus = if parent.rare_trait != RareTrait::None { 0.12 } else { 0.0 };
+            let adaptive_fertility_drag = harvester_resistance * 4.5;
 
-            let threshold = 115.0 - parent.genome.fertility * 13.0 - clustered_bonus * 20.0;
+            let threshold =
+                115.0 - parent.genome.fertility * 13.0 - clustered_bonus * 20.0
+                    + adaptive_fertility_drag;
 
             if parent.energy < threshold || parent.health < 48.0 || parent.age < 180 {
                 continue;
             }
 
             let chance =
-                (0.018 + parent.genome.fertility * 0.018 + clustered_bonus + rare_bonus)
+                (0.018 + parent.genome.fertility * 0.018 + clustered_bonus + rare_bonus
+                    + mutation_pressure * 0.012)
                     .clamp(0.01, 0.38);
 
             if !rng.gen_bool(chance as f64) {
@@ -333,16 +354,19 @@ impl App {
             };
 
             if substrate_density > 0.09
-                && rng.gen_bool((substrate_density * 0.95).clamp(0.01, 0.12) as f64)
+                && rng.gen_bool(
+                    (substrate_density * (0.95 - harvester_resistance * 0.45))
+                        .clamp(0.01, 0.12) as f64,
+                )
             {
                 child.genome.perception =
                     (child.genome.perception + rng.gen_range(0.004..0.024)).clamp(0.1, 0.38);
                 child.genome.fertility =
-                    (child.genome.fertility + rng.gen_range(0.025..0.11)).clamp(0.2, 2.4);
+                    (child.genome.fertility + rng.gen_range(0.018..0.095)).clamp(0.2, 2.4);
                 child.genome.hunger =
-                    (child.genome.hunger + rng.gen_range(-0.0004..0.0009)).clamp(0.005, 0.04);
+                    (child.genome.hunger + rng.gen_range(-0.0002..0.0012)).clamp(0.005, 0.04);
                 child.genome.metabolism =
-                    (child.genome.metabolism + rng.gen_range(-0.0004..0.0008)).clamp(0.004, 0.05);
+                    (child.genome.metabolism + rng.gen_range(-0.0002..0.0011)).clamp(0.004, 0.05);
                 child.species_id = None;
             }
 
@@ -359,9 +383,17 @@ impl App {
                 child.species_id = None;
             }
 
-            if (active_harvester_particles >= 15 || harvester_body_ratio > 0.11)
-                && substrate_density < 0.08
-                && rng.gen_bool(0.15)
+            let reaper_trigger =
+                active_harvester_particles >= 15
+                    || harvester_body_ratio > 0.11
+                    || (active_harvester_particles >= 10 && reaper_urgency > 0.55);
+
+            let reaper_chance =
+                (0.15 + reaper_urgency * 0.18 + recovery_bias * 0.06).clamp(0.08, 0.38);
+
+            if reaper_trigger
+                && substrate_density < (0.08 + recovery_bias * 0.025)
+                && rng.gen_bool(reaper_chance as f64)
             {
                 child.genome.volatility = rng.gen_range(1.70..1.92);
                 child.genome.perception = rng.gen_range(0.305..0.38);
@@ -370,6 +402,16 @@ impl App {
                 child.genome.bonding = rng.gen_range(0.55..1.15);
                 child.mass = (child.mass + rng.gen_range(0.35..1.2)).clamp(0.45, 7.0);
                 child.rare_trait = RareTrait::None;
+                child.species_id = None;
+            }
+
+            if mutation_pressure > 0.45 && rng.gen_bool((mutation_pressure * 0.035) as f64) {
+                child.genome.volatility =
+                    (child.genome.volatility + rng.gen_range(0.04..0.16)).clamp(0.36, 1.95);
+                child.genome.orbit =
+                    (child.genome.orbit + rng.gen_range(-0.06..0.12)).clamp(0.0, 1.55);
+                child.genome.membrane =
+                    (child.genome.membrane + rng.gen_range(0.02..0.14)).clamp(0.0, 1.8);
                 child.species_id = None;
             }
 
@@ -396,6 +438,7 @@ impl App {
 
     fn apply_selection_pressure(&mut self, rng: &mut StdRng) {
         let before = self.particles.len();
+        let adaptive_stability = 1.0 - self.memory.mutation_pressure() * 0.08;
 
         self.particles.retain(|particle| {
             let old_age_pressure = if particle.age > 18_000 { 0.08 } else { 0.0 };
@@ -407,7 +450,8 @@ impl App {
             let survival =
                 (energy_score * 0.44 + health_score * 0.44 + clustered_bonus + rare_bonus
                     - old_age_pressure)
-                    .clamp(0.02, 0.995);
+                    .clamp(0.02, 0.995)
+                    * adaptive_stability.clamp(0.92, 1.0);
 
             particle.energy > 0.0 && particle.health > 0.0 && rng.gen_bool(survival as f64)
         });
@@ -591,13 +635,21 @@ impl App {
 
     fn shift_environment(&mut self) {
         let roll = hash(self.seed, self.age as usize, self.generation as usize) % 100;
+        let recovery_bias = self.memory.substrate_recovery_bias();
+        let reaper_urgency = self.memory.reaper_urgency();
 
-        self.environment = match roll {
-            0..=32 => Environment::Calm,
-            33..=55 => Environment::Bloom,
-            56..=70 => Environment::Hunger,
-            71..=86 => Environment::Drift,
-            _ => Environment::Storm,
+        self.environment = if recovery_bias > 0.62 && roll < 48 {
+            Environment::Bloom
+        } else if reaper_urgency > 0.68 && roll > 58 {
+            Environment::Hunger
+        } else {
+            match roll {
+                0..=32 => Environment::Calm,
+                33..=55 => Environment::Bloom,
+                56..=70 => Environment::Hunger,
+                71..=86 => Environment::Drift,
+                _ => Environment::Storm,
+            }
         };
 
         self.push_event(&format!("environment shifted: {}", self.environment.name()));
