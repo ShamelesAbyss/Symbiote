@@ -1,5 +1,6 @@
 use crate::{
     app::{Environment, TRIBE_COUNT},
+    automata::{CellKind, CellularAutomata},
     ecology::{Ecology, ZoneKind},
     particle::{Genome, Particle, RareTrait, Tribe},
     species::Archetype,
@@ -18,9 +19,9 @@ pub fn build_rule_matrix(seed: u64) -> RuleMatrix {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut matrix = [[0.0; TRIBE_COUNT]; TRIBE_COUNT];
 
-    for a in 0..TRIBE_COUNT {
-        for b in 0..TRIBE_COUNT {
-            matrix[a][b] = rng.gen_range(-1.0..1.0);
+    for row in matrix.iter_mut() {
+        for value in row.iter_mut() {
+            *value = rng.gen_range(-1.0..1.0);
         }
     }
 
@@ -30,10 +31,10 @@ pub fn build_rule_matrix(seed: u64) -> RuleMatrix {
 pub fn mutate_rules(rules: &mut RuleMatrix, seed: u64, intensity: f32) {
     let mut rng = StdRng::seed_from_u64(seed);
 
-    for a in 0..TRIBE_COUNT {
-        for b in 0..TRIBE_COUNT {
+    for row in rules.iter_mut() {
+        for value in row.iter_mut() {
             if rng.gen_bool(0.18) {
-                rules[a][b] = (rules[a][b] + rng.gen_range(-intensity..intensity)).clamp(-1.0, 1.0);
+                *value = (*value + rng.gen_range(-intensity..intensity)).clamp(-1.0, 1.0);
             }
         }
     }
@@ -44,11 +45,12 @@ pub fn step_particles(
     rules: &RuleMatrix,
     env: Environment,
     ecology: &Ecology,
+    substrate: &CellularAutomata,
     archetypes: &[Option<Archetype>],
 ) {
     let snapshot = particles.to_vec();
 
-    for p in particles.iter_mut() {
+    for particle in particles.iter_mut() {
         let mut fx = 0.0;
         let mut fy = 0.0;
 
@@ -62,13 +64,13 @@ pub fn step_particles(
         let mut orbit_x = 0.0;
         let mut orbit_y = 0.0;
 
-        let archetype = p
+        let archetype = particle
             .species_id
             .and_then(|id| archetypes.get(id as usize).copied().flatten());
 
         for other in &snapshot {
-            let dx = other.x - p.x;
-            let dy = other.y - p.y;
+            let dx = other.x - particle.x;
+            let dy = other.y - particle.y;
             let d2 = dx * dx + dy * dy;
 
             if d2 <= 0.000001 {
@@ -76,8 +78,8 @@ pub fn step_particles(
             }
 
             let d = d2.sqrt();
-            let attraction = rules[p.tribe.index()][other.tribe.index()];
-            let predator_pressure = predator_factor(p.tribe, other.tribe, archetype);
+            let attraction = rules[particle.tribe.index()][other.tribe.index()];
+            let predator_pressure = predator_factor(particle.tribe, other.tribe, archetype);
 
             if d < BOND_RADIUS {
                 local_density += 1;
@@ -98,7 +100,7 @@ pub fn step_particles(
                     _ => 1.0,
                 };
 
-                let bond = (1.0 - d / BOND_RADIUS) * p.genome.bonding * bond_mult;
+                let bond = (1.0 - d / BOND_RADIUS) * particle.genome.bonding * bond_mult;
 
                 fx += dx * bond * 0.62;
                 fy += dy * bond * 0.62;
@@ -107,7 +109,7 @@ pub fn step_particles(
                 orbit_y += dx / d;
             }
 
-            let mut perception = p.genome.perception * env.perception_mult();
+            let mut perception = particle.genome.perception * env.perception_mult();
 
             if matches!(archetype, Some(Archetype::Grazer | Archetype::Hunter)) {
                 perception *= 1.15;
@@ -123,7 +125,7 @@ pub fn step_particles(
                 attraction * predator_pressure * (1.0 - d / perception)
             };
 
-            force *= p.genome.volatility;
+            force *= particle.genome.volatility;
             force *= env.force_mult();
 
             if matches!(archetype, Some(Archetype::Hunter)) {
@@ -134,12 +136,12 @@ pub fn step_particles(
             fy += (dy / d) * force;
 
             if matches!(archetype, Some(Archetype::Hunter)) && predator_pressure > 1.1 && d < perception * 0.45 {
-                p.energy += 0.018;
-                p.health += 0.012;
+                particle.energy += 0.018;
+                particle.health += 0.012;
             }
 
-            if matches!(archetype, Some(Archetype::Parasite)) && d < BOND_RADIUS && other.mass > p.mass {
-                p.energy += 0.012;
+            if matches!(archetype, Some(Archetype::Parasite)) && d < BOND_RADIUS && other.mass > particle.mass {
+                particle.energy += 0.012;
             }
         }
 
@@ -147,8 +149,8 @@ pub fn step_particles(
             vx_avg /= local_density as f32;
             vy_avg /= local_density as f32;
 
-            p.vx += (vx_avg - p.vx) * 0.22;
-            p.vy += (vy_avg - p.vy) * 0.22;
+            particle.vx += (vx_avg - particle.vx) * 0.22;
+            particle.vy += (vy_avg - particle.vy) * 0.22;
 
             let orbit_boost = if matches!(archetype, Some(Archetype::Orbiter)) {
                 1.75
@@ -156,86 +158,87 @@ pub fn step_particles(
                 1.0
             };
 
-            p.vx += orbit_x * p.genome.orbit * orbit_boost * 0.00042;
-            p.vy += orbit_y * p.genome.orbit * orbit_boost * 0.00042;
+            particle.vx += orbit_x * particle.genome.orbit * orbit_boost * 0.00042;
+            particle.vy += orbit_y * particle.genome.orbit * orbit_boost * 0.00042;
         }
 
-        apply_ecology(p, ecology);
+        apply_ecology(particle, ecology);
+        apply_substrate(particle, substrate);
 
-        let mass_drag = (1.0 + p.mass * 0.13).clamp(1.0, 2.0);
+        let mass_drag = (1.0 + particle.mass * 0.13).clamp(1.0, 2.0);
 
-        p.vx = (p.vx + fx * FORCE_SCALE) * FRICTION / mass_drag;
-        p.vy = (p.vy + fy * FORCE_SCALE) * FRICTION / mass_drag;
+        particle.vx = (particle.vx + fx * FORCE_SCALE) * FRICTION / mass_drag;
+        particle.vy = (particle.vy + fy * FORCE_SCALE) * FRICTION / mass_drag;
 
-        apply_environment_current(p, env);
+        apply_environment_current(particle, env);
 
-        if p.x < -1.0 {
-            p.vx += WALL_FORCE;
+        if particle.x < -1.0 {
+            particle.vx += WALL_FORCE;
         }
 
-        if p.x > 1.0 {
-            p.vx -= WALL_FORCE;
+        if particle.x > 1.0 {
+            particle.vx -= WALL_FORCE;
         }
 
-        if p.y < -1.0 {
-            p.vy += WALL_FORCE;
+        if particle.y < -1.0 {
+            particle.vy += WALL_FORCE;
         }
 
-        if p.y > 1.0 {
-            p.vy -= WALL_FORCE;
+        if particle.y > 1.0 {
+            particle.vy -= WALL_FORCE;
         }
 
-        p.x = (p.x + p.vx).clamp(-1.2, 1.2);
-        p.y = (p.y + p.vy).clamp(-1.2, 1.2);
+        particle.x = (particle.x + particle.vx).clamp(-1.2, 1.2);
+        particle.y = (particle.y + particle.vy).clamp(-1.2, 1.2);
 
         if friendly_density >= 4 {
-            p.health += 0.14;
-            p.energy += 0.028;
-            p.mass += 0.014;
+            particle.health += 0.14;
+            particle.energy += 0.028;
+            particle.mass += 0.014;
         }
 
         if hostile_density >= 3 {
-            p.health -= 0.21;
-            p.energy -= 0.026;
-            p.mass -= 0.012;
+            particle.health -= 0.21;
+            particle.energy -= 0.026;
+            particle.mass -= 0.012;
         }
 
         if local_density == 0 {
-            p.health -= 0.07;
-            p.energy -= 0.04;
-            p.mass -= 0.008;
+            particle.health -= 0.07;
+            particle.energy -= 0.04;
+            particle.mass -= 0.008;
         }
 
-        if p.cluster_id.is_some() {
-            p.health += 0.035;
-            p.energy += 0.012;
+        if particle.cluster_id.is_some() {
+            particle.health += 0.035;
+            particle.energy += 0.012;
         }
 
         if env == Environment::Bloom {
-            p.health += 0.035;
-            p.energy += 0.018;
+            particle.health += 0.035;
+            particle.energy += 0.018;
         }
 
         if matches!(archetype, Some(Archetype::Architect | Archetype::Leviathan)) {
-            p.mass += 0.002;
+            particle.mass += 0.002;
         }
 
-        if p.rare_trait == RareTrait::Radiant {
-            p.energy += 0.015;
+        if particle.rare_trait == RareTrait::Radiant {
+            particle.energy += 0.015;
         }
 
-        if p.rare_trait == RareTrait::Voracious {
-            p.energy -= 0.01;
-            p.health += 0.008;
+        if particle.rare_trait == RareTrait::Voracious {
+            particle.energy -= 0.01;
+            particle.health += 0.008;
         }
 
-        p.energy -= p.genome.metabolism * env.hunger_mult();
-        p.health -= p.genome.hunger * env.hunger_mult();
+        particle.energy -= particle.genome.metabolism * env.hunger_mult();
+        particle.health -= particle.genome.hunger * env.hunger_mult();
 
-        p.energy = p.energy.clamp(0.0, 160.0);
-        p.health = p.health.clamp(0.0, 100.0);
-        p.mass = p.mass.clamp(0.45, 7.0);
-        p.age = p.age.saturating_add(1);
+        particle.energy = particle.energy.clamp(0.0, 160.0);
+        particle.health = particle.health.clamp(0.0, 100.0);
+        particle.mass = particle.mass.clamp(0.45, 7.0);
+        particle.age = particle.age.saturating_add(1);
     }
 }
 
@@ -260,10 +263,40 @@ fn predator_factor(a: Tribe, b: Tribe, archetype: Option<Archetype>) -> f32 {
     }
 }
 
-fn apply_ecology(p: &mut Particle, ecology: &Ecology) {
+fn apply_substrate(particle: &mut Particle, substrate: &CellularAutomata) {
+    match substrate.influence_at(particle.x, particle.y) {
+        CellKind::Life => {
+            particle.energy += 0.018;
+            particle.health += 0.012;
+        }
+        CellKind::Spore => {
+            particle.energy += 0.025;
+            particle.genome.fertility = (particle.genome.fertility + 0.00025).clamp(0.2, 2.4);
+        }
+        CellKind::Nutrient => {
+            particle.energy += 0.04;
+            particle.health += 0.02;
+        }
+        CellKind::Dead => {
+            particle.energy -= 0.035;
+            particle.health -= 0.025;
+        }
+        CellKind::Mutagen => {
+            particle.genome.volatility = (particle.genome.volatility + 0.00055).clamp(0.36, 1.95);
+            particle.genome.orbit = (particle.genome.orbit + 0.00035).clamp(0.0, 1.55);
+        }
+        CellKind::Nest => {
+            particle.energy += 0.032;
+            particle.mass += 0.002;
+        }
+        CellKind::Empty => {}
+    }
+}
+
+fn apply_ecology(particle: &mut Particle, ecology: &Ecology) {
     for zone in &ecology.zones {
-        let dx = zone.x - p.x;
-        let dy = zone.y - p.y;
+        let dx = zone.x - particle.x;
+        let dy = zone.y - particle.y;
         let dist = (dx * dx + dy * dy).sqrt();
 
         if dist > zone.radius {
@@ -274,50 +307,50 @@ fn apply_ecology(p: &mut Particle, ecology: &Ecology) {
 
         match zone.kind {
             ZoneKind::Nutrient => {
-                p.health += 0.12 * effect;
-                p.energy += 0.08 * effect;
-                p.mass += 0.006 * effect;
+                particle.health += 0.12 * effect;
+                particle.energy += 0.08 * effect;
+                particle.mass += 0.006 * effect;
             }
             ZoneKind::Dead => {
-                p.health -= 0.18 * effect;
-                p.energy -= 0.09 * effect;
-                p.mass -= 0.006 * effect;
+                particle.health -= 0.18 * effect;
+                particle.energy -= 0.09 * effect;
+                particle.mass -= 0.006 * effect;
             }
             ZoneKind::Turbulent => {
-                p.vx += (p.y * 33.0).sin() * 0.001 * effect;
-                p.vy -= (p.x * 29.0).cos() * 0.001 * effect;
+                particle.vx += (particle.y * 33.0).sin() * 0.001 * effect;
+                particle.vy -= (particle.x * 29.0).cos() * 0.001 * effect;
             }
             ZoneKind::Mutagen => {
-                p.genome.volatility = (p.genome.volatility + 0.00045 * effect).clamp(0.36, 1.95);
-                p.genome.orbit = (p.genome.orbit + 0.0003 * effect).clamp(0.0, 1.55);
+                particle.genome.volatility = (particle.genome.volatility + 0.00045 * effect).clamp(0.36, 1.95);
+                particle.genome.orbit = (particle.genome.orbit + 0.0003 * effect).clamp(0.0, 1.55);
             }
             ZoneKind::Nest => {
-                p.energy += 0.04 * effect;
-                p.genome.fertility = (p.genome.fertility + 0.00035 * effect).clamp(0.2, 2.4);
+                particle.energy += 0.04 * effect;
+                particle.genome.fertility = (particle.genome.fertility + 0.00035 * effect).clamp(0.2, 2.4);
             }
         }
     }
 }
 
-fn apply_environment_current(p: &mut Particle, env: Environment) {
+fn apply_environment_current(particle: &mut Particle, env: Environment) {
     match env {
         Environment::Calm => {}
         Environment::Bloom => {
-            p.vx *= 0.998;
-            p.vy *= 0.998;
+            particle.vx *= 0.998;
+            particle.vy *= 0.998;
         }
         Environment::Hunger => {
-            p.vx *= 1.006;
-            p.vy *= 1.006;
+            particle.vx *= 1.006;
+            particle.vy *= 1.006;
         }
         Environment::Storm => {
-            let phase = ((p.x * 22.0 + p.y * 31.0).sin()) * 0.00105;
-            p.vx += phase;
-            p.vy -= phase;
+            let phase = ((particle.x * 22.0 + particle.y * 31.0).sin()) * 0.00105;
+            particle.vx += phase;
+            particle.vy -= phase;
         }
         Environment::Drift => {
-            p.vx += 0.0002;
-            p.vy += 0.00007;
+            particle.vx += 0.0002;
+            particle.vy += 0.00007;
         }
     }
 }
@@ -385,7 +418,11 @@ pub fn fused_child(a: Particle, b: Particle, seed: u64) -> Particle {
     if rng.gen_bool(0.003) {
         child.rare_trait = roll_rare_trait(&mut rng, child.genome, child.mass);
     } else {
-        child.rare_trait = if rng.gen_bool(0.5) { a.rare_trait } else { b.rare_trait };
+        child.rare_trait = if rng.gen_bool(0.5) {
+            a.rare_trait
+        } else {
+            b.rare_trait
+        };
     }
 
     child

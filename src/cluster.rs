@@ -64,8 +64,8 @@ impl ClusterTracker {
         species_bank: &mut SpeciesBank,
         age: u64,
     ) -> ClusterEvents {
-        for p in particles.iter_mut() {
-            p.cluster_id = None;
+        for particle in particles.iter_mut() {
+            particle.cluster_id = None;
         }
 
         let groups = detect_groups(particles);
@@ -92,31 +92,31 @@ impl ClusterTracker {
                 }
             }
 
-            let parent_species = best_match.as_ref().and_then(|c| c.species_id);
+            let parent_species = best_match.as_ref().and_then(|cluster| cluster.species_id);
 
             let mut cluster = if let Some(old) = best_match {
-                let mut c = measured;
-                c.id = old.id;
-                c.species_id = old.species_id;
-                c.archetype = old.archetype;
-                c.age = old.age + 1;
-                c.stability = (old.stability * 0.9 + c.stability * 0.1).clamp(0.0, 100.0);
-                c.membrane = (old.membrane * 0.94 + c.membrane * 0.06).clamp(0.0, 100.0);
-                c.last_seen = age;
+                let mut current = measured;
+                current.id = old.id;
+                current.species_id = old.species_id;
+                current.archetype = old.archetype;
+                current.age = old.age + 1;
+                current.stability = (old.stability * 0.9 + current.stability * 0.1).clamp(0.0, 100.0);
+                current.membrane = (old.membrane * 0.94 + current.membrane * 0.06).clamp(0.0, 100.0);
+                current.last_seen = age;
 
-                if c.rare_trait == RareTrait::None && old.rare_trait != RareTrait::None {
-                    c.rare_trait = old.rare_trait;
+                if current.rare_trait == RareTrait::None && old.rare_trait != RareTrait::None {
+                    current.rare_trait = old.rare_trait;
                 }
 
-                c
+                current
             } else {
-                let mut c = measured;
-                c.id = self.next_id;
+                let mut current = measured;
+                current.id = self.next_id;
                 self.next_id += 1;
-                c.age = 1;
-                c.last_seen = age;
+                current.age = 1;
+                current.last_seen = age;
                 events.births += 1;
-                c
+                current
             };
 
             let species_id = species_bank.assign_or_create(
@@ -128,9 +128,9 @@ impl ClusterTracker {
                 parent_species,
             );
 
-            let species = species_bank.species.iter().find(|s| s.id == species_id);
+            let species = species_bank.species.iter().find(|species| species.id == species_id);
             cluster.species_id = Some(species_id);
-            cluster.archetype = species.map(|s| s.archetype);
+            cluster.archetype = species.map(|species| species.archetype);
 
             if cluster.age > 50 && cluster.size > 14 {
                 cluster.membrane = (cluster.membrane + 1.2).min(100.0);
@@ -141,10 +141,10 @@ impl ClusterTracker {
             }
 
             for &idx in &group {
-                if let Some(p) = particles.get_mut(idx) {
-                    p.cluster_id = Some(cluster.id);
-                    p.species_id = Some(species_id);
-                    p.mass = (p.mass + 0.004 * cluster.size as f32).clamp(0.55, 6.5);
+                if let Some(particle) = particles.get_mut(idx) {
+                    particle.cluster_id = Some(cluster.id);
+                    particle.species_id = Some(species_id);
+                    particle.mass = (particle.mass + 0.004 * cluster.size as f32).clamp(0.55, 6.5);
                 }
             }
 
@@ -236,25 +236,25 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
     };
 
     for &idx in indices {
-        let p = particles[idx];
+        let particle = particles[idx];
 
-        x += p.x;
-        y += p.y;
-        vx += p.vx;
-        vy += p.vy;
-        membrane += p.genome.membrane;
+        x += particle.x;
+        y += particle.y;
+        vx += particle.vx;
+        vy += particle.vy;
+        membrane += particle.genome.membrane;
 
-        tribe_counts[p.tribe.index()] += 1;
-        rare_counts[rare_index(p.rare_trait)] += 1;
+        tribe_counts[particle.tribe.index()] += 1;
+        rare_counts[rare_index(particle.rare_trait)] += 1;
 
-        genome.perception += p.genome.perception;
-        genome.hunger += p.genome.hunger;
-        genome.bonding += p.genome.bonding;
-        genome.volatility += p.genome.volatility;
-        genome.orbit += p.genome.orbit;
-        genome.membrane += p.genome.membrane;
-        genome.metabolism += p.genome.metabolism;
-        genome.fertility += p.genome.fertility;
+        genome.perception += particle.genome.perception;
+        genome.hunger += particle.genome.hunger;
+        genome.bonding += particle.genome.bonding;
+        genome.volatility += particle.genome.volatility;
+        genome.orbit += particle.genome.orbit;
+        genome.membrane += particle.genome.membrane;
+        genome.metabolism += particle.genome.metabolism;
+        genome.fertility += particle.genome.fertility;
     }
 
     let count = indices.len() as f32;
@@ -277,9 +277,9 @@ fn measure_group(indices: &[usize], particles: &[Particle]) -> Cluster {
     let mut radius = 0.0;
 
     for &idx in indices {
-        let p = particles[idx];
-        let dx = p.x - x;
-        let dy = p.y - y;
+        let particle = particles[idx];
+        let dx = particle.x - x;
+        let dy = particle.y - y;
         radius += (dx * dx + dy * dy).sqrt();
     }
 

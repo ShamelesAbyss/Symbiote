@@ -1,4 +1,5 @@
 use crate::{
+    automata::CellularAutomata,
     cluster::{ClusterEvents, ClusterTracker},
     ecology::Ecology,
     memory::MemoryBank,
@@ -75,6 +76,7 @@ struct EcosystemState {
     clusters: ClusterTracker,
     species_bank: SpeciesBank,
     ecology: Ecology,
+    substrate: CellularAutomata,
     memory: MemoryBank,
     seed: u64,
     age: u64,
@@ -90,6 +92,7 @@ pub struct App {
     pub clusters: ClusterTracker,
     pub species_bank: SpeciesBank,
     pub ecology: Ecology,
+    pub substrate: CellularAutomata,
     pub memory: MemoryBank,
     pub seed: u64,
     pub age: u64,
@@ -122,6 +125,7 @@ impl App {
             clusters: ClusterTracker::new(),
             species_bank: SpeciesBank::new(),
             ecology: Ecology::new(seed),
+            substrate: CellularAutomata::new(seed ^ 0xC011, 96, 48),
             memory: MemoryBank::load_or_new(seed),
             seed,
             age: 0,
@@ -139,7 +143,7 @@ impl App {
 
         app.reset_particles();
         app.push_event("native reproduction engine online");
-        app.push_event("stable ecology zones seeded");
+        app.push_event("cellular automata substrate online");
         app
     }
 
@@ -151,12 +155,21 @@ impl App {
             &self.rules,
             self.environment,
             &self.ecology,
+            &self.substrate,
             &archetype_lookup,
         );
 
         self.age += 1;
 
         self.ecology.tick(self.seed, self.age, self.environment);
+
+        if self.age % 2 == 0 {
+            self.deposit_to_substrate();
+        }
+
+        if self.age % 3 == 0 {
+            self.substrate.tick();
+        }
 
         if self.age % 32 == 0 {
             self.native_reproduction();
@@ -203,6 +216,18 @@ impl App {
         }
     }
 
+    fn deposit_to_substrate(&mut self) {
+        let lookup = self.build_archetype_lookup();
+
+        for particle in self.particles.iter().step_by(3) {
+            let archetype = particle
+                .species_id
+                .and_then(|id| lookup.get(id as usize).copied().flatten());
+
+            self.substrate.deposit_particle(particle, archetype);
+        }
+    }
+
     fn native_reproduction(&mut self) {
         if self.particles.len() >= MAX_PARTICLES {
             return;
@@ -225,8 +250,8 @@ impl App {
                 continue;
             }
 
-            let chance = (0.018 + parent.genome.fertility * 0.018 + clustered_bonus + rare_bonus)
-                .clamp(0.01, 0.38);
+            let chance =
+                (0.018 + parent.genome.fertility * 0.018 + clustered_bonus + rare_bonus).clamp(0.01, 0.38);
 
             if !rng.gen_bool(chance as f64) {
                 continue;
@@ -272,17 +297,18 @@ impl App {
     fn apply_selection_pressure(&mut self, rng: &mut StdRng) {
         let before = self.particles.len();
 
-        self.particles.retain(|p| {
-            let old_age_pressure = if p.age > 18_000 { 0.08 } else { 0.0 };
-            let energy_score = (p.energy / 130.0).clamp(0.0, 1.0);
-            let health_score = (p.health / 100.0).clamp(0.0, 1.0);
-            let clustered_bonus = if p.cluster_id.is_some() { 0.18 } else { 0.0 };
-            let rare_bonus = if p.rare_trait != RareTrait::None { 0.04 } else { 0.0 };
+        self.particles.retain(|particle| {
+            let old_age_pressure = if particle.age > 18_000 { 0.08 } else { 0.0 };
+            let energy_score = (particle.energy / 130.0).clamp(0.0, 1.0);
+            let health_score = (particle.health / 100.0).clamp(0.0, 1.0);
+            let clustered_bonus = if particle.cluster_id.is_some() { 0.18 } else { 0.0 };
+            let rare_bonus = if particle.rare_trait != RareTrait::None { 0.04 } else { 0.0 };
 
-            let survival = (energy_score * 0.44 + health_score * 0.44 + clustered_bonus + rare_bonus - old_age_pressure)
-                .clamp(0.02, 0.995);
+            let survival =
+                (energy_score * 0.44 + health_score * 0.44 + clustered_bonus + rare_bonus - old_age_pressure)
+                    .clamp(0.02, 0.995);
 
-            p.energy > 0.0 && p.health > 0.0 && rng.gen_bool(survival as f64)
+            particle.energy > 0.0 && particle.health > 0.0 && rng.gen_bool(survival as f64)
         });
 
         while self.particles.len() < MIN_PARTICLES {
@@ -303,6 +329,7 @@ impl App {
         self.clusters = ClusterTracker::new();
         self.species_bank = SpeciesBank::new();
         self.ecology = Ecology::new(self.seed ^ self.age);
+        self.substrate = CellularAutomata::new(self.seed ^ self.age ^ 0xC011, 96, 48);
 
         for i in 0..PARTICLE_COUNT {
             let tribe = Tribe::from_index(i % TRIBE_COUNT);
@@ -356,7 +383,7 @@ impl App {
     }
 
     pub fn slow_down(&mut self) {
-        self.tick_ms = (self.tick_ms + 4).min(120);
+        self.tick_ms = (self.tick_ms + 4).min(220);
     }
 
     pub fn save_all(&mut self) {
@@ -392,6 +419,7 @@ impl App {
             clusters: state.clusters,
             species_bank: state.species_bank,
             ecology: state.ecology,
+            substrate: state.substrate,
             memory: state.memory,
             seed: state.seed,
             age: state.age,
@@ -420,6 +448,7 @@ impl App {
             },
             species_bank: self.species_bank.clone(),
             ecology: self.ecology.clone(),
+            substrate: self.substrate.clone(),
             memory: self.memory.clone(),
             seed: self.seed,
             age: self.age,
@@ -480,10 +509,10 @@ impl App {
         let mut cx = 0.0;
         let mut cy = 0.0;
 
-        for p in &self.particles {
-            speed_sum += (p.vx * p.vx + p.vy * p.vy).sqrt();
-            cx += p.x;
-            cy += p.y;
+        for particle in &self.particles {
+            speed_sum += (particle.vx * particle.vx + particle.vy * particle.vy).sqrt();
+            cx += particle.x;
+            cy += particle.y;
         }
 
         cx /= self.particles.len() as f32;
@@ -491,9 +520,9 @@ impl App {
 
         let mut spread = 0.0;
 
-        for p in &self.particles {
-            let dx = p.x - cx;
-            let dy = p.y - cy;
+        for particle in &self.particles {
+            let dx = particle.x - cx;
+            let dy = particle.y - cy;
             spread += (dx * dx + dy * dy).sqrt();
         }
 
@@ -513,20 +542,19 @@ impl App {
         self.memory.peak_population = self.memory.peak_population.max(self.particles.len());
         self.memory.peak_clusters = self.memory.peak_clusters.max(self.clusters.clusters.len());
         self.memory.peak_species = self.memory.peak_species.max(self.species_bank.active_count());
+        self.memory.peak_living_cells = self.memory.peak_living_cells.max(self.substrate.living_cells());
 
-        let mut rare_count = 0usize;
-
-        for p in &self.particles {
-            if p.rare_trait != RareTrait::None {
-                rare_count += 1;
-            }
-        }
+        let rare_count = self
+            .particles
+            .iter()
+            .filter(|particle| particle.rare_trait != RareTrait::None)
+            .count();
 
         self.memory.peak_rare_lifeforms = self.memory.peak_rare_lifeforms.max(rare_count);
 
         let mut counts = [0usize; 9];
 
-        for species in self.species_bank.species.iter().filter(|s| !s.extinct) {
+        for species in self.species_bank.species.iter().filter(|species| !species.extinct) {
             counts[species.archetype.index()] += 1;
         }
 
@@ -543,6 +571,7 @@ impl App {
         ];
 
         let mut best = 0;
+
         for i in 1..9 {
             if counts[i] > counts[best] {
                 best = i;

@@ -71,7 +71,7 @@ impl Ecology {
             zone.radius = (zone.radius + pulse).clamp(0.14, 0.46);
         }
 
-        self.zones.retain(|z| z.age < 24_000);
+        self.zones.retain(|zone| zone.age < 24_000);
 
         let spawn_rate = match env {
             Environment::Bloom => 2600,

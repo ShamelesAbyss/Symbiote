@@ -1,5 +1,6 @@
 use crate::{
     app::{App, Environment},
+    automata::CellKind,
     particle::Tribe,
 };
 use ratatui::{
@@ -70,7 +71,7 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     let lines = vec![
         Line::from(vec![
             Span::styled(" ◉ SYMBIOTE ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            Span::styled("self-reproducing artificial ecosystem ", Style::default().fg(Color::Magenta)),
+            Span::styled("cellular artificial ecosystem ", Style::default().fg(Color::Magenta)),
             Span::styled(pulse.repeat(12), Style::default().fg(env_color(app.environment))),
         ]),
         Line::from(vec![
@@ -82,6 +83,8 @@ fn render_header(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
             Span::styled(app.environment.name(), Style::default().fg(env_color(app.environment))),
             Span::styled(" | species: ", Style::default().fg(Color::DarkGray)),
             Span::styled(format!("{}", app.species_bank.active_count()), Style::default().fg(Color::Yellow)),
+            Span::styled(" | cells: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{}", app.substrate.living_cells()), Style::default().fg(Color::Green)),
             Span::styled(" | ", Style::default().fg(Color::DarkGray)),
             Span::styled(status, Style::default().fg(if app.paused { Color::Yellow } else { Color::Green })),
         ]),
@@ -99,25 +102,26 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 
     let mut cells: Vec<Vec<Cell>> = vec![vec![Cell::default(); width]; height];
 
+    draw_substrate(&mut cells, app, width, height);
     draw_ecology_zones(&mut cells, app, width, height);
 
-    for p in &app.particles {
-        let x = (((p.x + 1.2) / 2.4) * width as f32) as isize;
-        let y = (((p.y + 1.2) / 2.4) * height as f32) as isize;
+    for particle in &app.particles {
+        let x = (((particle.x + 1.2) / 2.4) * width as f32) as isize;
+        let y = (((particle.y + 1.2) / 2.4) * height as f32) as isize;
 
         if x >= 0 && y >= 0 && x < width as isize && y < height as isize {
             let cell = &mut cells[y as usize][x as usize];
             cell.count += 1;
-            cell.tribe_counts[p.tribe.index()] += 1;
-            cell.health += p.health;
-            cell.energy += p.energy;
-            cell.mass += p.mass;
+            cell.tribe_counts[particle.tribe.index()] += 1;
+            cell.health += particle.health;
+            cell.energy += particle.energy;
+            cell.mass += particle.mass;
 
-            if p.cluster_id.is_some() {
+            if particle.cluster_id.is_some() {
                 cell.clustered += 1;
             }
 
-            if !p.rare_trait.short().is_empty() {
+            if !particle.rare_trait.short().is_empty() {
                 cell.rare = true;
             }
         }
@@ -138,6 +142,9 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
                 spans.push(Span::styled("○", Style::default().fg(Color::Gray)));
             } else if cell.count == 0 && cell.zone.is_some() {
                 let (glyph, color) = cell.zone.unwrap();
+                spans.push(Span::styled(glyph.to_string(), Style::default().fg(color)));
+            } else if cell.count == 0 && cell.substrate.is_some() {
+                let (glyph, color) = cell.substrate.unwrap();
                 spans.push(Span::styled(glyph.to_string(), Style::default().fg(color)));
             } else if cell.count == 0 {
                 spans.push(Span::styled(background_glyph(app.environment), Style::default().fg(Color::DarkGray)));
@@ -183,6 +190,30 @@ fn render_world(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     );
 }
 
+fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
+    for y in 0..height {
+        for x in 0..width {
+            let kind = app.substrate.sample_screen(x, y, width, height);
+
+            if kind == CellKind::Empty {
+                continue;
+            }
+
+            let color = match kind {
+                CellKind::Life => Color::Green,
+                CellKind::Nutrient => Color::Yellow,
+                CellKind::Dead => Color::DarkGray,
+                CellKind::Mutagen => Color::Magenta,
+                CellKind::Nest => Color::Cyan,
+                CellKind::Spore => Color::LightGreen,
+                CellKind::Empty => Color::DarkGray,
+            };
+
+            cells[y][x].substrate = Some((kind.glyph(), color));
+        }
+    }
+}
+
 fn draw_ecology_zones(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
     for zone in &app.ecology.zones {
         let x = (((zone.x + 1.2) / 2.4) * width as f32) as i32;
@@ -212,12 +243,12 @@ fn draw_cluster_membranes(cells: &mut [Vec<Cell>], app: &App, width: usize, heig
         let cy = (((cluster.y + 1.2) / 2.4) * height as f32) as i32;
 
         let pulse = ((app.age as f32 / 12.0).sin() * 1.2) as i32;
-        let r = ((cluster.radius * width as f32 * 0.9).max(2.0)).min(9.0) as i32 + pulse;
+        let radius = ((cluster.radius * width as f32 * 0.9).max(2.0)).min(9.0) as i32 + pulse;
 
         for deg in (0..360).step_by(18) {
             let rad = deg as f32 * std::f32::consts::PI / 180.0;
-            let x = cx + (rad.cos() * r as f32) as i32;
-            let y = cy + (rad.sin() * (r as f32 * 0.62)) as i32;
+            let x = cx + (rad.cos() * radius as f32) as i32;
+            let y = cy + (rad.sin() * (radius as f32 * 0.62)) as i32;
 
             if x >= 0 && y >= 0 && x < width as i32 && y < height as i32 {
                 cells[y as usize][x as usize].membrane = true;
@@ -271,23 +302,23 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         )];
 
         for b in 0..6 {
-            let v = app.rules[a][b];
+            let value = app.rules[a][b];
 
-            let symbol = if v > 0.62 {
+            let symbol = if value > 0.62 {
                 "++"
-            } else if v > 0.18 {
+            } else if value > 0.18 {
                 "+ "
-            } else if v < -0.62 {
+            } else if value < -0.62 {
                 "--"
-            } else if v < -0.18 {
+            } else if value < -0.18 {
                 "- "
             } else {
                 "· "
             };
 
-            let color = if v > 0.18 {
+            let color = if value > 0.18 {
                 Color::Green
-            } else if v < -0.18 {
+            } else if value < -0.18 {
                 Color::Red
             } else {
                 Color::DarkGray
@@ -304,6 +335,8 @@ fn render_rules(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
         Span::styled(format!("{}", app.particles.len()), Style::default().fg(Color::Green)),
         Span::styled(" Zones: ", Style::default().fg(Color::Yellow)),
         Span::styled(format!("{}", app.ecology.zones.len()), Style::default().fg(Color::Cyan)),
+        Span::styled(" Cells: ", Style::default().fg(Color::Yellow)),
+        Span::styled(format!("{}", app.substrate.living_cells()), Style::default().fg(Color::Green)),
     ]));
 
     f.render_widget(
@@ -323,7 +356,7 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
     ])];
 
     for cluster in app.clusters.clusters.iter().take(4) {
-        let archetype = cluster.archetype.map(|a| a.short()).unwrap_or("UNK");
+        let archetype = cluster.archetype.map(|value| value.short()).unwrap_or("UNK");
 
         lines.push(Line::from(vec![
             Span::styled(format!("#{} ", cluster.id), Style::default().fg(Color::DarkGray)),
@@ -345,14 +378,16 @@ fn render_clusters(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
 }
 
 fn render_species(f: &mut Frame<'_>, area: ratatui::layout::Rect, app: &App) {
+    let extinct = app.species_bank.species.iter().filter(|species| species.extinct).count();
+
     let mut lines = vec![Line::from(vec![
         Span::styled("Active: ", Style::default().fg(Color::DarkGray)),
         Span::styled(format!("{}", app.species_bank.active_count()), Style::default().fg(Color::Green)),
-        Span::styled(" Rare: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(format!("{}", app.memory.peak_rare_lifeforms), Style::default().fg(Color::White)),
+        Span::styled(" Extinct: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", extinct), Style::default().fg(Color::Red)),
     ])];
 
-    for species in app.species_bank.species.iter().rev().filter(|s| !s.extinct).take(3) {
+    for species in app.species_bank.species.iter().rev().filter(|species| !species.extinct).take(3) {
         let rare = species.rare_trait.short();
 
         lines.push(Line::from(vec![
@@ -441,6 +476,7 @@ struct Cell {
     trail: bool,
     rare: bool,
     zone: Option<(char, Color)>,
+    substrate: Option<(char, Color)>,
 }
 
 impl Default for Cell {
@@ -456,6 +492,7 @@ impl Default for Cell {
             trail: false,
             rare: false,
             zone: None,
+            substrate: None,
         }
     }
 }
