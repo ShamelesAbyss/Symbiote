@@ -498,7 +498,9 @@ fn root_screen_visual(app: &App, x: usize, y: usize, width: usize, height: usize
         x + 1 < width && app.substrate.sample_screen(x + 1, y, width, height) == CellKind::Root;
 
     let height_ratio = y as f32 / height.max(1) as f32;
-    let color = if height_ratio > 0.76 {
+    let phase = ((app.age / 5) as usize + visual_hash(app.age / 3, x, y)) % 6;
+
+    let color = if height_ratio > 0.72 {
         Color::Blue
     } else if height_ratio > 0.38 {
         Color::Yellow
@@ -507,17 +509,79 @@ fn root_screen_visual(app: &App, x: usize, y: usize, width: usize, height: usize
     };
 
     let glyph = match (up, down, left, right) {
-        (true, true, true, true) => '┼',
-        (true, true, true, false) => '┤',
-        (true, true, false, true) => '├',
-        (true, false, true, true) => '┴',
-        (false, true, true, true) => '┬',
-        (true, true, false, false) => '│',
-        (false, false, true, true) => '─',
-        (false, true, false, true) => '┌',
-        (false, true, true, false) => '┐',
-        (true, false, false, true) => '└',
-        (true, false, true, false) => '┘',
+        (true, true, true, true) => {
+            if phase % 2 == 0 {
+                '┼'
+            } else {
+                '╋'
+            }
+        }
+        (true, true, true, false) => {
+            if phase % 3 == 0 {
+                '┤'
+            } else {
+                '┫'
+            }
+        }
+        (true, true, false, true) => {
+            if phase % 3 == 0 {
+                '├'
+            } else {
+                '┣'
+            }
+        }
+        (true, false, true, true) => {
+            if phase % 2 == 0 {
+                '┴'
+            } else {
+                '┻'
+            }
+        }
+        (false, true, true, true) => {
+            if phase % 2 == 0 {
+                '┬'
+            } else {
+                '┳'
+            }
+        }
+        (true, true, false, false) => match phase {
+            0 | 3 => '│',
+            1 | 4 => '╽',
+            _ => '╿',
+        },
+        (false, false, true, true) => match phase {
+            0 | 3 => '─',
+            1 | 4 => '╼',
+            _ => '╾',
+        },
+        (false, true, false, true) => {
+            if phase % 2 == 0 {
+                '┌'
+            } else {
+                '╭'
+            }
+        }
+        (false, true, true, false) => {
+            if phase % 2 == 0 {
+                '┐'
+            } else {
+                '╮'
+            }
+        }
+        (true, false, false, true) => {
+            if phase % 2 == 0 {
+                '└'
+            } else {
+                '╰'
+            }
+        }
+        (true, false, true, false) => {
+            if phase % 2 == 0 {
+                '┘'
+            } else {
+                '╯'
+            }
+        }
         (true, false, false, false) => {
             if height_ratio < 0.38 {
                 '♣'
@@ -526,15 +590,31 @@ fn root_screen_visual(app: &App, x: usize, y: usize, width: usize, height: usize
             }
         }
         (false, true, false, false) => '╷',
-        (false, false, true, false) => '╴',
-        (false, false, false, true) => '╶',
+        (false, false, true, false) => {
+            if phase % 2 == 0 {
+                '╴'
+            } else {
+                '╌'
+            }
+        }
+        (false, false, false, true) => {
+            if phase % 2 == 0 {
+                '╶'
+            } else {
+                '╍'
+            }
+        }
         _ => {
             if height_ratio < 0.38 {
-                '♣'
-            } else if height_ratio < 0.58 {
-                '┼'
+                if phase % 2 == 0 {
+                    '♣'
+                } else {
+                    '♧'
+                }
+            } else if phase % 2 == 0 {
+                '│'
             } else {
-                '╋'
+                '╎'
             }
         }
     };

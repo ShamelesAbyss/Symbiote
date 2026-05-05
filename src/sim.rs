@@ -215,7 +215,7 @@ pub fn step_particles(
                 } else {
                     1.0 - attraction.abs() * matrix_repulsion * 0.12
                 }
-                .clamp(0.68, 1.30);
+                .clamp(0.68_f32, 1.30_f32);
 
                 let bond =
                     (1.0 - d / BOND_RADIUS) * particle.genome.bonding * bond_mult * matrix_bond;
@@ -527,7 +527,7 @@ fn matrix_pressure(rules: &RuleMatrix) -> f32 {
         }
     }
 
-    (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0, 1.0)
+    (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0_f32, 1.0_f32)
 }
 
 fn matrix_attraction(rules: &RuleMatrix) -> f32 {
@@ -541,7 +541,7 @@ fn matrix_attraction(rules: &RuleMatrix) -> f32 {
         }
     }
 
-    (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0, 1.0)
+    (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0_f32, 1.0_f32)
 }
 
 fn matrix_repulsion(rules: &RuleMatrix) -> f32 {
@@ -555,7 +555,7 @@ fn matrix_repulsion(rules: &RuleMatrix) -> f32 {
         }
     }
 
-    (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0, 1.0)
+    (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0_f32, 1.0_f32)
 }
 
 fn matrix_pair_pressure(
