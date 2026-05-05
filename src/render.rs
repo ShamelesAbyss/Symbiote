@@ -489,7 +489,7 @@ fn root_color(y: usize, height: usize) -> Color {
     }
 }
 
-fn root_screen_glyph(app: &App, x: usize, y: usize, width: usize, height: usize) -> char {
+fn root_screen_visual(app: &App, x: usize, y: usize, width: usize, height: usize) -> (char, Color) {
     let up = y > 0 && app.substrate.sample_screen(x, y - 1, width, height) == CellKind::Root;
     let down =
         y + 1 < height && app.substrate.sample_screen(x, y + 1, width, height) == CellKind::Root;
@@ -497,32 +497,49 @@ fn root_screen_glyph(app: &App, x: usize, y: usize, width: usize, height: usize)
     let right =
         x + 1 < width && app.substrate.sample_screen(x + 1, y, width, height) == CellKind::Root;
 
-    match (up, down, left, right) {
-        (true, true, true, true) => '╋',
-        (true, true, true, false) => '┫',
-        (true, true, false, true) => '┣',
-        (true, false, true, true) => '┻',
-        (false, true, true, true) => '┳',
-        (true, true, false, false) => '┃',
-        (false, false, true, true) => '━',
-        (false, true, false, true) => '┏',
-        (false, true, true, false) => '┓',
-        (true, false, false, true) => '┗',
-        (true, false, true, false) => '┛',
-        (true, false, false, false) => '╹',
-        (false, true, false, false) => '╻',
-        (false, false, true, false) => '╸',
-        (false, false, false, true) => '╺',
-        _ => {
-            if y + 4 >= height {
-                '╋'
-            } else if visual_hash(app.age / 8, x, y) % 3 == 0 {
-                '┃'
+    let height_ratio = y as f32 / height.max(1) as f32;
+    let color = if height_ratio > 0.76 {
+        Color::Blue
+    } else if height_ratio > 0.38 {
+        Color::Yellow
+    } else {
+        Color::Green
+    };
+
+    let glyph = match (up, down, left, right) {
+        (true, true, true, true) => '┼',
+        (true, true, true, false) => '┤',
+        (true, true, false, true) => '├',
+        (true, false, true, true) => '┴',
+        (false, true, true, true) => '┬',
+        (true, true, false, false) => '│',
+        (false, false, true, true) => '─',
+        (false, true, false, true) => '┌',
+        (false, true, true, false) => '┐',
+        (true, false, false, true) => '└',
+        (true, false, true, false) => '┘',
+        (true, false, false, false) => {
+            if height_ratio < 0.38 {
+                '♣'
             } else {
-                '╹'
+                '╵'
             }
         }
-    }
+        (false, true, false, false) => '╷',
+        (false, false, true, false) => '╴',
+        (false, false, false, true) => '╶',
+        _ => {
+            if height_ratio < 0.38 {
+                '♣'
+            } else if height_ratio < 0.58 {
+                '┼'
+            } else {
+                '╋'
+            }
+        }
+    };
+
+    (glyph, color)
 }
 
 fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
@@ -1240,4 +1257,8 @@ fn visual_hash(age: u64, x: usize, y: usize) -> usize {
     value ^= y.wrapping_mul(668_265_263);
     value = (value ^ (value >> 13)).wrapping_mul(1_274_126_177);
     value ^ (value >> 16)
+}
+
+fn root_screen_glyph(app: &App, x: usize, y: usize, width: usize, height: usize) -> char {
+    root_screen_visual(app, x, y, width, height).0
 }

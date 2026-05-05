@@ -710,16 +710,17 @@ impl CellularAutomata {
             return false;
         }
 
-        if root_neighbors == 0 || root_neighbors > 5 {
+        // Roots should pierce through living noise, but dense root knots are blocked.
+        if root_neighbors == 0 || root_neighbors > 3 {
             return false;
         }
 
-        if alive_neighbors > 7 {
+        if alive_neighbors > 8 {
             return false;
         }
 
         let local_roots = self.kind_radius_neighbors(snapshot, x, y, CellKind::Root, 2);
-        if local_roots > 9 {
+        if local_roots > 5 {
             return false;
         }
 
@@ -733,67 +734,58 @@ impl CellularAutomata {
             && y + 1 < self.height
             && snapshot[self.idx(x + 1, y + 1)].kind == CellKind::Root;
 
-        let parent_left = x > 0 && snapshot[self.idx(x - 1, y)].kind == CellKind::Root;
-        let parent_right =
-            x + 1 < self.width && snapshot[self.idx(x + 1, y)].kind == CellKind::Root;
+        // Important: no side-only parent growth.
+        // This prevents horizontal ribbons and forces crack/tree-line continuation.
+        let vertical_parent = parent_below;
+        let diagonal_parent = parent_down_left || parent_down_right;
 
-        let trunk_parent = parent_below || parent_down_left || parent_down_right;
-        let lateral_parent = parent_left || parent_right;
-
-        if !trunk_parent && !lateral_parent {
+        if !vertical_parent && !diagonal_parent {
             return false;
         }
 
         let parent_age = self.oldest_neighbor_age(snapshot, x, y, CellKind::Root);
-
-        if parent_age < 8 {
+        if parent_age < 10 {
             return false;
         }
 
         let height_ratio = y as f32 / self.height.max(1) as f32;
 
-        let vertical_band_bonus = if height_ratio > 0.72 {
-            22
-        } else if height_ratio > 0.46 {
-            16
-        } else if height_ratio > 0.24 {
-            10
-        } else {
-            5
-        };
-
-        let parent_bias = if parent_below {
-            34
-        } else if parent_down_left || parent_down_right {
-            22
-        } else {
-            7
-        };
-
-        let maturity_bias = if parent_age > 260 {
-            22
-        } else if parent_age > 120 {
-            16
-        } else if parent_age > 40 {
-            10
-        } else {
-            5
-        };
-
-        let bend_noise = hash(self.seed ^ 0xA11CE ^ self.cycle, x, y) % 19;
-        let lateral_bias = if lateral_parent && bend_noise <= 4 {
-            7
+        // Early structure phase: faster lower-half trunk establishment, never near top.
+        let burst_bias = if self.cycle < 1500 && height_ratio > 0.45 {
+            32
         } else {
             0
         };
 
-        let branch_gate = hash(self.seed ^ 0xC0FFEE ^ self.cycle, x, y) % 10_000;
-        if !trunk_parent && branch_gate > 3_900 {
+        let parent_bias = if vertical_parent { 48 } else { 24 };
+
+        let maturity_bias = if parent_age > 260 {
+            18
+        } else if parent_age > 120 {
+            13
+        } else if parent_age > 40 {
+            8
+        } else {
+            4
+        };
+
+        // Diagonal growth is the branch/crack behavior, but it must stay rare.
+        let branch_roll = hash(self.seed ^ 0xC0FFEE ^ self.cycle, x, y) % 10_000;
+        if diagonal_parent && branch_roll > 2_700 {
             return false;
         }
 
-        let chance = vertical_band_bonus + parent_bias + maturity_bias + lateral_bias + 10;
-        seed_roll < chance
+        // Taper higher up so trunks become thinner before canopy/leaf behavior later.
+        let taper: usize = if height_ratio < 0.28 {
+            22
+        } else if height_ratio < 0.45 {
+            10
+        } else {
+            0
+        };
+
+        let chance: usize = parent_bias + maturity_bias + burst_bias;
+        seed_roll < chance.saturating_sub(taper)
     }
 
     fn alive_neighbors(&self, snapshot: &[Cell], x: usize, y: usize) -> usize {
