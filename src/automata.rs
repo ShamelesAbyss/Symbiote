@@ -411,7 +411,10 @@ impl CellularAutomata {
                     next.age = next.age.saturating_add(1);
                 }
 
-                self.cells[idx] = next;
+                if self.cells[idx].kind == CellKind::Root {
+    next.kind = CellKind::Root;
+}
+self.cells[idx] = next;
             }
         }
     }
@@ -458,7 +461,7 @@ impl CellularAutomata {
             }
         };
 
-        cell.kind = desired;
+        if cell.kind != CellKind::Root { cell.kind = desired; }
         cell.energy = (cell.energy + particle.energy * 0.055).clamp(0.0, 85.0);
         cell.tribe_hint = particle.tribe.index();
 
@@ -547,7 +550,7 @@ impl CellularAutomata {
 
                 cell.age = 0;
             } else {
-                cell.kind = CellKind::Empty;
+                if cell.kind != CellKind::Root { cell.kind = CellKind::Empty; }
                 cell.energy = 0.0;
                 cell.age = 0;
             }

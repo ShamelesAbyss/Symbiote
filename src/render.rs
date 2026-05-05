@@ -170,6 +170,22 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
     draw_substrate(&mut cells, app, width, height);
     draw_signal_trails(&mut cells, app, width, height);
     draw_ecology_zones(&mut cells, app, width, height);
+    // force root layer to overwrite everything (no flicker)
+    for y in 0..height {
+        for x in 0..width {
+            if app.substrate.sample_screen(x, y, width, height) == CellKind::Root {
+                cells[y][x].substrate = Some((
+                    match (x + y) % 4 {
+                        0 => "│",
+                        1 => "─",
+                        2 => "┼",
+                        _ => "┤",
+                    }.chars().next().unwrap(),
+                    Color::Blue
+                ));
+            }
+        }
+    }
 
     for particle in &app.particles {
         let x = (((particle.x + 1.2) / 2.4) * width as f32) as isize;
@@ -528,6 +544,22 @@ fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
 }
 
 fn draw_ecology_zones(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
+    // force root layer to overwrite everything (no flicker)
+    for y in 0..height {
+        for x in 0..width {
+            if app.substrate.sample_screen(x, y, width, height) == CellKind::Root {
+                cells[y][x].substrate = Some((
+                    match (x + y) % 4 {
+                        0 => "│",
+                        1 => "─",
+                        2 => "┼",
+                        _ => "┤",
+                    }.chars().next().unwrap(),
+                    Color::Blue
+                ));
+            }
+        }
+    }
     for zone in &app.ecology.zones {
         let x = (((zone.x + 1.2) / 2.4) * width as f32) as i32;
         let y = (((zone.y + 1.2) / 2.4) * height as f32) as i32;
