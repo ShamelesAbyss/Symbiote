@@ -743,17 +743,11 @@ impl CellularAutomata {
         alive_neighbors: usize,
         seed_roll: usize,
     ) -> bool {
-        let policy = TreePolicy::default();
-
         if root_count >= root_cap {
             return false;
         }
 
-        if y == 0 {
-            return false;
-        }
-
-        if root_neighbors == 0 || root_neighbors > policy.max_neighbor_roots {
+        if root_neighbors == 0 || root_neighbors > 3 {
             return false;
         }
 
@@ -762,28 +756,24 @@ impl CellularAutomata {
         }
 
         let local_roots = self.kind_radius_neighbors(snapshot, x, y, CellKind::Root, 2);
-        if local_roots > policy.max_local_roots {
+        if local_roots > 5 {
             return false;
         }
 
-        let parent_below =
+        let near_wall = x <= 1 || x + 2 >= self.width;
+
+        let vertical_parent =
             y + 1 < self.height && snapshot[self.idx(x, y + 1)].kind == CellKind::Root;
 
-        let parent_down_left =
-            x > 0 && y + 1 < self.height && snapshot[self.idx(x - 1, y + 1)].kind == CellKind::Root;
-
-        let parent_down_right = x + 1 < self.width
+        let diagonal_parent = (x > 0
             && y + 1 < self.height
-            && snapshot[self.idx(x + 1, y + 1)].kind == CellKind::Root;
+            && snapshot[self.idx(x - 1, y + 1)].kind == CellKind::Root)
+            || (x + 1 < self.width
+                && y + 1 < self.height
+                && snapshot[self.idx(x + 1, y + 1)].kind == CellKind::Root);
 
-        let parent_left = x > 0 && snapshot[self.idx(x - 1, y)].kind == CellKind::Root;
-        let parent_right =
-            x + 1 < self.width && snapshot[self.idx(x + 1, y)].kind == CellKind::Root;
-
-        let vertical_parent = parent_below;
-        let diagonal_parent = parent_down_left || parent_down_right;
-        let lateral_parent = parent_left || parent_right;
-        let near_wall = x <= 2 || x + 3 >= self.width;
+        let lateral_parent = (x > 0 && snapshot[self.idx(x - 1, y)].kind == CellKind::Root)
+            || (x + 1 < self.width && snapshot[self.idx(x + 1, y)].kind == CellKind::Root);
 
         if !tree::allow_root_direction(near_wall, vertical_parent, diagonal_parent, lateral_parent)
         {
@@ -791,30 +781,42 @@ impl CellularAutomata {
         }
 
         let parent_age = self.oldest_neighbor_age(snapshot, x, y, CellKind::Root);
-        if parent_age < policy.min_parent_age as u16 {
+        if parent_age < 18 {
             return false;
         }
 
         let height_ratio = y as f32 / self.height.max(1) as f32;
-        let lateral_wall_parent = near_wall && lateral_parent;
-        let wiggle_roll = hash(self.seed ^ 0x1A7E_51D5 ^ self.cycle, x, y) % 10_000;
 
-        if !tree::accept_wiggle(diagonal_parent, lateral_wall_parent, wiggle_roll) {
+        let growth_cadence = if self.cycle < 1_500 && height_ratio > 0.48 {
+            4
+        } else if vertical_parent {
+            6
+        } else {
+            11
+        };
+
+        let phase = hash(self.seed ^ 0x51A7_EEAF ^ self.cycle, x, y) as u64;
+        if (self.cycle + phase) % growth_cadence != 0 {
             return false;
         }
 
-        let chance = tree::growth_pressure(
+        let wiggle_roll = hash(self.seed ^ 0xC0FF_EE11 ^ self.cycle, x, y) % 10_000;
+        if !tree::accept_wiggle(diagonal_parent, near_wall && lateral_parent, wiggle_roll) {
+            return false;
+        }
+
+        let pressure = tree::growth_pressure(
             self.cycle,
             height_ratio,
             vertical_parent,
             diagonal_parent,
-            lateral_wall_parent,
-            parent_age as u32,
+            near_wall && lateral_parent,
+            u32::from(parent_age),
             root_count,
             root_cap,
         );
 
-        seed_roll < chance
+        seed_roll < pressure
     }
 
     fn alive_neighbors(&self, snapshot: &[Cell], x: usize, y: usize) -> usize {
