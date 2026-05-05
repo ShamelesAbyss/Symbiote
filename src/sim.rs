@@ -4,6 +4,7 @@ use crate::{
     ecology::{Ecology, ZoneKind},
     particle::{Genome, Particle, RareTrait, Tribe},
     species::Archetype,
+    tree::TreeForces,
 };
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -21,9 +22,9 @@ const HARVESTER_BODY_PRESSURE_RATIO: f32 = 0.095;
 const HARVESTER_OVERGROWTH_RATIO: f32 = 0.155;
 
 const SIGNAL_FORCE_SCALE: f32 = 0.42;
-const ROOT_AVOIDANCE_RADIUS: f32 = 0.092;
-const ROOT_FORCE_SCALE: f32 = 1.58;
-const ROOT_CHANNEL_FORCE: f32 = 0.72;
+const ROOT_AVOIDANCE_RADIUS: f32 = TreeForces::DEFAULT.avoidance_radius;
+const ROOT_FORCE_SCALE: f32 = TreeForces::DEFAULT.force_scale;
+const ROOT_CHANNEL_FORCE: f32 = TreeForces::DEFAULT.channel_force;
 
 #[allow(dead_code)]
 #[derive(Default, Clone, Copy, Debug)]
@@ -777,7 +778,7 @@ fn apply_root_field(
     // Root surface flow (NEW)
     let tangent_x = -push_y;
     let tangent_y = push_x;
-    let flow_strength = root_pressure * 0.42;
+    let flow_strength = root_pressure * TreeForces::DEFAULT.surface_flow;
 
     *fx += tangent_x * flow_strength;
     *fy += tangent_y * flow_strength;
@@ -824,8 +825,8 @@ fn nudge_from_root(particle: &mut Particle, substrate: &CellularAutomata) {
         particle.vx = (particle.vx + dx * 0.04).clamp(-0.04, 0.04);
         particle.vy = (particle.vy + dy * 0.04).clamp(-0.04, 0.04);
     } else {
-        particle.vx = -particle.vx * 0.72;
-        particle.vy = -particle.vy * 0.72;
+        particle.vx = -particle.vx * TreeForces::DEFAULT.bounce;
+        particle.vy = -particle.vy * TreeForces::DEFAULT.bounce;
     }
 
     particle.energy -= 0.012;

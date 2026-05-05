@@ -6,6 +6,7 @@ use crate::{
     particle::{Genome, Particle, RareTrait, Tribe},
     sim::{build_rule_matrix, child_from, fused_child, mutate_rules, step_particles, RuleMatrix},
     species::{Archetype, SpeciesBank},
+    tree::TreeProfile,
 };
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -113,6 +114,8 @@ pub struct App {
     pub population: f32,
     pub matrix_attraction: f32,
     pub matrix_repulsion: f32,
+    #[allow(dead_code)]
+    pub tree_profile: TreeProfile,
     pub matrix_pressure: f32,
     pub environment: Environment,
     pub events: VecDeque<String>,
@@ -153,6 +156,7 @@ impl App {
             population: 0.0,
             matrix_attraction: 0.0,
             matrix_repulsion: 0.0,
+            tree_profile: TreeProfile::default(),
             matrix_pressure: 0.0,
             environment: Environment::Calm,
             events: VecDeque::new(),
@@ -943,6 +947,7 @@ impl App {
             population: 0.0,
             matrix_attraction: 0.0,
             matrix_repulsion: 0.0,
+            tree_profile: TreeProfile::default(),
             matrix_pressure: 0.0,
             environment: state.environment,
             events: VecDeque::from(state.events),

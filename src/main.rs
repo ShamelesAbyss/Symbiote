@@ -7,6 +7,7 @@ mod particle;
 mod render;
 mod sim;
 mod species;
+mod tree;
 
 use anyhow::Result;
 use app::App;

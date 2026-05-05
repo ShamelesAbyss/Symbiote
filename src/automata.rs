@@ -1,6 +1,7 @@
 use crate::{
     particle::{Particle, RareTrait},
     species::Archetype,
+    tree::{self, TreePolicy},
 };
 use serde::{Deserialize, Serialize};
 
@@ -176,7 +177,8 @@ impl CellularAutomata {
             .filter(|cell| cell.kind == CellKind::Root)
             .count();
 
-        let root_cap = (total / 26).max(self.width / 2).max(12);
+        let tree_policy = TreePolicy::default();
+        let root_cap = tree::root_cap(total, self.width, tree_policy);
 
         for y in 0..self.height {
             for x in 0..self.width {
@@ -741,12 +743,17 @@ impl CellularAutomata {
         alive_neighbors: usize,
         seed_roll: usize,
     ) -> bool {
+        let policy = TreePolicy::default();
+
         if root_count >= root_cap {
             return false;
         }
 
-        // Roots should pierce through living noise, but dense root knots are blocked.
-        if root_neighbors == 0 || root_neighbors > 3 {
+        if y == 0 {
+            return false;
+        }
+
+        if root_neighbors == 0 || root_neighbors > policy.max_neighbor_roots {
             return false;
         }
 
@@ -755,7 +762,7 @@ impl CellularAutomata {
         }
 
         let local_roots = self.kind_radius_neighbors(snapshot, x, y, CellKind::Root, 2);
-        if local_roots > 5 {
+        if local_roots > policy.max_local_roots {
             return false;
         }
 
@@ -769,58 +776,45 @@ impl CellularAutomata {
             && y + 1 < self.height
             && snapshot[self.idx(x + 1, y + 1)].kind == CellKind::Root;
 
-        // Important: no side-only parent growth.
-        // This prevents horizontal ribbons and forces crack/tree-line continuation.
+        let parent_left = x > 0 && snapshot[self.idx(x - 1, y)].kind == CellKind::Root;
+        let parent_right =
+            x + 1 < self.width && snapshot[self.idx(x + 1, y)].kind == CellKind::Root;
+
         let vertical_parent = parent_below;
         let diagonal_parent = parent_down_left || parent_down_right;
+        let lateral_parent = parent_left || parent_right;
+        let near_wall = x <= 2 || x + 3 >= self.width;
 
-        if !vertical_parent && !diagonal_parent {
+        if !tree::allow_root_direction(near_wall, vertical_parent, diagonal_parent, lateral_parent)
+        {
             return false;
         }
 
         let parent_age = self.oldest_neighbor_age(snapshot, x, y, CellKind::Root);
-        if parent_age < 10 {
+        if parent_age < policy.min_parent_age as u16 {
             return false;
         }
 
         let height_ratio = y as f32 / self.height.max(1) as f32;
+        let lateral_wall_parent = near_wall && lateral_parent;
+        let wiggle_roll = hash(self.seed ^ 0x1A7E_51D5 ^ self.cycle, x, y) % 10_000;
 
-        // Early structure phase: faster lower-half trunk establishment, never near top.
-        let burst_bias = if self.cycle < 1500 && height_ratio > 0.45 {
-            32
-        } else {
-            0
-        };
-
-        let parent_bias = if vertical_parent { 48 } else { 24 };
-
-        let maturity_bias = if parent_age > 260 {
-            18
-        } else if parent_age > 120 {
-            13
-        } else if parent_age > 40 {
-            8
-        } else {
-            4
-        };
-
-        // Diagonal growth is the branch/crack behavior, but it must stay rare.
-        let branch_roll = hash(self.seed ^ 0xC0FFEE ^ self.cycle, x, y) % 10_000;
-        if diagonal_parent && branch_roll > 2_700 {
+        if !tree::accept_wiggle(diagonal_parent, lateral_wall_parent, wiggle_roll) {
             return false;
         }
 
-        // Taper higher up so trunks become thinner before canopy/leaf behavior later.
-        let taper: usize = if height_ratio < 0.28 {
-            22
-        } else if height_ratio < 0.45 {
-            10
-        } else {
-            0
-        };
+        let chance = tree::growth_pressure(
+            self.cycle,
+            height_ratio,
+            vertical_parent,
+            diagonal_parent,
+            lateral_wall_parent,
+            parent_age as u32,
+            root_count,
+            root_cap,
+        );
 
-        let chance: usize = parent_bias + maturity_bias + burst_bias;
-        seed_roll < chance.saturating_sub(taper)
+        seed_roll < chance
     }
 
     fn alive_neighbors(&self, snapshot: &[Cell], x: usize, y: usize) -> usize {

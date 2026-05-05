@@ -39,6 +39,18 @@ pub struct MemoryBank {
     #[serde(default)]
     pub peak_root_cells: usize,
     #[serde(default)]
+    pub peak_tree_trunk_cells: usize,
+    #[serde(default)]
+    pub peak_tree_branch_cells: usize,
+    #[serde(default)]
+    pub peak_tree_canopy_cells: usize,
+    #[serde(default)]
+    pub tree_growth_events: u64,
+    #[serde(default)]
+    pub tree_wall_events: u64,
+    #[serde(default)]
+    pub tree_surface_flow_events: u64,
+    #[serde(default)]
     pub peak_root_pressure: f32,
     #[serde(default)]
     pub root_pressure_average: f32,
@@ -102,6 +114,12 @@ impl MemoryBank {
             richest_zone: "unknown".to_string(),
 
             peak_root_cells: 0,
+            peak_tree_trunk_cells: 0,
+            peak_tree_branch_cells: 0,
+            peak_tree_canopy_cells: 0,
+            tree_growth_events: 0,
+            tree_wall_events: 0,
+            tree_surface_flow_events: 0,
             peak_root_pressure: 0.0,
             root_pressure_average: 0.0,
             root_pressure_samples: 0,
@@ -146,6 +164,40 @@ impl MemoryBank {
         if self.notes.len() > 32 {
             self.notes.remove(0);
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn observe_tree(
+        &mut self,
+        root_cells: usize,
+        trunk_cells: usize,
+        branch_cells: usize,
+        canopy_cells: usize,
+    ) {
+        self.peak_root_cells = self.peak_root_cells.max(root_cells);
+        self.peak_tree_trunk_cells = self.peak_tree_trunk_cells.max(trunk_cells);
+        self.peak_tree_branch_cells = self.peak_tree_branch_cells.max(branch_cells);
+        self.peak_tree_canopy_cells = self.peak_tree_canopy_cells.max(canopy_cells);
+
+        if root_cells + trunk_cells + branch_cells + canopy_cells > 0 {
+            self.tree_growth_events = self.tree_growth_events.saturating_add(1);
+        }
+
+        self.recalculate_adaptive_pressures();
+    }
+
+    #[allow(dead_code)]
+    pub fn observe_tree_wall_event(&mut self) {
+        self.tree_wall_events = self.tree_wall_events.saturating_add(1);
+        self.root_collision_events = self.root_collision_events.saturating_add(1);
+        self.recalculate_adaptive_pressures();
+    }
+
+    #[allow(dead_code)]
+    pub fn observe_tree_surface_flow_event(&mut self) {
+        self.tree_surface_flow_events = self.tree_surface_flow_events.saturating_add(1);
+        self.root_corridor_events = self.root_corridor_events.saturating_add(1);
+        self.recalculate_adaptive_pressures();
     }
 
     pub fn observe_substrate(

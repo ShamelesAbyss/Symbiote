@@ -3,6 +3,7 @@ use crate::{
     automata::{CellKind, SignalKind},
     particle::Tribe,
     species::Archetype,
+    tree::{self, TreeStage, TreeVisualPolicy},
 };
 
 use ratatui::{
@@ -510,15 +511,17 @@ fn root_screen_visual(app: &App, x: usize, y: usize, width: usize, height: usize
     let right =
         x + 1 < width && app.substrate.sample_screen(x + 1, y, width, height) == CellKind::Root;
 
+    let stage = tree::tree_stage_for_height(y, height);
+    let visuals = TreeVisualPolicy::default();
     let height_ratio = y as f32 / height.max(1) as f32;
-    let phase = ((app.age / 5) as usize + visual_hash(app.age / 3, x, y)) % 6;
+    let phase =
+        ((app.age / visuals.wiggle_rate.max(1)) as usize + visual_hash(app.age / 3, x, y)) % 6;
 
-    let color = if height_ratio > 0.72 {
-        Color::Blue
-    } else if height_ratio > 0.38 {
-        Color::Yellow
-    } else {
-        Color::Green
+    let color = match stage {
+        TreeStage::Root => Color::Blue,
+        TreeStage::Trunk => Color::Yellow,
+        TreeStage::Branch => Color::LightYellow,
+        TreeStage::Canopy => Color::Green,
     };
 
     let glyph = match (up, down, left, right) {
