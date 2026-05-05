@@ -1,6 +1,7 @@
 use crate::{
     automata::CellularAutomata,
     cluster::{ClusterEvents, ClusterTracker},
+    density::DensitySnapshot,
     ecology::Ecology,
     memory::MemoryBank,
     particle::{Genome, Particle, RareTrait, Tribe},
@@ -1118,6 +1119,14 @@ impl App {
             self.substrate.protected_cells(),
             0,
         );
+
+        self.memory.observe_density(DensitySnapshot::new(
+            self.substrate.width,
+            self.substrate.height,
+            self.substrate.living_cells(),
+            self.particles.len(),
+            self.substrate.protected_cells(),
+        ));
 
         let rare_count = self
             .particles

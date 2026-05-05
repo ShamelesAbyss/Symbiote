@@ -1,6 +1,7 @@
 mod app;
 mod automata;
 mod cluster;
+mod density;
 mod ecology;
 mod memory;
 mod particle;

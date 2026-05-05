@@ -219,11 +219,7 @@ fn spawn_pressure(current: usize, min: usize, target: usize, max: usize) -> u16 
     (remaining.saturating_mul(520) / span) as u16
 }
 
-fn root_pressure(
-    snapshot: DensitySnapshot,
-    targets: DensityTargets,
-    config: DensityConfig,
-) -> u16 {
+fn root_pressure(snapshot: DensitySnapshot, targets: DensityTargets, config: DensityConfig) -> u16 {
     if snapshot.empty() <= targets.reserved_empty {
         return 80;
     }

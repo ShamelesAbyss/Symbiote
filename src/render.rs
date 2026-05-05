@@ -1130,6 +1130,7 @@ fn render_species(f: &mut Frame<'_>, area: Rect, app: &App) {
 }
 
 fn render_events(f: &mut Frame<'_>, area: Rect, app: &App) {
+    let _density_status = app.memory.density_status_line();
     let items = app
         .events
         .iter()

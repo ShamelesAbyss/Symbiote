@@ -1,3 +1,4 @@
+use crate::density::{DensityConfig, DensityPressure, DensitySnapshot};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
@@ -77,6 +78,26 @@ pub struct MemoryBank {
     #[serde(default)]
     pub adaptive_substrate_throttle: f32,
 
+    #[serde(default)]
+    pub density_band: String,
+    #[serde(default)]
+    pub density_cell_spawn_pressure: u16,
+    #[serde(default)]
+    pub density_particle_spawn_pressure: u16,
+    #[serde(default)]
+    pub density_root_growth_pressure: u16,
+    #[serde(default)]
+    pub density_refill_pressure: u16,
+    #[serde(default)]
+    pub density_crowding_pressure: u16,
+    #[serde(default)]
+    pub density_empty_ratio: f32,
+    #[serde(default)]
+    pub density_occupied_ratio: f32,
+    #[serde(default)]
+    pub density_peak_occupied_ratio: f32,
+    #[serde(default)]
+    pub density_samples: u64,
     pub notes: Vec<String>,
 }
 
@@ -134,6 +155,16 @@ impl MemoryBank {
             adaptive_corridor_bias: 0.0,
             adaptive_substrate_throttle: 0.0,
 
+            density_band: "unknown".to_string(),
+            density_cell_spawn_pressure: 0,
+            density_particle_spawn_pressure: 0,
+            density_root_growth_pressure: 0,
+            density_refill_pressure: 0,
+            density_crowding_pressure: 0,
+            density_empty_ratio: 0.0,
+            density_occupied_ratio: 0.0,
+            density_peak_occupied_ratio: 0.0,
+            density_samples: 0,
             notes: Vec::new(),
         }
     }
@@ -198,6 +229,36 @@ impl MemoryBank {
         self.tree_surface_flow_events = self.tree_surface_flow_events.saturating_add(1);
         self.root_corridor_events = self.root_corridor_events.saturating_add(1);
         self.recalculate_adaptive_pressures();
+    }
+
+    pub fn observe_density(&mut self, snapshot: DensitySnapshot) {
+        let pressure = DensityPressure::analyze(snapshot, DensityConfig::default());
+
+        self.density_band = format!("{:?}", pressure.band);
+        self.density_cell_spawn_pressure = pressure.cell_spawn_pressure;
+        self.density_particle_spawn_pressure = pressure.particle_spawn_pressure;
+        self.density_root_growth_pressure = pressure.root_growth_pressure;
+        self.density_refill_pressure = pressure.refill_pressure;
+        self.density_crowding_pressure = pressure.crowding_pressure;
+        self.density_empty_ratio = snapshot.empty_ratio();
+        self.density_occupied_ratio = snapshot.occupied_ratio();
+        self.density_peak_occupied_ratio = self
+            .density_peak_occupied_ratio
+            .max(self.density_occupied_ratio);
+        self.density_samples = self.density_samples.saturating_add(1);
+    }
+
+    pub fn density_status_line(&self) -> String {
+        format!(
+            "{} occ:{:>2}% empty:{:>2}% cell:{} part:{} root:{} crowd:{}",
+            self.density_band,
+            percent(self.density_occupied_ratio),
+            percent(self.density_empty_ratio),
+            self.density_cell_spawn_pressure,
+            self.density_particle_spawn_pressure,
+            self.density_root_growth_pressure,
+            self.density_crowding_pressure
+        )
     }
 
     pub fn observe_substrate(
@@ -342,4 +403,8 @@ fn rolling_average(current: f32, next: f32, samples: u64) -> f32 {
         let samples = samples.min(10_000) as f32;
         current + (next - current) / samples
     }
+}
+
+fn percent(value: f32) -> u16 {
+    (value.clamp(0.0, 1.0) * 100.0).round() as u16
 }
