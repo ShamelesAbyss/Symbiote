@@ -770,8 +770,17 @@ fn apply_root_field(
         root_force *= 1.16;
     }
 
+    // Root terrain repulsion
     *fx += push_x * root_force;
     *fy += push_y * root_force;
+
+    // Root surface flow (NEW)
+    let tangent_x = -push_y;
+    let tangent_y = push_x;
+    let flow_strength = root_pressure * 0.42;
+
+    *fx += tangent_x * flow_strength;
+    *fy += tangent_y * flow_strength;
 
     if clear_count > 0.0 {
         let channel_x = clear_x / clear_count;

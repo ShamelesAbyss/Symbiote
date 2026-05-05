@@ -192,6 +192,41 @@ impl CellularAutomata {
                 let mut next = cell;
                 next.signal.decay(recovery_mode);
 
+                // --- ROOT SOFT INVASION LAYER ---
+                // Build on top of the existing ecology instead of replacing it:
+                // roots remain permanent terrain, but tendrils can claim soft substrate
+                // when they are continuing a valid root path.
+                let root_seed_roll = hash(self.seed ^ self.cycle ^ 0xA17E_5EED, x, y) % 10_000;
+                let soft_root_target = matches!(
+                    cell.kind,
+                    CellKind::Empty
+                        | CellKind::Life
+                        | CellKind::Nutrient
+                        | CellKind::Dead
+                        | CellKind::Spore
+                );
+
+                if soft_root_target
+                    && self.should_grow_trunk_root(
+                        &snapshot,
+                        x,
+                        y,
+                        root_count,
+                        root_cap,
+                        root_neighbors,
+                        neighbors,
+                        root_seed_roll,
+                    )
+                {
+                    next.kind = CellKind::Root;
+                    next.energy = 96.0;
+                    next.age = 0;
+                    next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
+                    next.signal.growth = (next.signal.growth + 0.24).clamp(0.0, 1.0);
+                    self.cells[idx] = next;
+                    continue;
+                }
+
                 match cell.kind {
                     CellKind::Empty => {
                         let seed_roll = hash(self.seed ^ self.cycle, x, y) % 10_000;

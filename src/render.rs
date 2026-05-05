@@ -191,6 +191,19 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
     }
 
     for particle in &app.particles {
+        // --- ROOT VISUAL PRIORITY GUARD ---
+        let px = particle.x as isize;
+        let py = particle.y as isize;
+
+        if px >= 0 && py >= 0 {
+            let (px, py) = (px as usize, py as usize);
+            if py < height && px < width {
+                if app.substrate.sample_screen(px, py, width, height) == CellKind::Root {
+                    continue; // do not draw particle over root
+                }
+            }
+        }
+
         let x = (((particle.x + 1.2) / 2.4) * width as f32) as isize;
         let y = (((particle.y + 1.2) / 2.4) * height as f32) as isize;
 
