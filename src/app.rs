@@ -13,6 +13,8 @@ use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fs, path::Path};
 
 const ECOSYSTEM_PATH: &str = "memory/ecosystem_state.json";
+const ECOSYSTEM_SCHEMA_PATH: &str = "memory/ecosystem_schema.txt";
+const ECOSYSTEM_SCHEMA_VERSION: &str = "trunk-root-v1";
 
 pub const TRIBE_COUNT: usize = 6;
 pub const PARTICLE_COUNT: usize = 1200;
@@ -124,8 +126,8 @@ impl App {
             restored.measure_matrix();
             restored
                 .memory
-                .note("restored ecosystem with root memory online".to_string());
-            restored.push_event("ecosystem restored from persistent state");
+                .note("restored trunk-root ecosystem state".to_string());
+            restored.push_event("trunk-root ecosystem restored");
             return restored;
         }
 
@@ -157,11 +159,12 @@ impl App {
         };
 
         app.reset_particles();
+        app.push_event("bottom-seeded trunk roots online");
+        app.push_event("organic upward root growth online");
         app.push_event("regenerative substrate online");
         app.push_event("reaper ecology online");
         app.push_event("adaptive ecosystem memory online");
         app.push_event("adaptive attraction matrix online");
-        app.push_event("root navigation memory online");
         app.push_event("early dispersal warmup online");
 
         app
@@ -854,6 +857,7 @@ impl App {
         self.measure();
         self.measure_matrix();
         self.push_event("particle field reseeded across full dish");
+        self.push_event("trunk-root substrate reseeded from bottom band");
         self.save_all();
     }
 
@@ -866,7 +870,7 @@ impl App {
         self.events.clear();
 
         self.reset_particles();
-        self.push_event("new symbiote seed generated");
+        self.push_event("new trunk-root symbiote seed generated");
     }
 
     pub fn speed_up(&mut self) {
@@ -912,6 +916,10 @@ impl App {
             return None;
         }
 
+        if fs::read_to_string(ECOSYSTEM_SCHEMA_PATH).ok()?.trim() != ECOSYSTEM_SCHEMA_VERSION {
+            return None;
+        }
+
         let data = fs::read_to_string(ECOSYSTEM_PATH).ok()?;
         let state = serde_json::from_str::<EcosystemState>(&data).ok()?;
 
@@ -943,6 +951,7 @@ impl App {
 
     fn save_ecosystem(&self) -> anyhow::Result<()> {
         fs::create_dir_all("memory")?;
+        fs::write(ECOSYSTEM_SCHEMA_PATH, ECOSYSTEM_SCHEMA_VERSION)?;
 
         let state = EcosystemState {
             particles: self.particles.clone(),

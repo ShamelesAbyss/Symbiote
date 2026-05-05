@@ -168,25 +168,15 @@ impl CellularAutomata {
         let total = snapshot.len().max(1);
         let density = living as f32 / total as f32;
 
-        let nutrient_count = snapshot
-            .iter()
-            .filter(|cell| cell.kind == CellKind::Nutrient)
-            .count();
-        let spore_count = snapshot
-            .iter()
-            .filter(|cell| cell.kind == CellKind::Spore)
-            .count();
+        let recovery_mode = living < 150;
+        let bloom_mode = living < 55;
+
         let root_count = snapshot
             .iter()
             .filter(|cell| cell.kind == CellKind::Root)
             .count();
 
-        let recovery_mode = living < total / 10;
-        let bloom_mode = living < total / 24;
-        let oversaturated = density > 0.18 || nutrient_count + spore_count > total / 7;
-
-        let root_cap = (total / 34).max(8);
-        let root_pressure = root_count as f32 / root_cap.max(1) as f32;
+        let root_cap = (total / 26).max(self.width / 2).max(12);
 
         for y in 0..self.height {
             for x in 0..self.width {
@@ -206,7 +196,7 @@ impl CellularAutomata {
                     CellKind::Empty => {
                         let seed_roll = hash(self.seed ^ self.cycle, x, y) % 10_000;
 
-                        if self.should_grow_root(
+                        if self.should_grow_trunk_root(
                             &snapshot,
                             x,
                             y,
@@ -217,143 +207,115 @@ impl CellularAutomata {
                             seed_roll,
                         ) {
                             next.kind = CellKind::Root;
-                            next.energy = 82.0;
+                            next.energy = 92.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
-                            next.signal.growth = (next.signal.growth + 0.16).clamp(0.0, 1.0);
-                        } else if !oversaturated && neighbors == 3 && nutrient_neighbors > 0 {
+                            next.signal.growth = (next.signal.growth + 0.18).clamp(0.0, 1.0);
+                        } else if neighbors == 3 && nutrient_neighbors > 0 {
                             next.kind = CellKind::Life;
-                            next.energy = 28.0 + nutrient_neighbors as f32 * 4.0;
+                            next.energy = 30.0 + nutrient_neighbors as f32 * 5.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
-                        } else if recovery_mode
-                            && !oversaturated
-                            && root_neighbors > 0
-                            && nutrient_neighbors > 1
-                        {
+                        } else if recovery_mode && root_neighbors > 0 && nutrient_neighbors > 0 {
                             next.kind = CellKind::Life;
-                            next.energy = 29.0;
+                            next.energy = 31.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
-                        } else if recovery_mode
-                            && !oversaturated
-                            && nutrient_neighbors >= 1
-                            && spore_neighbors >= 1
-                            && seed_roll < 2_200
-                        {
+                        } else if recovery_mode && nutrient_neighbors >= 1 && spore_neighbors >= 1 {
                             next.kind = CellKind::Life;
-                            next.energy = 25.0;
+                            next.energy = 27.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
-                        } else if bloom_mode && seed_roll < 14 {
+                        } else if bloom_mode && seed_roll < 24 {
                             next.kind = CellKind::Nutrient;
-                            next.energy = 34.0;
-                            next.age = 0;
-                            next.tribe_hint = seed_roll % 6;
-                            next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
-                        } else if recovery_mode && !oversaturated && seed_roll < 6 {
-                            next.kind = CellKind::Spore;
-                            next.energy = 26.0;
+                            next.energy = 38.0;
                             next.age = 0;
                             next.tribe_hint = seed_roll % 6;
                             next.signal.growth = (next.signal.growth + 0.06).clamp(0.0, 1.0);
+                        } else if recovery_mode && seed_roll < 10 {
+                            next.kind = CellKind::Spore;
+                            next.energy = 30.0;
+                            next.age = 0;
+                            next.tribe_hint = seed_roll % 6;
+                            next.signal.growth = (next.signal.growth + 0.05).clamp(0.0, 1.0);
                         }
                     }
 
                     CellKind::Life => {
                         if root_neighbors > 1 {
                             next.kind = CellKind::Dead;
-                            next.energy = 12.0;
+                            next.energy = 18.0;
                             next.signal.danger = (next.signal.danger + 0.18).clamp(0.0, 1.0);
                         } else if root_neighbors > 0
                             && recovery_mode
                             && neighbors >= 1
-                            && neighbors <= 3
+                            && neighbors <= 4
                         {
-                            next.energy = (cell.energy + 0.18).min(72.0);
-                            next.signal.growth = (next.signal.growth + 0.035).clamp(0.0, 1.0);
-                        } else if oversaturated && neighbors > 2 {
-                            next.kind = CellKind::Dead;
-                            next.energy = 14.0;
-                            next.signal.danger = (next.signal.danger + 0.16).clamp(0.0, 1.0);
+                            next.energy = (cell.energy + 0.35).min(85.0);
+                            next.signal.growth = (next.signal.growth + 0.03).clamp(0.0, 1.0);
                         } else if neighbors < 2 || neighbors > 3 {
                             next.kind = CellKind::Dead;
-                            next.energy = 16.0;
-                            next.signal.danger = (next.signal.danger + 0.14).clamp(0.0, 1.0);
-                        } else if !oversaturated && neighbors == 3 && nutrient_neighbors > 2 {
+                            next.energy = 18.0;
+                            next.signal.danger = (next.signal.danger + 0.22).clamp(0.0, 1.0);
+                        } else if neighbors == 3 && nutrient_neighbors > 2 {
                             next.kind = CellKind::Spore;
-                            next.energy = (cell.energy + 2.25).min(76.0);
+                            next.energy = (cell.energy + 3.0).min(85.0);
                             next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else {
-                            next.energy = (cell.energy + nutrient_neighbors as f32 * 0.35 - 1.18)
-                                .clamp(0.0, 76.0);
+                            next.energy = (cell.energy + nutrient_neighbors as f32 * 0.55 - 1.05)
+                                .clamp(0.0, 85.0);
 
                             if next.energy <= 0.0 {
                                 next.kind = CellKind::Dead;
-                                next.energy = 11.0;
-                                next.signal.danger = (next.signal.danger + 0.12).clamp(0.0, 1.0);
+                                next.energy = 12.0;
+                                next.signal.danger = (next.signal.danger + 0.16).clamp(0.0, 1.0);
                             }
                         }
                     }
 
                     CellKind::Spore => {
-                        next.signal.growth = (next.signal.growth + 0.008).clamp(0.0, 1.0);
+                        next.signal.growth = (next.signal.growth + 0.012).clamp(0.0, 1.0);
 
                         if root_neighbors > 1 {
                             next.kind = CellKind::Nutrient;
-                            next.energy = 24.0;
-                        } else if root_neighbors > 0
-                            && recovery_mode
-                            && !oversaturated
-                            && nutrient_neighbors > 1
-                        {
+                            next.energy = 28.0;
+                        } else if root_neighbors > 0 && recovery_mode && nutrient_neighbors > 0 {
                             next.kind = CellKind::Life;
-                            next.energy = 32.0;
-                        } else if oversaturated || neighbors < 2 || neighbors > 4 {
+                            next.energy = 36.0;
+                        } else if neighbors < 2 || neighbors > 4 {
                             next.kind = CellKind::Dead;
-                            next.energy = 12.0;
-                            next.signal.danger = (next.signal.danger + 0.12).clamp(0.0, 1.0);
+                            next.energy = 14.0;
+                            next.signal.danger = (next.signal.danger + 0.14).clamp(0.0, 1.0);
                         } else {
-                            next.energy = (cell.energy - 1.05).max(0.0);
+                            next.energy = (cell.energy - 0.85).max(0.0);
 
                             if next.energy <= 0.0 {
                                 next.kind = CellKind::Dead;
-                                next.energy = 7.0;
-                                next.signal.danger = (next.signal.danger + 0.10).clamp(0.0, 1.0);
+                                next.energy = 8.0;
+                                next.signal.danger = (next.signal.danger + 0.12).clamp(0.0, 1.0);
                             }
                         }
                     }
 
                     CellKind::Nutrient => {
-                        next.signal.growth = (next.signal.growth + 0.004).clamp(0.0, 1.0);
+                        next.signal.growth = (next.signal.growth + 0.006).clamp(0.0, 1.0);
 
-                        if root_neighbors > 1 && oversaturated {
+                        if root_neighbors > 1 && density > 0.14 {
                             next.kind = CellKind::Empty;
                             next.energy = 0.0;
                             next.age = 0;
-                        } else if root_neighbors > 0
-                            && recovery_mode
-                            && !oversaturated
-                            && neighbors >= 2
-                        {
+                        } else if root_neighbors > 0 && recovery_mode && neighbors >= 1 {
                             next.kind = CellKind::Spore;
-                            next.energy = 31.0;
-                        } else if !oversaturated && neighbors == 3 && cell.energy > 30.0 {
-                            next.kind = CellKind::Life;
                             next.energy = 38.0;
+                        } else if neighbors == 3 && cell.energy > 28.0 {
+                            next.kind = CellKind::Life;
+                            next.energy = 42.0;
                             next.age = 0;
-                        } else if recovery_mode && !oversaturated && neighbors >= 2 {
+                        } else if recovery_mode && neighbors >= 2 {
                             next.kind = CellKind::Spore;
-                            next.energy = 30.0;
+                            next.energy = 35.0;
                         } else {
-                            let decay = if oversaturated {
-                                0.42
-                            } else if recovery_mode {
-                                0.07
-                            } else {
-                                0.19
-                            };
-
+                            let decay = if recovery_mode { 0.04 } else { 0.14 };
                             next.energy = (cell.energy - decay).max(0.0);
 
                             if next.energy <= 0.0 {
@@ -364,77 +326,63 @@ impl CellularAutomata {
                     }
 
                     CellKind::Dead => {
-                        next.signal.danger = (next.signal.danger + 0.004).clamp(0.0, 1.0);
+                        next.signal.danger = (next.signal.danger + 0.006).clamp(0.0, 1.0);
 
-                        let decay = if oversaturated {
-                            0.52
-                        } else if recovery_mode {
-                            0.14
-                        } else {
-                            0.34
-                        };
-
+                        let decay = if recovery_mode { 0.10 } else { 0.30 };
                         next.energy = (cell.energy - decay).max(0.0);
 
-                        if root_neighbors > 0
-                            && recovery_mode
-                            && !oversaturated
-                            && nutrient_neighbors > 0
-                        {
+                        if root_neighbors > 0 && recovery_mode {
                             next.kind = CellKind::Nutrient;
-                            next.energy = 25.0;
+                            next.energy = 30.0;
+                            next.signal.growth = (next.signal.growth + 0.12).clamp(0.0, 1.0);
+                        } else if nutrient_neighbors >= 2 && neighbors >= 2 {
+                            next.kind = CellKind::Nutrient;
+                            next.energy = 32.0;
                             next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
-                        } else if !oversaturated && nutrient_neighbors >= 2 && neighbors >= 2 {
+                        } else if recovery_mode && dead_neighbors >= 2 && density < 0.06 {
                             next.kind = CellKind::Nutrient;
-                            next.energy = 28.0;
+                            next.energy = 24.0;
                             next.signal.growth = (next.signal.growth + 0.06).clamp(0.0, 1.0);
-                        } else if recovery_mode && dead_neighbors >= 2 && density < 0.045 {
-                            next.kind = CellKind::Nutrient;
-                            next.energy = 20.0;
-                            next.signal.growth = (next.signal.growth + 0.04).clamp(0.0, 1.0);
-                        } else if next.energy <= 0.0 || dead_neighbors > 4 {
+                        } else if next.energy <= 0.0 || dead_neighbors > 5 {
                             next.kind = CellKind::Empty;
                             next.age = 0;
                         }
                     }
 
                     CellKind::Mutagen => {
-                        if root_neighbors > 0 && oversaturated {
-                            next.kind = CellKind::Nutrient;
-                            next.energy = 18.0;
-                        } else if root_neighbors > 0 && recovery_mode && !oversaturated {
+                        if root_neighbors > 0 && recovery_mode {
                             next.kind = CellKind::Spore;
-                            next.energy = 32.0;
+                            next.energy = 38.0;
                             next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
-                        } else if !oversaturated && neighbors == 3 {
+                        } else if neighbors == 3 {
                             next.kind = CellKind::Spore;
-                            next.energy = 36.0;
-                            next.signal.growth = (next.signal.growth + 0.06).clamp(0.0, 1.0);
+                            next.energy = 42.0;
+                            next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else {
-                            next.energy = (cell.energy - 0.24).max(0.0);
+                            next.energy = (cell.energy - 0.18).max(0.0);
 
                             if next.energy <= 0.0 {
                                 next.kind = CellKind::Nutrient;
-                                next.energy = 18.0;
+                                next.energy = 20.0;
                             }
                         }
                     }
 
                     CellKind::Nest => {
-                        next.signal.growth = (next.signal.growth + 0.012).clamp(0.0, 1.0);
+                        next.signal.growth = (next.signal.growth + 0.018).clamp(0.0, 1.0);
 
                         if root_neighbors > 1 || neighbors > 4 {
                             next.kind = CellKind::Dead;
-                            next.energy = 18.0;
-                            next.signal.danger = (next.signal.danger + 0.18).clamp(0.0, 1.0);
-                        } else if recovery_mode && !oversaturated && neighbors >= 1 {
-                            next.energy = (cell.energy + 0.08).min(82.0);
+                            next.energy = 20.0;
+                            next.signal.danger = (next.signal.danger + 0.20).clamp(0.0, 1.0);
+                        } else if recovery_mode && neighbors >= 1 {
+                            next.energy = (cell.energy + 0.12).min(90.0);
                         } else {
-                            next.energy = (cell.energy - 0.08).max(0.0);
+                            next.energy = (cell.energy - 0.05).max(0.0);
 
                             if next.energy <= 0.0 {
                                 next.kind = CellKind::Nutrient;
-                                next.energy = 18.0;
+                                next.energy = 22.0;
                             }
                         }
                     }
@@ -442,18 +390,19 @@ impl CellularAutomata {
                     CellKind::Root => {
                         let seed_roll = hash(self.seed ^ self.cycle ^ 0xBEEF, x, y) % 10_000;
 
-                        next.signal.growth = (next.signal.growth + 0.018).clamp(0.0, 1.0);
+                        next.signal.growth = (next.signal.growth + 0.02).clamp(0.0, 1.0);
 
                         if root_neighbors > 4 {
                             next.kind = CellKind::Nutrient;
-                            next.energy = 30.0;
-                        } else if root_pressure > 1.12 && root_neighbors > 2 && seed_roll < 180 {
-                            next.kind = CellKind::Dead;
-                            next.energy = 18.0;
+                            next.energy = 44.0;
                             next.signal.danger = (next.signal.danger + 0.10).clamp(0.0, 1.0);
+                        } else if root_count > root_cap && root_neighbors > 2 && seed_roll < 120 {
+                            next.kind = CellKind::Dead;
+                            next.energy = 22.0;
+                            next.signal.danger = (next.signal.danger + 0.08).clamp(0.0, 1.0);
                         } else {
-                            let mature_bonus = if cell.age > 160 { 0.05 } else { 0.015 };
-                            next.energy = (cell.energy + mature_bonus).clamp(68.0, 100.0);
+                            let trunk_bonus = if cell.age > 240 { 0.015 } else { 0.006 };
+                            next.energy = (cell.energy + trunk_bonus).clamp(65.0, 100.0);
                         }
                     }
                 }
@@ -481,13 +430,12 @@ impl CellularAutomata {
 
         let deposit_allowed = match cell.kind {
             CellKind::Empty => true,
-            CellKind::Dead => particle.energy > 85.0,
+            CellKind::Dead => particle.energy > 80.0,
             CellKind::Nutrient => {
-                particle.energy > 105.0
-                    && matches!(archetype, Some(Archetype::Grazer | Archetype::Mycelial))
+                matches!(archetype, Some(Archetype::Grazer | Archetype::Mycelial))
             }
             CellKind::Mutagen => particle.rare_trait != RareTrait::None,
-            CellKind::Life | CellKind::Spore | CellKind::Nest => particle.energy > 135.0,
+            CellKind::Life | CellKind::Spore | CellKind::Nest => particle.energy > 125.0,
             CellKind::Root => false,
         };
 
@@ -495,7 +443,7 @@ impl CellularAutomata {
             return;
         }
 
-        let desired = if particle.rare_trait != RareTrait::None && particle.energy > 112.0 {
+        let desired = if particle.rare_trait != RareTrait::None && particle.energy > 110.0 {
             CellKind::Mutagen
         } else {
             match archetype {
@@ -511,7 +459,7 @@ impl CellularAutomata {
         };
 
         cell.kind = desired;
-        cell.energy = (cell.energy + particle.energy * 0.045).clamp(0.0, 78.0);
+        cell.energy = (cell.energy + particle.energy * 0.055).clamp(0.0, 85.0);
         cell.tribe_hint = particle.tribe.index();
 
         match archetype {
@@ -570,6 +518,7 @@ impl CellularAutomata {
         }
 
         let eaten = cell.kind;
+
         cell.energy -= power;
         cell.signal.hunger = (cell.signal.hunger + 0.22).clamp(0.0, 1.0);
         cell.signal.danger = (cell.signal.danger + 0.06).clamp(0.0, 1.0);
@@ -589,9 +538,9 @@ impl CellularAutomata {
                 };
 
                 cell.energy = match cell.kind {
-                    CellKind::Dead => 20.0,
-                    CellKind::Spore => 20.0,
-                    CellKind::Nutrient => 24.0,
+                    CellKind::Dead => 22.0,
+                    CellKind::Spore => 22.0,
+                    CellKind::Nutrient => 28.0,
                     CellKind::Root => 95.0,
                     _ => 0.0,
                 };
@@ -676,23 +625,36 @@ impl CellularAutomata {
     }
 
     fn seed_initial_life(&mut self) {
+        let ground_start = self.height.saturating_sub(4);
+
         for y in 0..self.height {
             for x in 0..self.width {
                 let n = hash(self.seed, x, y) % 10_000;
                 let idx = self.idx(x, y);
 
-                self.cells[idx] = if n < 38 {
+                self.cells[idx] = if y >= ground_start && n < 210 {
+                    Cell {
+                        kind: CellKind::Root,
+                        energy: 96.0,
+                        age: 0,
+                        tribe_hint: n % 6,
+                        signal: Signal {
+                            growth: 0.18,
+                            ..Signal::default()
+                        },
+                    }
+                } else if n < 48 {
                     Cell {
                         kind: CellKind::Life,
-                        energy: 30.0,
+                        energy: 34.0,
                         age: 0,
                         tribe_hint: n % 6,
                         signal: Signal::default(),
                     }
-                } else if n < 68 {
+                } else if n < 88 {
                     Cell {
                         kind: CellKind::Nutrient,
-                        energy: 40.0,
+                        energy: 48.0,
                         age: 0,
                         tribe_hint: n % 6,
                         signal: Signal {
@@ -700,10 +662,10 @@ impl CellularAutomata {
                             ..Signal::default()
                         },
                     }
-                } else if n < 82 {
+                } else if n < 108 {
                     Cell {
                         kind: CellKind::Spore,
-                        energy: 30.0,
+                        energy: 36.0,
                         age: 0,
                         tribe_hint: n % 6,
                         signal: Signal {
@@ -711,24 +673,13 @@ impl CellularAutomata {
                             ..Signal::default()
                         },
                     }
-                } else if n < 87 {
+                } else if n < 114 {
                     Cell {
                         kind: CellKind::Mutagen,
-                        energy: 48.0,
+                        energy: 55.0,
                         age: 0,
                         tribe_hint: n % 6,
                         signal: Signal::default(),
-                    }
-                } else if n < 93 {
-                    Cell {
-                        kind: CellKind::Root,
-                        energy: 88.0,
-                        age: 0,
-                        tribe_hint: n % 6,
-                        signal: Signal {
-                            growth: 0.14,
-                            ..Signal::default()
-                        },
                     }
                 } else {
                     Cell::default()
@@ -737,7 +688,7 @@ impl CellularAutomata {
         }
     }
 
-    fn should_grow_root(
+    fn should_grow_trunk_root(
         &self,
         snapshot: &[Cell],
         x: usize,
@@ -752,41 +703,73 @@ impl CellularAutomata {
             return false;
         }
 
-        if root_neighbors == 0 || root_neighbors > 2 {
+        if root_neighbors == 0 || root_neighbors > 3 {
             return false;
         }
 
-        if alive_neighbors > 4 {
+        if alive_neighbors > 5 {
+            return false;
+        }
+
+        let local_roots = self.kind_radius_neighbors(snapshot, x, y, CellKind::Root, 2);
+
+        if local_roots > 6 {
+            return false;
+        }
+
+        let parent_below =
+            y + 1 < self.height && snapshot[self.idx(x, y + 1)].kind == CellKind::Root;
+
+        let parent_down_left =
+            x > 0 && y + 1 < self.height && snapshot[self.idx(x - 1, y + 1)].kind == CellKind::Root;
+
+        let parent_down_right = x + 1 < self.width
+            && y + 1 < self.height
+            && snapshot[self.idx(x + 1, y + 1)].kind == CellKind::Root;
+
+        let parent_left = x > 0 && snapshot[self.idx(x - 1, y)].kind == CellKind::Root;
+        let parent_right =
+            x + 1 < self.width && snapshot[self.idx(x + 1, y)].kind == CellKind::Root;
+
+        let trunk_parent = parent_below || parent_down_left || parent_down_right;
+        let lateral_parent = parent_left || parent_right;
+
+        if !trunk_parent && !lateral_parent {
             return false;
         }
 
         let parent_age = self.oldest_neighbor_age(snapshot, x, y, CellKind::Root);
 
-        if parent_age < 42 {
+        if parent_age < 28 {
             return false;
         }
 
-        let nearby_roots = self.kind_radius_neighbors(snapshot, x, y, CellKind::Root, 2);
-
-        if nearby_roots > 5 {
-            return false;
-        }
-
-        let branch_bias = if parent_age > 220 {
+        let height_ratio = y as f32 / self.height.max(1) as f32;
+        let bottom_bias = if height_ratio > 0.72 {
             18
-        } else if parent_age > 120 {
+        } else if height_ratio > 0.46 {
             12
         } else {
             7
         };
 
-        let edge_bias = if x < 3 || y < 3 || x + 4 > self.width || y + 4 > self.height {
-            4
+        let parent_bias = if trunk_parent { 12 } else { 4 };
+        let maturity_bias = if parent_age > 260 {
+            10
+        } else if parent_age > 120 {
+            6
+        } else {
+            2
+        };
+
+        let bend_noise = hash(self.seed ^ 0xA11CE ^ self.cycle, x, y) % 17;
+        let lateral_bias = if lateral_parent && bend_noise <= 3 {
+            5
         } else {
             0
         };
 
-        seed_roll < branch_bias + edge_bias
+        seed_roll < bottom_bias + parent_bias + maturity_bias + lateral_bias
     }
 
     fn alive_neighbors(&self, snapshot: &[Cell], x: usize, y: usize) -> usize {
@@ -889,6 +872,7 @@ impl CellularAutomata {
                 let nx = wrap(x as isize + dx, self.width);
                 let ny = wrap(y as isize + dy, self.height);
                 let hint = snapshot[self.idx(nx, ny)].tribe_hint % 6;
+
                 counts[hint] += 1;
             }
         }
@@ -930,8 +914,10 @@ fn wrap(value: isize, max: usize) -> usize {
 
 fn hash(seed: u64, x: usize, y: usize) -> usize {
     let mut value = seed as usize;
+
     value ^= x.wrapping_mul(374_761_393);
     value ^= y.wrapping_mul(668_265_263);
     value = (value ^ (value >> 13)).wrapping_mul(1_274_126_177);
+
     value ^ (value >> 16)
 }

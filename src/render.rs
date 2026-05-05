@@ -86,7 +86,7 @@ fn render_header(f: &mut Frame<'_>, area: Rect, app: &App) {
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "root lattice adaptive matrix signal ecology ",
+                "trunk-root lattice adaptive matrix signal ecology ",
                 Style::default().fg(Color::Magenta),
             ),
             Span::styled(
@@ -126,7 +126,7 @@ fn render_header(f: &mut Frame<'_>, area: Rect, app: &App) {
                     Color::DarkGray
                 }),
             ),
-            Span::styled(" | roots: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" | trunk roots: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{}", app.substrate.protected_cells()),
                 Style::default()
@@ -261,38 +261,38 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                 let tribe = cell.dominant_tribe();
                 let avg_health = cell.health / cell.count as f32;
                 let avg_mass = cell.mass / cell.count as f32;
-                let organic_phase = cell.organic_phase(app.age);
+                let phase = cell.organic_phase(app.age);
 
                 let glyph = if cell.reaper {
-                    match organic_phase % 4 {
+                    match phase % 4 {
                         0 => 'Ω',
                         1 => 'ϟ',
                         2 => '◉',
                         _ => '○',
                     }
                 } else if cell.harvester {
-                    match organic_phase % 4 {
+                    match phase % 4 {
                         0 => '♻',
                         1 => '◌',
                         2 => '○',
                         _ => '∙',
                     }
                 } else if cell.drifting {
-                    match organic_phase % 4 {
+                    match phase % 4 {
                         0 => '◆',
                         1 => '◇',
                         2 => '✧',
                         _ => '◌',
                     }
                 } else if cell.rare {
-                    match organic_phase % 4 {
+                    match phase % 4 {
                         0 => '✦',
                         1 => '✧',
                         2 => '◇',
                         _ => '○',
                     }
                 } else if cell.clustered > 0 && avg_mass > 3.8 {
-                    match organic_phase % 5 {
+                    match phase % 5 {
                         0 => '◉',
                         1 => '◎',
                         2 => '◍',
@@ -300,7 +300,7 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                         _ => '◌',
                     }
                 } else if cell.clustered > 0 && cell.count >= 5 {
-                    match organic_phase % 5 {
+                    match phase % 5 {
                         0 => '◍',
                         1 => '◎',
                         2 => '○',
@@ -308,21 +308,21 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                         _ => 'o',
                     }
                 } else if avg_mass > 2.5 {
-                    match organic_phase % 4 {
+                    match phase % 4 {
                         0 => '◉',
                         1 => '◎',
                         2 => '○',
                         _ => 'o',
                     }
                 } else if cell.count >= 3 {
-                    match organic_phase % 4 {
+                    match phase % 4 {
                         0 => '●',
                         1 => '○',
                         2 => 'o',
                         _ => '∙',
                     }
                 } else {
-                    match organic_phase % 4 {
+                    match phase % 4 {
                         0 => '•',
                         1 => '∙',
                         2 => '·',
@@ -447,7 +447,26 @@ fn substrate_visual(
                 None
             }
         }
-        CellKind::Root => Some((root_screen_glyph(app, x, y, width, height), Color::Blue)),
+        CellKind::Root => Some((
+            root_screen_glyph(app, x, y, width, height),
+            root_color(y, height),
+        )),
+    }
+}
+
+fn root_color(y: usize, height: usize) -> Color {
+    if height == 0 {
+        return Color::Blue;
+    }
+
+    let ratio = y as f32 / height as f32;
+
+    if ratio > 0.78 {
+        Color::Blue
+    } else if ratio > 0.50 {
+        Color::Cyan
+    } else {
+        Color::LightBlue
     }
 }
 
@@ -476,10 +495,12 @@ fn root_screen_glyph(app: &App, x: usize, y: usize, width: usize, height: usize)
         (false, false, true, false) => '╸',
         (false, false, false, true) => '╺',
         _ => {
-            if visual_hash(app.age / 8, x, y) % 3 == 0 {
+            if y + 4 >= height {
                 '╋'
+            } else if visual_hash(app.age / 8, x, y) % 3 == 0 {
+                '┃'
             } else {
-                '•'
+                '╹'
             }
         }
     }
@@ -678,14 +699,15 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
 
     lines.push(Line::from(vec![
         Span::styled(
-            "Terrain ",
+            "Trunks  ",
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled("╋┃━┳┻ roots ", Style::default().fg(Color::Blue)),
-        Span::styled("∙ life ", Style::default().fg(Color::DarkGray)),
-        Span::styled("+ food ", Style::default().fg(Color::Green)),
+        Span::styled("╋ base ", Style::default().fg(Color::Blue)),
+        Span::styled("┃ vertical ", Style::default().fg(Color::Cyan)),
+        Span::styled("┏┓ bends ", Style::default().fg(Color::LightBlue)),
+        Span::styled("╹ tips", Style::default().fg(Color::LightBlue)),
     ]));
 
     lines.push(Line::from(vec![
@@ -695,6 +717,8 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         ),
+        Span::styled("∙ life ", Style::default().fg(Color::DarkGray)),
+        Span::styled("+ food ", Style::default().fg(Color::Green)),
         Span::styled("× dead ", Style::default().fg(Color::DarkGray)),
         Span::styled("░ spore ", Style::default().fg(Color::DarkGray)),
         Span::styled("*✶ mutagen ", Style::default().fg(Color::Magenta)),
@@ -787,12 +811,10 @@ fn render_clusters(f: &mut Frame<'_>, area: Rect, app: &App) {
             .archetype
             .map(|value| value.short())
             .unwrap_or("UNK");
-
         let effective = cluster
             .effective_archetype()
             .map(|value| value.short())
             .unwrap_or("UNK");
-
         let overridden = cluster.archetype_override.is_some();
 
         let archetype_color = if effective == "RPR" {
