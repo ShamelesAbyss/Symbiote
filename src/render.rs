@@ -180,8 +180,11 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                         1 => "─",
                         2 => "┼",
                         _ => "┤",
-                    }.chars().next().unwrap(),
-                    Color::Blue
+                    }
+                    .chars()
+                    .next()
+                    .unwrap(),
+                    Color::Blue,
                 ));
             }
         }
@@ -554,8 +557,11 @@ fn draw_ecology_zones(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                         1 => "─",
                         2 => "┼",
                         _ => "┤",
-                    }.chars().next().unwrap(),
-                    Color::Blue
+                    }
+                    .chars()
+                    .next()
+                    .unwrap(),
+                    Color::Blue,
                 ));
             }
         }

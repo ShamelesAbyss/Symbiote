@@ -412,9 +412,9 @@ impl CellularAutomata {
                 }
 
                 if self.cells[idx].kind == CellKind::Root {
-    next.kind = CellKind::Root;
-}
-self.cells[idx] = next;
+                    next.kind = CellKind::Root;
+                }
+                self.cells[idx] = next;
             }
         }
     }
@@ -461,7 +461,9 @@ self.cells[idx] = next;
             }
         };
 
-        if cell.kind != CellKind::Root { cell.kind = desired; }
+        if cell.kind != CellKind::Root {
+            cell.kind = desired;
+        }
         cell.energy = (cell.energy + particle.energy * 0.055).clamp(0.0, 85.0);
         cell.tribe_hint = particle.tribe.index();
 
@@ -550,7 +552,9 @@ self.cells[idx] = next;
 
                 cell.age = 0;
             } else {
-                if cell.kind != CellKind::Root { cell.kind = CellKind::Empty; }
+                if cell.kind != CellKind::Root {
+                    cell.kind = CellKind::Empty;
+                }
                 cell.energy = 0.0;
                 cell.age = 0;
             }
@@ -706,17 +710,16 @@ self.cells[idx] = next;
             return false;
         }
 
-        if root_neighbors == 0 || root_neighbors > 3 {
+        if root_neighbors == 0 || root_neighbors > 5 {
             return false;
         }
 
-        if alive_neighbors > 5 {
+        if alive_neighbors > 7 {
             return false;
         }
 
         let local_roots = self.kind_radius_neighbors(snapshot, x, y, CellKind::Root, 2);
-
-        if local_roots > 6 {
+        if local_roots > 9 {
             return false;
         }
 
@@ -743,36 +746,54 @@ self.cells[idx] = next;
 
         let parent_age = self.oldest_neighbor_age(snapshot, x, y, CellKind::Root);
 
-        if parent_age < 28 {
+        if parent_age < 8 {
             return false;
         }
 
         let height_ratio = y as f32 / self.height.max(1) as f32;
-        let bottom_bias = if height_ratio > 0.72 {
-            18
+
+        let vertical_band_bonus = if height_ratio > 0.72 {
+            22
         } else if height_ratio > 0.46 {
-            12
+            16
+        } else if height_ratio > 0.24 {
+            10
+        } else {
+            5
+        };
+
+        let parent_bias = if parent_below {
+            34
+        } else if parent_down_left || parent_down_right {
+            22
         } else {
             7
         };
 
-        let parent_bias = if trunk_parent { 12 } else { 4 };
         let maturity_bias = if parent_age > 260 {
-            10
+            22
         } else if parent_age > 120 {
-            6
+            16
+        } else if parent_age > 40 {
+            10
         } else {
-            2
+            5
         };
 
-        let bend_noise = hash(self.seed ^ 0xA11CE ^ self.cycle, x, y) % 17;
-        let lateral_bias = if lateral_parent && bend_noise <= 3 {
-            5
+        let bend_noise = hash(self.seed ^ 0xA11CE ^ self.cycle, x, y) % 19;
+        let lateral_bias = if lateral_parent && bend_noise <= 4 {
+            7
         } else {
             0
         };
 
-        seed_roll < bottom_bias + parent_bias + maturity_bias + lateral_bias
+        let branch_gate = hash(self.seed ^ 0xC0FFEE ^ self.cycle, x, y) % 10_000;
+        if !trunk_parent && branch_gate > 3_900 {
+            return false;
+        }
+
+        let chance = vertical_band_bonus + parent_bias + maturity_bias + lateral_bias + 10;
+        seed_roll < chance
     }
 
     fn alive_neighbors(&self, snapshot: &[Cell], x: usize, y: usize) -> usize {
