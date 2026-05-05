@@ -21,9 +21,9 @@ const HARVESTER_BODY_PRESSURE_RATIO: f32 = 0.095;
 const HARVESTER_OVERGROWTH_RATIO: f32 = 0.155;
 
 const SIGNAL_FORCE_SCALE: f32 = 0.42;
-const ROOT_AVOIDANCE_RADIUS: f32 = 0.068;
-const ROOT_FORCE_SCALE: f32 = 1.18;
-const ROOT_CHANNEL_FORCE: f32 = 0.48;
+const ROOT_AVOIDANCE_RADIUS: f32 = 0.092;
+const ROOT_FORCE_SCALE: f32 = 1.58;
+const ROOT_CHANNEL_FORCE: f32 = 0.72;
 
 #[allow(dead_code)]
 #[derive(Default, Clone, Copy, Debug)]
@@ -815,8 +815,8 @@ fn nudge_from_root(particle: &mut Particle, substrate: &CellularAutomata) {
         particle.vx = (particle.vx + dx * 0.04).clamp(-0.04, 0.04);
         particle.vy = (particle.vy + dy * 0.04).clamp(-0.04, 0.04);
     } else {
-        particle.vx = -particle.vx * 0.55;
-        particle.vy = -particle.vy * 0.55;
+        particle.vx = -particle.vx * 0.72;
+        particle.vy = -particle.vy * 0.72;
     }
 
     particle.energy -= 0.012;
