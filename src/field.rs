@@ -125,6 +125,7 @@ impl FieldCell {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FieldSample {
     pub intensity: f32,
@@ -139,6 +140,7 @@ pub struct FieldSample {
     pub motion: PatternMotion,
 }
 
+#[allow(dead_code)]
 impl FieldSample {
     pub fn influence_strength(self) -> f32 {
         (self.intensity * 0.42
@@ -229,6 +231,7 @@ impl PatternField {
         }
     }
 
+    #[allow(dead_code)]
     pub fn sample_world(&self, x: f32, y: f32) -> FieldSample {
         let Some((gx, gy)) = self.world_to_grid(x, y) else {
             return FieldSample::default();
@@ -237,6 +240,7 @@ impl PatternField {
         self.sample_grid(gx, gy)
     }
 
+    #[allow(dead_code)]
     pub fn sample_grid(&self, gx: usize, gy: usize) -> FieldSample {
         let mut sample = FieldSample::default();
         let mut total = 0.0_f32;
