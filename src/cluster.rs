@@ -4,9 +4,9 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-const CLUSTER_WARMUP_AGE: u64 = 420;
-const STRUCTURE_MATURITY_AGE: u64 = 900;
-const MIN_CLUSTER_SIZE: usize = 7;
+const CLUSTER_WARMUP_AGE: u64 = 180; // ARCHETYPE_FORMATIONS_REAWAKENED
+const STRUCTURE_MATURITY_AGE: u64 = 540;
+const MIN_CLUSTER_SIZE: usize = 4;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Cluster {
@@ -117,7 +117,7 @@ impl ClusterTracker {
 
             let measured = measure_group(&group, particles, age);
 
-            if age < CLUSTER_WARMUP_AGE && measured.radius < 0.026 {
+            if age < CLUSTER_WARMUP_AGE && measured.radius < 0.018 {
                 continue;
             }
 
@@ -130,11 +130,11 @@ impl ClusterTracker {
                 let dist = (dx * dx + dy * dy).sqrt();
 
                 let match_radius = if age < CLUSTER_WARMUP_AGE {
-                    0.18
+                    0.24
                 } else if age < STRUCTURE_MATURITY_AGE {
-                    0.22
+                    0.30
                 } else {
-                    0.28
+                    0.36
                 };
 
                 if dist < match_radius && dist < best_dist {
@@ -266,7 +266,7 @@ impl ClusterTracker {
                         1.0
                     };
 
-                    let mass_gain = 0.0011 * cluster.size as f32 * maturity;
+                    let mass_gain = 0.0018 * cluster.size as f32 * maturity;
                     particle.mass = (particle.mass + mass_gain).clamp(0.55, 6.5);
 
                     if cluster.archetype_override.is_some() && age >= STRUCTURE_MATURITY_AGE {
@@ -605,7 +605,7 @@ fn measure_group(indices: &[usize], particles: &[Particle], age: u64) -> Cluster
     vy /= count;
 
     let maturity = (age as f32 / STRUCTURE_MATURITY_AGE as f32).clamp(0.0, 1.0);
-    membrane = (membrane / count * 48.0 * maturity).clamp(0.0, 100.0);
+    membrane = (membrane / count * 78.0 * maturity).clamp(0.0, 100.0);
 
     genome.perception /= count;
     genome.hunger /= count;
@@ -645,9 +645,9 @@ fn measure_group(indices: &[usize], particles: &[Particle], age: u64) -> Cluster
     }
 
     let warmup = (age as f32 / CLUSTER_WARMUP_AGE as f32).clamp(0.0, 1.0);
-    let raw_stability = ((indices.len() as f32 * 3.2) - radius * 155.0).clamp(0.0, 100.0);
+    let raw_stability = ((indices.len() as f32 * 4.8) - radius * 95.0).clamp(0.0, 100.0);
     let stability = (raw_stability * (0.35 + warmup * 0.65)).clamp(0.0, 100.0);
-    let drift_heat = root_mobility_score(genome) * 18.0 * maturity + stability * 0.06;
+    let drift_heat = root_mobility_score(genome) * 28.0 * maturity + stability * 0.11;
 
     Cluster {
         id: 0,
