@@ -589,7 +589,23 @@ impl App {
             particle.energy > 0.0 && particle.health > 0.0 && rng.gen_bool(survival as f64)
         });
 
-        while self.particles.len() < MIN_PARTICLES {
+        let density_particle_floor = if self.memory.density_crowding_pressure >= 850 {
+            MIN_PARTICLES.saturating_mul(48) / 100
+        } else if self.memory.density_crowding_pressure >= 650 {
+            MIN_PARTICLES.saturating_mul(62) / 100
+        } else if self.memory.density_crowding_pressure >= 425 {
+            MIN_PARTICLES.saturating_mul(78) / 100
+        } else if self.memory.density_refill_pressure >= 700 {
+            MIN_PARTICLES.saturating_mul(118) / 100
+        } else {
+            MIN_PARTICLES
+        }
+        .clamp(
+            MIN_PARTICLES.saturating_mul(45) / 100,
+            MIN_PARTICLES.saturating_mul(120) / 100,
+        );
+
+        while self.particles.len() < density_particle_floor {
             self.particles.push(random_particle(rng));
         }
 
