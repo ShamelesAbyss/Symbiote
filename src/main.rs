@@ -5,6 +5,7 @@ mod density;
 mod ecology;
 mod memory;
 mod particle;
+mod pattern;
 mod render;
 mod sim;
 mod species;
@@ -24,6 +25,7 @@ use std::{
 };
 
 fn main() -> Result<()> {
+    let _ = pattern::bootstrap_pattern_layer(0); // PATTERN_BOOTSTRAP_ACTIVE
     enable_raw_mode()?;
 
     let mut stdout = io::stdout();

@@ -2,6 +2,7 @@ use crate::{
     app::{App, Environment},
     automata::{CellKind, SignalKind},
     particle::Tribe,
+    pattern::{pattern_glyph, pattern_strength_bar, PatternKind, PatternMotion, PatternSignature},
     species::Archetype,
     tree::{self, TreeStage, TreeVisualPolicy},
 };
@@ -993,6 +994,55 @@ fn render_clusters(f: &mut Frame<'_>, area: Rect, app: &App) {
             " "
         };
 
+        let pattern_kind = if overridden && cluster.drift_heat > 78.0 {
+            PatternKind::Oscillator
+        } else if effective == "ORB" {
+            PatternKind::Halo
+        } else if effective == "SWR" && cluster.size >= 18 {
+            PatternKind::Swarmfront
+        } else if effective == "PAR" && cluster.size >= 9 {
+            PatternKind::Chain
+        } else if effective == "HRV" && cluster.size >= 12 {
+            PatternKind::Nest
+        } else if cluster.membrane > 62.0 && cluster.size >= 18 {
+            PatternKind::Lattice
+        } else if cluster.age < 160 && cluster.size >= 7 {
+            PatternKind::Bloom
+        } else if cluster.drift_heat < 28.0 && cluster.size >= 14 {
+            PatternKind::StillLife
+        } else {
+            PatternKind::Glider
+        };
+
+        let pattern_motion = match pattern_kind {
+            PatternKind::StillLife | PatternKind::Lattice | PatternKind::Nest => {
+                PatternMotion::Static
+            }
+            PatternKind::Oscillator | PatternKind::Halo => PatternMotion::Pulse,
+            PatternKind::Bloom => PatternMotion::Expand,
+            PatternKind::Swarmfront | PatternKind::Glider => PatternMotion::Translate,
+            PatternKind::Chain => PatternMotion::Drift,
+            PatternKind::Dormant => PatternMotion::Static,
+        };
+
+        let pattern_signature = PatternSignature {
+            kind: pattern_kind,
+            motion: pattern_motion,
+            stability: (cluster.stability / 100.0).clamp(0.0, 1.0),
+            pulse: (cluster.drift_heat / 100.0).clamp(0.0, 1.0),
+            drift: if overridden {
+                0.86
+            } else {
+                (cluster.speed() * 900.0).clamp(0.0, 1.0)
+            },
+            cohesion: (cluster.size as f32 / 42.0).clamp(0.0, 1.0),
+            fertility: (cluster.membrane / 100.0).clamp(0.0, 1.0),
+            danger: if effective == "RPR" { 0.88 } else { 0.0 },
+        };
+
+        let pattern_symbol = pattern_glyph(pattern_signature, app.age);
+        let pattern_bar = pattern_strength_bar(pattern_signature.intensity(), 5); // RENDER_PATTERN_CLUSTER_READOUT
+
         lines.push(Line::from(vec![
             Span::styled(
                 format!("#{} ", cluster.id),
@@ -1028,6 +1078,19 @@ fn render_clusters(f: &mut Frame<'_>, area: Rect, app: &App) {
             ),
             Span::styled(
                 format!("h{:.0}{}", cluster.drift_heat, drift_marker),
+                Style::default().fg(if overridden {
+                    Color::Magenta
+                } else {
+                    Color::DarkGray
+                }),
+            ),
+            Span::raw(" "),
+            Span::styled(
+                format!("{} {} ", pattern_symbol, pattern_signature.label()),
+                Style::default().fg(archetype_color),
+            ),
+            Span::styled(
+                pattern_bar,
                 Style::default().fg(if overridden {
                     Color::Magenta
                 } else {

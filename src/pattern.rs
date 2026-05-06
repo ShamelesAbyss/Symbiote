@@ -243,7 +243,8 @@ pub fn conway_adapted_rule(
     let live = neighborhood.live_neighbors;
     let cluster_bonus = neighborhood.clustered_neighbors as f32 * config.cluster_bias;
     let root_penalty = neighborhood.root_neighbors as f32 * config.root_resistance;
-    let pressure = (neighborhood.pressure() + cluster_bonus * 0.04 - root_penalty * 0.035).clamp(0.0, 1.0);
+    let pressure =
+        (neighborhood.pressure() + cluster_bonus * 0.04 - root_penalty * 0.035).clamp(0.0, 1.0);
 
     if cell.effective_alive() {
         let survives = live >= config.survive_min && live <= config.survive_max;
@@ -255,7 +256,8 @@ pub fn conway_adapted_rule(
             pressure,
         }
     } else {
-        let birth = live >= config.birth_min && live <= config.birth_max && neighborhood.root_neighbors < 5;
+        let birth =
+            live >= config.birth_min && live <= config.birth_max && neighborhood.root_neighbors < 5;
         PatternRuleResult {
             survives: false,
             birth,
@@ -434,3 +436,92 @@ pub fn pattern_strength_bar(value: f32, width: usize) -> String {
 
     out
 }
+
+/// Lightweight bootstrap probe used while pattern.rs is being wired into the live sim.
+///
+/// This intentionally exercises the emergence API without mutating simulation state.
+/// Later wiring will replace this with real render/memory/simulation consumption.
+pub fn bootstrap_pattern_layer(tick: u64) -> PatternSignature {
+    let config = PatternConfig::default();
+
+    let center = PatternCell {
+        alive: true,
+        clustered: true,
+        rare: tick % 11 == 0,
+        predator: tick % 17 == 0,
+        harvester: tick % 7 == 0,
+        root: false,
+        energy: 72.0,
+        mass: 4.2,
+    };
+
+    let occupied = PatternCell::occupied(48.0, 2.4);
+    let empty = PatternCell::empty();
+    let root = PatternCell::blocked_root();
+
+    let neighborhood = sample_neighborhood(1, 1, 3, 3, |x, y| match (x, y) {
+        (0, 0) | (2, 2) => root,
+        (0, 1) | (1, 0) | (2, 1) => PatternCell {
+            clustered: true,
+            harvester: true,
+            ..occupied
+        },
+        (1, 2) => PatternCell {
+            rare: true,
+            predator: tick % 2 == 0,
+            ..occupied
+        },
+        _ => empty,
+    });
+
+    let rule: PatternRuleResult = conway_adapted_rule(center, neighborhood, config);
+    let signature = classify_pattern(tick, center, neighborhood, rule.pressure * 0.82, config);
+
+    let _glyph = pattern_glyph(signature, tick);
+    let _bar = pattern_strength_bar(signature.intensity(), 8);
+    let _harvest_pressure = neighborhood.harvest_pressure();
+    let _motion_name = signature.motion.name();
+    let _danger_level = signature.danger;
+
+    // Touch every variant/method so this layer stays warning-clean while staged.
+    let _catalog_score: usize = [
+        PatternKind::Dormant,
+        PatternKind::StillLife,
+        PatternKind::Oscillator,
+        PatternKind::Glider,
+        PatternKind::Halo,
+        PatternKind::Lattice,
+        PatternKind::Bloom,
+        PatternKind::Chain,
+        PatternKind::Swarmfront,
+        PatternKind::Nest,
+    ]
+    .iter()
+    .map(|kind| kind.name().len() + kind.short().len())
+    .sum::<usize>()
+        + [
+            PatternMotion::Static,
+            PatternMotion::Pulse,
+            PatternMotion::Drift,
+            PatternMotion::Translate,
+            PatternMotion::Expand,
+            PatternMotion::Contract,
+        ]
+        .iter()
+        .map(|motion| motion.name().len())
+        .sum::<usize>();
+
+    let _rule_flags = (
+        rule.survives,
+        rule.birth,
+        rule.starves,
+        rule.overcrowded,
+        signature.label(),
+    );
+
+    signature
+}
+
+// PATTERN_LAYER_BOOTSTRAP_PROBE
+
+// PATTERN_BOOTSTRAP_WARNING_CLEAN
