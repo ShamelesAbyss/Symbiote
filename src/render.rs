@@ -209,22 +209,24 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
         let y = (((particle.y + 1.2) / 2.4) * height as f32) as isize;
 
         if x >= 0 && y >= 0 && x < width as isize && y < height as isize {
-            let archetype = particle.species_id.and_then(|id| {
-                app.clusters
-                    .clusters
-                    .iter()
-                    .find(|cluster| {
-                        cluster.species_id == Some(id) && cluster.archetype_override.is_some()
-                    })
-                    .and_then(|cluster| cluster.archetype_override)
-                    .or_else(|| {
+            let archetype = particle
+                .cluster_id
+                .and_then(|cluster_id| {
+                    app.clusters
+                        .clusters
+                        .iter()
+                        .find(|cluster| cluster.id == cluster_id)
+                        .and_then(|cluster| cluster.effective_archetype())
+                })
+                .or_else(|| {
+                    particle.species_id.and_then(|id| {
                         app.species_bank
                             .species
                             .iter()
                             .find(|species| species.id == id)
                             .map(|species| species.archetype)
                     })
-            });
+                }); // RENDER_ARCHETYPE_SOURCE_UNIFIED
 
             let cell = &mut cells[y as usize][x as usize];
 
