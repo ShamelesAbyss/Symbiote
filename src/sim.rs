@@ -355,8 +355,9 @@ pub fn step_particles(
                 1.0
             };
 
-            particle.vx += orbit_x * particle.genome.orbit * orbit_boost * 0.00042;
-            particle.vy += orbit_y * particle.genome.orbit * orbit_boost * 0.00042;
+            particle.vx += orbit_x * particle.genome.orbit * orbit_boost * 0.00022; // PATTERN_CALM_PASS_ACTIVE
+            particle.vy += orbit_y * particle.genome.orbit * orbit_boost * 0.00022;
+            // PATTERN_CALM_PASS_ACTIVE
         }
 
         apply_ecology(particle, ecology);
@@ -1099,18 +1100,18 @@ fn apply_pattern_micro_rules(particle: &mut Particle) {
         }
         crate::pattern::PatternKind::Oscillator => {
             let wave =
-                (particle.x * 7.0 + particle.y * 11.0 + age_seed as f32 * 0.013).sin() * 0.00042;
+                (particle.x * 7.0 + particle.y * 11.0 + age_seed as f32 * 0.013).sin() * 0.00022; // PATTERN_CALM_PASS_ACTIVE
             particle.vx += wave * (0.45 + pulse);
             particle.vy -= wave * (0.35 + pulse);
-            particle.energy += 0.004 * intensity;
+            particle.energy += 0.002 * intensity;
         }
         crate::pattern::PatternKind::Glider => {
             let angle = particle.genome.orbit * 6.28318 + particle.genome.volatility;
-            particle.vx += angle.cos() * 0.00038 * (0.35 + drift);
-            particle.vy += angle.sin() * 0.00038 * (0.35 + drift);
+            particle.vx += angle.cos() * 0.00024 * (0.28 + drift * 0.72);
+            particle.vy += angle.sin() * 0.00024 * (0.28 + drift * 0.72);
         }
         crate::pattern::PatternKind::Halo => {
-            let turn = (particle.x * particle.y * 9.0 + particle.genome.orbit).sin() * 0.00034;
+            let turn = (particle.x * particle.y * 9.0 + particle.genome.orbit).sin() * 0.00018;
             particle.vx += -particle.y.signum() * turn * (0.6 + cohesion);
             particle.vy += particle.x.signum() * turn * (0.6 + cohesion);
             particle.genome.orbit = (particle.genome.orbit + 0.000012 * intensity).clamp(0.0, 1.55);
@@ -1124,8 +1125,8 @@ fn apply_pattern_micro_rules(particle: &mut Particle) {
                 (particle.genome.membrane + 0.000018 * intensity).clamp(0.0, 1.55);
         }
         crate::pattern::PatternKind::Bloom => {
-            particle.energy += 0.006 * signature.fertility;
-            particle.health += 0.003 * signature.fertility;
+            particle.energy += 0.003 * signature.fertility;
+            particle.health += 0.0018 * signature.fertility;
             particle.genome.fertility =
                 (particle.genome.fertility + 0.000018 * intensity).clamp(0.0, 1.75);
         }
@@ -1136,8 +1137,8 @@ fn apply_pattern_micro_rules(particle: &mut Particle) {
                 (particle.genome.bonding + 0.00001 * cohesion).clamp(0.0, 1.65);
         }
         crate::pattern::PatternKind::Swarmfront => {
-            particle.vx += particle.genome.volatility.cos() * 0.00048 * (0.5 + drift);
-            particle.vy += particle.genome.volatility.sin() * 0.00048 * (0.5 + drift);
+            particle.vx += particle.genome.volatility.cos() * 0.00028 * (0.42 + drift * 0.68);
+            particle.vy += particle.genome.volatility.sin() * 0.00028 * (0.42 + drift * 0.68);
             particle.genome.volatility =
                 (particle.genome.volatility + 0.000012 * signature.danger).clamp(0.0, 1.95);
         }
@@ -1158,6 +1159,29 @@ fn apply_pattern_micro_rules(particle: &mut Particle) {
 
 fn apply_ecology(particle: &mut Particle, ecology: &Ecology) {
     apply_pattern_micro_rules(particle);
+
+    // --- PATTERN MEMORY ---
+    // lightweight persistence using genome channels (no struct changes)
+
+    let memory_decay = 0.985;
+
+    particle.genome.orbit *= memory_decay;
+    particle.genome.bonding *= memory_decay;
+    particle.genome.membrane *= memory_decay;
+
+    // reinforce based on current motion (carry structure forward)
+    let motion_strength = (particle.vx.abs() + particle.vy.abs()).clamp(0.0, 1.0);
+
+    particle.genome.orbit += motion_strength * 0.0008;
+    particle.genome.bonding += motion_strength * 0.0006;
+    particle.genome.membrane += motion_strength * 0.0005;
+
+    // clamp back into safe ranges
+    particle.genome.orbit = particle.genome.orbit.clamp(0.0, 1.55);
+    particle.genome.bonding = particle.genome.bonding.clamp(0.0, 1.65);
+    particle.genome.membrane = particle.genome.membrane.clamp(0.0, 1.55);
+    // --- PATTERN MEMORY ACTIVE ---
+
     for zone in &ecology.zones {
         let dx = zone.x - particle.x;
         let dy = zone.y - particle.y;
