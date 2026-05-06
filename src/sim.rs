@@ -1044,32 +1044,35 @@ fn apply_ecology(particle: &mut Particle, ecology: &Ecology) {
             continue;
         }
 
-        let effect = (1.0 - dist / zone.radius) * zone.strength;
+        let _effect = (1.0 - dist / zone.radius) * zone.strength;
 
         match zone.kind {
             ZoneKind::Nutrient => {
-                particle.health += 0.12 * effect;
-                particle.energy += 0.08 * effect;
-                particle.mass += 0.006 * effect;
+                particle.health += 0.12 * 1.0 /* ROOT_BIAS_DISABLED */;
+                particle.energy += 0.08 * 1.0 /* ROOT_BIAS_DISABLED */;
+                particle.mass += 0.006 * 1.0 /* ROOT_BIAS_DISABLED */;
             }
             ZoneKind::Dead => {
-                particle.health -= 0.18 * effect;
-                particle.energy -= 0.09 * effect;
-                particle.mass -= 0.006 * effect;
+                particle.health -= 0.18 * 1.0 /* ROOT_BIAS_DISABLED */;
+                particle.energy -= 0.09 * 1.0 /* ROOT_BIAS_DISABLED */;
+                particle.mass -= 0.006 * 1.0 /* ROOT_BIAS_DISABLED */;
             }
             ZoneKind::Turbulent => {
-                particle.vx += (particle.y * 33.0).sin() * 0.001 * effect;
-                particle.vy -= (particle.x * 29.0).cos() * 0.001 * effect;
+                particle.vx += (particle.y * 33.0).sin() * 0.001 * 1.0 /* ROOT_BIAS_DISABLED */;
+                particle.vy -= (particle.x * 29.0).cos() * 0.001 * 1.0 /* ROOT_BIAS_DISABLED */;
             }
             ZoneKind::Mutagen => {
                 particle.genome.volatility =
-                    (particle.genome.volatility + 0.00045 * effect).clamp(0.36, 1.95);
-                particle.genome.orbit = (particle.genome.orbit + 0.0003 * effect).clamp(0.0, 1.55);
+                    (particle.genome.volatility + 0.00045 * 1.0/* ROOT_BIAS_DISABLED */)
+                        .clamp(0.36, 1.95);
+                particle.genome.orbit =
+                    (particle.genome.orbit + 0.0003 * 1.0/* ROOT_BIAS_DISABLED */).clamp(0.0, 1.55);
             }
             ZoneKind::Nest => {
-                particle.energy += 0.04 * effect;
+                particle.energy += 0.04 * 1.0 /* ROOT_BIAS_DISABLED */;
                 particle.genome.fertility =
-                    (particle.genome.fertility + 0.00035 * effect).clamp(0.2, 2.4);
+                    (particle.genome.fertility + 0.00035 * 1.0/* ROOT_BIAS_DISABLED */)
+                        .clamp(0.2, 2.4);
             }
         }
     }
