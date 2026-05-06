@@ -1,137 +1,218 @@
-# ◉ SYMBIOTE
+# Symbiote
 
-**A living terminal organism.  
-An artificial life system you don’t play… you witness.**
+A Rust artificial life simulation focused on emergent behavior, evolving particle ecosystems, Conway-inspired pattern formation, archetype evolution, cluster intelligence, ecological pressure systems, and persistent spatial memory.
 
----
-
-## ✦ Overview
-
-SYMBIOTE is a terminal-based artificial life simulation written in Rust.
-
-Inspired by particle-life systems, it uses simple attraction and repulsion rules between colored entities to produce **emergent behavior**, including:
-
-- Clustering
-- Flocking
-- Orbital structures
-- Predator-prey dynamics
-- Membrane-like organism shells
-- Evolution over time
-
-The result is a **self-organizing digital ecosystem** that evolves the longer it runs.
+Built entirely in Rust.
 
 ---
 
-## ✦ Features
+# Vision
 
-### ◉ Living Particle System
-- Hundreds of autonomous agents
-- Each with unique genome traits:
-  - Perception
-  - Bonding
-  - Hunger
-  - Volatility
-  - Orbit tendency
-  - Membrane behavior
+Symbiote is not just a particle simulation.
 
-### ◉ Emergent Clusters
-- True cluster identity tracking
-- Clusters form, merge, split, and migrate
-- Organisms behave as **cohesive moving bodies**
+The long-term goal is a living artificial ecosystem where:
+- particles evolve into recognizable archetypes
+- clusters form tribes, colonies, halos, nests, and swarmfronts
+- local rules generate emergent structures
+- spatial memory influences future movement
+- organisms inherit pattern tendencies
+- ecosystems develop migratory regions and territorial behavior
+- Conway-style oscillators, gliders, and stable forms naturally emerge
 
-### ◉ Evolution Engine
-- Natural selection via survival pressure
-- Mutation of behavior rules
-- Environmental shifts:
-  - Calm
-  - Bloom
-  - Hunger
-  - Storm
-  - Drift
-
-### ◉ Visual System
-- ASCII / Unicode rendering
-- Dynamic density-based glyphs
-- Pulsing membranes
-- Motion trails
-- Directional cluster indicators
-
-### ◉ Memory System
-- Tracks:
-  - Peak population
-  - Cluster evolution
-  - Merges / splits
-  - Longest survival
-- Stored at:
-```
-memory/session_memory.json
-```
+The project combines:
+- artificial life
+- cellular automata
+- particle systems
+- ecology simulation
+- procedural emergence
+- terminal visualization
+- evolutionary behavior
 
 ---
 
-## ✦ Controls
+# Core Features
 
-```
-space   pause / resume
-e       toggle evolution
-r       reset world
-m       force mutation
-n       new seed
-+ / -   speed control
-q       quit
-```
+## Emergent Particle Ecosystem
+Particles move, interact, cluster, reproduce, mutate, and evolve over time through simple local rules.
+
+Each particle contains:
+- energy
+- mass
+- health
+- velocity
+- genome traits
+- species identity
+- cluster identity
+- rare traits
+- archetype influence
 
 ---
 
-## ✦ Installation
+## Cluster Formation
+Particles naturally organize into:
+- tribes
+- swarms
+- halos
+- membranes
+- lattice structures
+- nests
+- drifting colonies
+
+Clusters track:
+- cohesion
+- stability
+- drift heat
+- membrane integrity
+- dominant archetypes
+- velocity
+- lifetime
+- formation complexity
+
+---
+
+## Archetype System
+Symbiote contains evolving behavior archetypes such as:
+- Harvester
+- Reaper
+- Swarmer
+- Parasite
+- Orbiter
+- Rooted forms
+- Bloom structures
+- Oscillator-style entities
+
+Archetypes influence:
+- movement
+- reproduction
+- aggression
+- clustering
+- ecological interaction
+- formation tendencies
+
+---
+
+# Conway-Inspired Pattern System
+
+## src/pattern.rs
+The pattern layer classifies local structures into higher-level emergent forms.
+
+Current pattern types include:
+- Dormant
+- StillLife
+- Oscillator
+- Glider
+- Halo
+- Lattice
+- Bloom
+- Chain
+- Swarmfront
+- Nest
+
+---
+
+# Spatial Pattern Fields
+
+## src/field.rs
+The field layer creates persistent spatial memory across the world.
+
+It stores:
+- pattern intensity
+- cohesion
+- pulse
+- drift
+- stability
+- danger
+- motion vectors
+- dominant pattern signatures
+
+This allows the ecosystem to eventually develop:
+- migration lanes
+- territorial regions
+- glider trails
+- persistent nest zones
+- attractor fields
+- ecological scars
+- pattern memory over time
+
+---
+
+# Runtime Architecture
+
+## src/main.rs
+Application entry point and module declarations.
+
+## src/app.rs
+Top-level orchestration layer.
+
+## src/sim.rs
+Core particle simulation engine.
+
+## src/particle.rs
+Defines particles and genomes.
+
+## src/species.rs
+Species identity and archetype behavior.
+
+## src/cluster.rs
+Cluster intelligence and formation behavior.
+
+## src/ecology.rs
+Environmental pressure and ecological zones.
+
+## src/automata.rs
+Cellular automata and substrate systems.
+
+## src/render.rs
+Terminal visualization layer.
+
+## src/memory.rs
+Telemetry and long-term ecosystem metrics.
+
+---
+
+# Build
+
+## Clone
 
 ```bash
-git clone <your-repo>
-cd symbiote
+git clone git@github.com:ShamelesAbyss/Symbiote.git
+cd Symbiote
+```
 
+## Build
+
+```bash
 cargo build --release
-./target/release/symbiote
+```
+
+## Run
+
+```bash
+cargo run --release
 ```
 
 ---
 
-## ✦ Philosophy
+# Development Workflow
 
-SYMBIOTE is not a game in the traditional sense.
+Preferred workflow:
+- Rust-only
+- GitHub as source of truth
+- surgical modifications
+- preserve architecture
+- compile/check after every integration layer
 
-It is:
+Validation cycle:
 
-- A **digital petri dish**
-- A **procedural life experiment**
-- A system where:
-  - order emerges from chaos
-  - patterns appear, dissolve, and reappear
-  - structure is never hardcoded
-
-You don’t control it.
-
-You **observe it evolve**.
-
----
-
-## ✦ Future Direction
-
-- Long-term evolutionary memory persistence
-- Stable organism species emergence
-- Complex predator hierarchies
-- Persistent world states
-- Exportable “organism seeds”
+```bash
+cargo fmt
+cargo check
+cargo build --release
+cargo run --release
+```
 
 ---
 
-## ✦ Author
+# GitHub
 
-Built by Chris  
-Powered by curiosity, chaos, and way too much terminal time
-
----
-
-## ✦ License
-
-MIT
-
+https://github.com/ShamelesAbyss/Symbiote
