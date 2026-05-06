@@ -317,7 +317,7 @@ fn apply_cluster_drift(
 ) {
     let base = cluster.archetype;
     let mobility = root_mobility_score(cluster.avg_genome);
-    let density = (cluster.size as f32 / 110.0).clamp(0.0, 1.0);
+    let density = (cluster.size as f32 / 32.0).clamp(0.0, 1.0); // CLUSTER_DRIFT_REACTIVATED
     let maturity =
         ((world_age.saturating_sub(CLUSTER_WARMUP_AGE)) as f32 / 1_800.0).clamp(0.0, 1.0);
 
@@ -330,7 +330,9 @@ fn apply_cluster_drift(
 
     let heat_target =
         (pressure * 62.0 + mobility * 16.0 + density * 8.0).clamp(0.0, 100.0) * maturity;
-    cluster.drift_heat = (cluster.drift_heat * 0.90 + heat_target * 0.10).clamp(0.0, 100.0);
+    let heat_target = heat_target + density * 10.8;
+    let delta = heat_target - cluster.drift_heat;
+    cluster.drift_heat = (cluster.drift_heat + delta * 0.35).clamp(0.0, 100.0);
 
     cluster.archetype_override = if cluster.drift_heat > 68.0 && pressure > 0.52 && maturity > 0.35
     {
