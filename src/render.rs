@@ -700,14 +700,15 @@ fn draw_ecology_zones(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
 
 fn draw_cluster_membranes(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
     for cluster in &app.clusters.clusters {
-        if cluster.size < 18 || cluster.membrane < 34.0 || cluster.age < 80 {
+        if cluster.size < 7 || cluster.membrane < 12.0 || cluster.age < 24 {
+            // CLUSTER_VISUALS_REVEALED {
             continue;
         }
 
         let cx = (((cluster.x + 1.2) / 2.4) * width as f32) as i32;
         let cy = (((cluster.y + 1.2) / 2.4) * height as f32) as i32;
         let pulse = ((app.age as f32 / 18.0 + cluster.id as f32).sin() * 0.9) as i32;
-        let radius = ((cluster.radius * width as f32 * 0.72).max(2.0)).min(8.0) as i32 + pulse;
+        let radius = ((cluster.radius * width as f32 * 1.15).max(2.0)).min(12.0) as i32 + pulse;
 
         for deg in (0..360).step_by(24) {
             let rad = deg as f32 * std::f32::consts::PI / 180.0;
@@ -725,14 +726,14 @@ fn draw_cluster_membranes(cells: &mut [Vec<Cell>], app: &App, width: usize, heig
 
 fn draw_cluster_motion_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
     for cluster in &app.clusters.clusters {
-        if cluster.speed() < 0.00035 || cluster.age < 45 {
+        if cluster.speed() < 0.00014 || cluster.age < 18 {
             continue;
         }
 
         let cx = (((cluster.x + 1.2) / 2.4) * width as f32) as i32;
         let cy = (((cluster.y + 1.2) / 2.4) * height as f32) as i32;
-        let tx = cx - (cluster.vx * 780.0) as i32;
-        let ty = cy - (cluster.vy * 780.0) as i32;
+        let tx = cx - (cluster.vx * 1180.0) as i32;
+        let ty = cy - (cluster.vy * 1180.0) as i32;
 
         for i in 0..3 {
             let x = cx + ((tx - cx) * i) / 3;
