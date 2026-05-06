@@ -1034,7 +1034,130 @@ fn apply_substrate(
     consumed
 }
 
+fn apply_pattern_micro_rules(particle: &mut Particle) {
+    let clustered = particle.cluster_id.is_some();
+    let rare = !particle.rare_trait.short().is_empty();
+
+    let center = crate::pattern::PatternCell {
+        alive: true,
+        clustered,
+        rare,
+        predator: particle.genome.hunger > 0.020 || particle.genome.volatility > 1.46,
+        harvester: particle.genome.fertility > 1.34 && particle.genome.hunger < 0.018,
+        root: false,
+        energy: particle.energy,
+        mass: particle.mass,
+    };
+
+    let mut neighborhood = crate::pattern::PatternNeighborhood::default();
+
+    let orbit_pressure = particle.genome.orbit.clamp(0.0, 1.55);
+    let bonding_pressure = particle.genome.bonding.clamp(0.0, 1.65);
+    let membrane_pressure = (particle.genome.membrane / 1.35).clamp(0.0, 1.45);
+    let volatility_pressure = particle.genome.volatility.clamp(0.0, 1.95);
+    let fertility_pressure = particle.genome.fertility.clamp(0.0, 1.75);
+
+    neighborhood.live_neighbors =
+        ((bonding_pressure * 3.0 + membrane_pressure * 2.0 + fertility_pressure) as u8).clamp(0, 8);
+    neighborhood.clustered_neighbors = if clustered {
+        ((bonding_pressure * 4.0 + membrane_pressure * 2.0) as u8).clamp(1, 8)
+    } else {
+        ((bonding_pressure * 2.0) as u8).clamp(0, 4)
+    };
+    neighborhood.rare_neighbors = if rare { 2 } else { 0 };
+    neighborhood.predator_neighbors =
+        ((volatility_pressure * 2.4 + particle.genome.hunger * 80.0) as u8).clamp(0, 8);
+    neighborhood.harvester_neighbors = ((fertility_pressure * 2.6) as u8).clamp(0, 8);
+    neighborhood.root_neighbors = 0;
+    neighborhood.energy_sum = particle.energy;
+    neighborhood.mass_sum = particle.mass;
+
+    let config = crate::pattern::PatternConfig::default();
+    let previous_pressure =
+        ((orbit_pressure + bonding_pressure + membrane_pressure) / 4.8).clamp(0.0, 1.0);
+    let age_seed = particle
+        .species_id
+        .or(particle.cluster_id)
+        .unwrap_or(0)
+        .wrapping_add((particle.x.abs() * 1000.0) as u64)
+        .wrapping_add((particle.y.abs() * 1000.0) as u64);
+
+    let signature =
+        crate::pattern::classify_pattern(age_seed, center, neighborhood, previous_pressure, config);
+
+    let intensity = signature.intensity();
+    let pulse = signature.pulse;
+    let drift = signature.drift;
+    let cohesion = signature.cohesion;
+
+    match signature.kind {
+        crate::pattern::PatternKind::StillLife => {
+            particle.vx *= 0.996;
+            particle.vy *= 0.996;
+            particle.health += 0.006 * intensity;
+            particle.energy += 0.004 * cohesion;
+        }
+        crate::pattern::PatternKind::Oscillator => {
+            let wave =
+                (particle.x * 7.0 + particle.y * 11.0 + age_seed as f32 * 0.013).sin() * 0.00042;
+            particle.vx += wave * (0.45 + pulse);
+            particle.vy -= wave * (0.35 + pulse);
+            particle.energy += 0.004 * intensity;
+        }
+        crate::pattern::PatternKind::Glider => {
+            let angle = particle.genome.orbit * 6.28318 + particle.genome.volatility;
+            particle.vx += angle.cos() * 0.00038 * (0.35 + drift);
+            particle.vy += angle.sin() * 0.00038 * (0.35 + drift);
+        }
+        crate::pattern::PatternKind::Halo => {
+            let turn = (particle.x * particle.y * 9.0 + particle.genome.orbit).sin() * 0.00034;
+            particle.vx += -particle.y.signum() * turn * (0.6 + cohesion);
+            particle.vy += particle.x.signum() * turn * (0.6 + cohesion);
+            particle.genome.orbit = (particle.genome.orbit + 0.000012 * intensity).clamp(0.0, 1.55);
+        }
+        crate::pattern::PatternKind::Lattice => {
+            particle.vx *= 0.998;
+            particle.vy *= 0.998;
+            particle.genome.bonding =
+                (particle.genome.bonding + 0.000014 * intensity).clamp(0.0, 1.65);
+            particle.genome.membrane =
+                (particle.genome.membrane + 0.000018 * intensity).clamp(0.0, 1.55);
+        }
+        crate::pattern::PatternKind::Bloom => {
+            particle.energy += 0.006 * signature.fertility;
+            particle.health += 0.003 * signature.fertility;
+            particle.genome.fertility =
+                (particle.genome.fertility + 0.000018 * intensity).clamp(0.0, 1.75);
+        }
+        crate::pattern::PatternKind::Chain => {
+            particle.vx += particle.genome.bonding.sin() * 0.00028 * intensity;
+            particle.vy += particle.genome.membrane.cos() * 0.00028 * intensity;
+            particle.genome.bonding =
+                (particle.genome.bonding + 0.00001 * cohesion).clamp(0.0, 1.65);
+        }
+        crate::pattern::PatternKind::Swarmfront => {
+            particle.vx += particle.genome.volatility.cos() * 0.00048 * (0.5 + drift);
+            particle.vy += particle.genome.volatility.sin() * 0.00048 * (0.5 + drift);
+            particle.genome.volatility =
+                (particle.genome.volatility + 0.000012 * signature.danger).clamp(0.0, 1.95);
+        }
+        crate::pattern::PatternKind::Nest => {
+            particle.vx *= 0.997;
+            particle.vy *= 0.997;
+            particle.energy += 0.005 * cohesion;
+            particle.mass += 0.0009 * intensity;
+        }
+        crate::pattern::PatternKind::Dormant => {}
+    }
+
+    particle.health = particle.health.clamp(0.0, 140.0);
+    particle.energy = particle.energy.clamp(0.0, 160.0);
+    particle.mass = particle.mass.clamp(0.12, 18.0);
+}
+// PATTERN_MICRO_RULES_ACTIVE
+
 fn apply_ecology(particle: &mut Particle, ecology: &Ecology) {
+    apply_pattern_micro_rules(particle);
     for zone in &ecology.zones {
         let dx = zone.x - particle.x;
         let dy = zone.y - particle.y;
