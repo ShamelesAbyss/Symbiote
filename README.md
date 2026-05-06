@@ -1,218 +1,159 @@
-# Symbiote
+# 🧬 Symbiote
 
-A Rust artificial life simulation focused on emergent behavior, evolving particle ecosystems, Conway-inspired pattern formation, archetype evolution, cluster intelligence, ecological pressure systems, and persistent spatial memory.
+### *A Living Artificial Ecosystem Written in Rust*
 
-Built entirely in Rust.
+![Rust](https://img.shields.io/badge/Rust-Systems%20Level-orange?style=for-the-badge&logo=rust)
+![Status](https://img.shields.io/badge/Status-Evolving-green?style=for-the-badge)
+![Simulation](https://img.shields.io/badge/Type-Artificial%20Life-blueviolet?style=for-the-badge)
+![Platform](https://img.shields.io/badge/Platform-Terminal-black?style=for-the-badge)
 
----
-
-# Vision
-
-Symbiote is not just a particle simulation.
-
-The long-term goal is a living artificial ecosystem where:
-- particles evolve into recognizable archetypes
-- clusters form tribes, colonies, halos, nests, and swarmfronts
-- local rules generate emergent structures
-- spatial memory influences future movement
-- organisms inherit pattern tendencies
-- ecosystems develop migratory regions and territorial behavior
-- Conway-style oscillators, gliders, and stable forms naturally emerge
-
-The project combines:
-- artificial life
-- cellular automata
-- particle systems
-- ecology simulation
-- procedural emergence
-- terminal visualization
-- evolutionary behavior
+> Conway’s Game of Life meets emergent artificial life, evolving ecosystems, predator-prey dynamics, root systems, spatial memory, and alien microbiology — all rendered live in the terminal.
 
 ---
 
-# Core Features
+# 🌌 What Is Symbiote?
 
-## Emergent Particle Ecosystem
-Particles move, interact, cluster, reproduce, mutate, and evolve over time through simple local rules.
+**Symbiote** is a real-time artificial life simulation written entirely in Rust.
 
-Each particle contains:
-- energy
-- mass
-- health
-- velocity
-- genome traits
-- species identity
-- cluster identity
-- rare traits
-- archetype influence
+Inside the simulation, thousands of autonomous entities evolve and interact inside a living digital ecosystem.
 
----
+- 🦠 Swarming organisms
+- 🌱 Root and fungal growth
+- 🧠 Spatial pattern memory
+- 🌊 Invisible ecological pressure fields
+- 👁 Emergent archetypes and behaviors
+- 🌀 Halo formations and oscillators
+- 🪺 Nest structures and colonies
+- 🐺 Predator/prey ecosystem loops
+- 🌐 Procedural ecosystem drift over long runtimes
 
-## Cluster Formation
-Particles naturally organize into:
-- tribes
-- swarms
-- halos
-- membranes
-- lattice structures
-- nests
-- drifting colonies
+Nothing is scripted.
 
-Clusters track:
-- cohesion
-- stability
-- drift heat
-- membrane integrity
-- dominant archetypes
-- velocity
-- lifetime
-- formation complexity
+The world evolves from layered systems interacting with each other over time.
+
+Every run becomes its own strange alien biosphere.
 
 ---
 
-## Archetype System
-Symbiote contains evolving behavior archetypes such as:
-- Harvester
-- Reaper
-- Swarmer
-- Parasite
-- Orbiter
-- Rooted forms
-- Bloom structures
-- Oscillator-style entities
+# ✨ Current Features
 
-Archetypes influence:
-- movement
-- reproduction
-- aggression
-- clustering
-- ecological interaction
-- formation tendencies
+## 🧬 Emergent Organisms
 
----
+Particles evolve into recognizable behavioral structures:
 
-# Conway-Inspired Pattern System
+- Halos
+- Swarmfronts
+- Oscillators
+- Membranes
+- Nests
+- Chains
+- Bloom regions
+- Drift colonies
+- Glider-like movement structures
 
-## src/pattern.rs
-The pattern layer classifies local structures into higher-level emergent forms.
-
-Current pattern types include:
-- Dormant
-- StillLife
-- Oscillator
-- Glider
-- Halo
-- Lattice
-- Bloom
-- Chain
-- Swarmfront
-- Nest
+These behaviors are not hardcoded animations.
+They emerge from the simulation itself.
 
 ---
 
-# Spatial Pattern Fields
+## 🌱 Living Root Ecosystem
 
-## src/field.rs
-The field layer creates persistent spatial memory across the world.
+Symbiote contains a fully simulated substrate/root layer:
 
-It stores:
-- pattern intensity
-- cohesion
-- pulse
-- drift
-- stability
-- danger
-- motion vectors
-- dominant pattern signatures
-
-This allows the ecosystem to eventually develop:
-- migration lanes
-- territorial regions
-- glider trails
-- persistent nest zones
-- attractor fields
-- ecological scars
-- pattern memory over time
+- Gradual root expansion
+- Tree-like growth
+- Root collision systems
+- Regenerative substrate zones
+- Cellular automata driven growth
+- Protected trunk structures
+- Organic upward propagation
 
 ---
 
-# Runtime Architecture
+## 🧠 PatternField System
 
-## src/main.rs
-Application entry point and module declarations.
+The simulation now contains a persistent low-resolution ecological memory layer called the PatternField.
 
-## src/app.rs
-Top-level orchestration layer.
-
-## src/sim.rs
-Core particle simulation engine.
-
-## src/particle.rs
-Defines particles and genomes.
-
-## src/species.rs
-Species identity and archetype behavior.
-
-## src/cluster.rs
-Cluster intelligence and formation behavior.
-
-## src/ecology.rs
-Environmental pressure and ecological zones.
-
-## src/automata.rs
-Cellular automata and substrate systems.
-
-## src/render.rs
-Terminal visualization layer.
-
-## src/memory.rs
-Telemetry and long-term ecosystem metrics.
+The field stores:
+- Spatial memory
+- Danger zones
+- Migration pressure
+- Pattern persistence
+- Cohesion regions
+- Drift direction
+- Halo territories
+- Swarm signatures
+- Ecological intensity
 
 ---
 
-# Build
+## 🐺 Archetype Ecology
 
-## Clone
+Creatures evolve into ecosystem roles:
+
+- 🌿 Grazers
+- 🍄 Mycelials
+- 🧠 Architects
+- 👻 Phantoms
+- ⚔ Hunters
+- ☠ Reapers
+- 🌾 Harvesters
+- 🐉 Leviathans
+- 🪱 Parasites
+- 🌀 Orbiters
+
+---
+
+# 🚀 Running Symbiote
 
 ```bash
 git clone git@github.com:ShamelesAbyss/Symbiote.git
 cd Symbiote
-```
 
-## Build
-
-```bash
-cargo build --release
-```
-
-## Run
-
-```bash
-cargo run --release
-```
-
----
-
-# Development Workflow
-
-Preferred workflow:
-- Rust-only
-- GitHub as source of truth
-- surgical modifications
-- preserve architecture
-- compile/check after every integration layer
-
-Validation cycle:
-
-```bash
-cargo fmt
-cargo check
 cargo build --release
 cargo run --release
 ```
 
 ---
 
-# GitHub
+# 🎮 Controls
 
+| Key | Action |
+|---|---|
+| `q` | Quit |
+| `space` | Pause simulation |
+| `r` | Reset ecosystem |
+| `n` | Generate new world seed |
+| `+` | Increase simulation speed |
+| `-` | Slow simulation |
+
+---
+
+# 🔮 Planned Systems
+
+- Migration lanes
+- Territory memory
+- Ecosystem currents
+- Pattern reproduction
+- Oscillation locking
+- Predator-prey balancing
+- Mega-scale multi-region worlds
+
+---
+
+# 👤 Creator
+
+Built by **ShamelesAbyss**
+
+GitHub:
 https://github.com/ShamelesAbyss/Symbiote
+
+---
+
+# ⭐ Final Note
+
+The goal isn’t to script life.
+
+The goal is to create conditions where life-like behavior emerges on its own.
+
+🧬
