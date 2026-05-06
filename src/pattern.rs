@@ -525,3 +525,15 @@ pub fn bootstrap_pattern_layer(tick: u64) -> PatternSignature {
 // PATTERN_LAYER_BOOTSTRAP_PROBE
 
 // PATTERN_BOOTSTRAP_WARNING_CLEAN
+
+impl Default for PatternKind {
+    fn default() -> Self {
+        Self::Dormant
+    }
+}
+
+impl Default for PatternMotion {
+    fn default() -> Self {
+        Self::Static
+    }
+}

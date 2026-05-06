@@ -77,7 +77,13 @@ impl FieldCell {
         }
     }
 
-    pub fn reinforce(&mut self, signature: PatternSignature, vx: f32, vy: f32, config: FieldConfig) {
+    pub fn reinforce(
+        &mut self,
+        signature: PatternSignature,
+        vx: f32,
+        vy: f32,
+        config: FieldConfig,
+    ) {
         let incoming = signature.intensity().clamp(0.0, config.max_intensity);
         let blend = (0.18 + incoming * 0.34).clamp(0.18, 0.52);
 

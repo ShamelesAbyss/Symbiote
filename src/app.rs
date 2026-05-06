@@ -3,8 +3,10 @@ use crate::{
     cluster::{ClusterEvents, ClusterTracker},
     density::DensitySnapshot,
     ecology::Ecology,
+    field::{FieldConfig, PatternField},
     memory::MemoryBank,
     particle::{Genome, Particle, RareTrait, Tribe},
+    pattern::{PatternKind, PatternMotion, PatternSignature},
     sim::{build_rule_matrix, child_from, fused_child, mutate_rules, step_particles, RuleMatrix},
     species::{Archetype, SpeciesBank},
     tree::TreeProfile,
@@ -102,6 +104,7 @@ pub struct App {
     pub species_bank: SpeciesBank,
     pub ecology: Ecology,
     pub substrate: CellularAutomata,
+    pub pattern_field: PatternField,
     pub memory: MemoryBank,
     pub seed: u64,
     pub age: u64,
@@ -144,6 +147,7 @@ impl App {
             species_bank: SpeciesBank::new(),
             ecology: Ecology::new(seed),
             substrate: CellularAutomata::new(seed ^ 0xC011, 96, 48),
+            pattern_field: PatternField::new(96, 48, FieldConfig::default()),
             memory: MemoryBank::load_or_new(seed),
             seed,
             age: 0,
@@ -176,6 +180,17 @@ impl App {
     }
 
     pub fn step(&mut self) {
+        self.pattern_field.step();
+        self.reinforce_pattern_field_from_clusters();
+        if self.age % 240 == 0 {
+            self.push_event(&format!(
+                "pattern field tick {} | active {} | avg {:.2} | strongest {}",
+                self.pattern_field.tick(),
+                self.pattern_field.active_cells(),
+                self.pattern_field.average_intensity(),
+                self.pattern_field.strongest_kind().short()
+            ));
+        }
         let archetype_lookup = self.build_archetype_lookup();
 
         let report = step_particles(
@@ -184,6 +199,7 @@ impl App {
             self.environment,
             &self.ecology,
             &mut self.substrate,
+            &self.pattern_field,
             &archetype_lookup,
         );
 
@@ -841,6 +857,7 @@ impl App {
         self.species_bank = SpeciesBank::new();
         self.ecology = Ecology::new(self.seed ^ self.age);
         self.substrate = CellularAutomata::new(self.seed ^ self.age ^ 0xC011, 96, 48);
+        self.pattern_field = PatternField::new(96, 48, FieldConfig::default());
 
         for i in 0..PARTICLE_COUNT {
             let tribe = Tribe::from_index(i % TRIBE_COUNT);
@@ -909,6 +926,55 @@ impl App {
         let _ = self.memory.save();
     }
 
+    fn reinforce_pattern_field_from_clusters(&mut self) {
+        for cluster in &self.clusters.clusters {
+            if cluster.size < 4 {
+                continue;
+            }
+
+            let archetype = cluster.effective_archetype();
+            let kind = match archetype {
+                Some(Archetype::Reaper) | Some(Archetype::Hunter) => PatternKind::Swarmfront,
+                Some(Archetype::Harvester)
+                | Some(Archetype::Grazer)
+                | Some(Archetype::Mycelial) => PatternKind::Nest,
+                Some(Archetype::Orbiter) => PatternKind::Halo,
+                Some(Archetype::Architect) | Some(Archetype::Leviathan) => PatternKind::Lattice,
+                Some(Archetype::Swarmer) => PatternKind::Chain,
+                Some(Archetype::Phantom) => PatternKind::Glider,
+                Some(Archetype::Parasite) | None => PatternKind::Bloom,
+            };
+
+            let speed = (cluster.vx * cluster.vx + cluster.vy * cluster.vy)
+                .sqrt()
+                .clamp(0.0, 1.0);
+
+            let signature = PatternSignature {
+                kind,
+                motion: if speed > 0.025 {
+                    PatternMotion::Translate
+                } else if cluster.membrane > 42.0 {
+                    PatternMotion::Pulse
+                } else {
+                    PatternMotion::Static
+                },
+                stability: (cluster.stability / 100.0).clamp(0.0, 1.0),
+                pulse: ((cluster.membrane / 100.0) * 0.62 + speed * 0.38).clamp(0.0, 1.0),
+                drift: (cluster.drift_heat / 100.0).clamp(0.0, 1.0),
+                cohesion: (cluster.size as f32 / 80.0).clamp(0.0, 1.0),
+                fertility: cluster.avg_genome.fertility.clamp(0.0, 1.0),
+                danger: if matches!(archetype, Some(Archetype::Reaper) | Some(Archetype::Hunter)) {
+                    0.85
+                } else {
+                    0.0
+                },
+            };
+
+            self.pattern_field
+                .reinforce_world(cluster.x, cluster.y, signature, cluster.vx, cluster.vy);
+        }
+    }
+
     fn build_archetype_lookup(&self) -> Vec<Option<Archetype>> {
         let max_id = self.species_bank.next_id as usize + 1;
         let mut lookup = vec![None; max_id];
@@ -951,6 +1017,7 @@ impl App {
             species_bank: state.species_bank,
             ecology: state.ecology,
             substrate: state.substrate,
+            pattern_field: PatternField::new(96, 48, FieldConfig::default()),
             memory: state.memory,
             seed: state.seed,
             age: state.age,

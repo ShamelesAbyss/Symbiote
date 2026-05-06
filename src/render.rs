@@ -172,6 +172,7 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
     draw_substrate(&mut cells, app, width, height);
     draw_signal_trails(&mut cells, app, width, height);
     draw_ecology_zones(&mut cells, app, width, height);
+    draw_pattern_field(&mut cells, app, width, height);
     // force root layer to overwrite everything (no flicker)
     for y in 0..height {
         for x in 0..width {
@@ -405,6 +406,87 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
             .wrap(Wrap { trim: false }),
         area,
     );
+}
+
+fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
+    if width == 0 || height == 0 {
+        return;
+    }
+
+    let (field_width, field_height) = app.pattern_field.dimensions();
+
+    if field_width == 0 || field_height == 0 {
+        return;
+    }
+
+    let field_cells = app.pattern_field.cells();
+
+    for y in 0..height {
+        for x in 0..width {
+            let screen_cell = &mut cells[y][x];
+
+            if screen_cell.count > 0
+                || screen_cell.trail
+                || screen_cell.membrane
+                || screen_cell.zone.is_some()
+                || screen_cell.substrate.is_some()
+                || screen_cell.signal.is_some()
+            {
+                continue;
+            }
+
+            let field_x = (x * field_width / width).min(field_width.saturating_sub(1));
+            let field_y = (y * field_height / height).min(field_height.saturating_sub(1));
+            let field_idx = field_y * field_width + field_x;
+
+            let Some(field_cell) = field_cells.get(field_idx).copied() else {
+                continue;
+            };
+
+            if !field_cell.is_active() {
+                continue;
+            }
+
+            screen_cell.signal = Some((
+                field_cell.glyph(),
+                field_color(field_cell.kind, field_cell.danger, field_cell.intensity),
+            ));
+        }
+    }
+}
+
+fn field_color(kind: PatternKind, danger: f32, intensity: f32) -> Color {
+    if danger > 0.35 {
+        return Color::Red;
+    }
+
+    if intensity > 0.82 {
+        return match kind {
+            PatternKind::Halo => Color::Cyan,
+            PatternKind::Nest => Color::Green,
+            PatternKind::Swarmfront => Color::Magenta,
+            PatternKind::Glider => Color::LightCyan,
+            PatternKind::Lattice => Color::Yellow,
+            PatternKind::Bloom => Color::LightGreen,
+            PatternKind::Chain => Color::LightMagenta,
+            PatternKind::Oscillator => Color::LightBlue,
+            PatternKind::StillLife => Color::Gray,
+            PatternKind::Dormant => Color::DarkGray,
+        };
+    }
+
+    match kind {
+        PatternKind::Halo => Color::Blue,
+        PatternKind::Nest => Color::Green,
+        PatternKind::Swarmfront => Color::Magenta,
+        PatternKind::Glider => Color::Cyan,
+        PatternKind::Lattice => Color::Yellow,
+        PatternKind::Bloom => Color::Green,
+        PatternKind::Chain => Color::Magenta,
+        PatternKind::Oscillator => Color::Blue,
+        PatternKind::StillLife => Color::Gray,
+        PatternKind::Dormant => Color::DarkGray,
+    }
 }
 
 fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {

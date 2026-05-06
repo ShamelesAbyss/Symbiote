@@ -2,6 +2,7 @@ use crate::{
     app::{Environment, TRIBE_COUNT},
     automata::{CellKind, CellularAutomata, SignalKind},
     ecology::{Ecology, ZoneKind},
+    field::PatternField,
     particle::{Genome, Particle, RareTrait, Tribe},
     species::Archetype,
     tree::TreeForces,
@@ -68,6 +69,7 @@ pub fn step_particles(
     env: Environment,
     ecology: &Ecology,
     substrate: &mut CellularAutomata,
+    pattern_field: &PatternField,
     archetypes: &[Option<Archetype>],
 ) -> StepReport {
     let snapshot = particles.to_vec();
@@ -143,6 +145,7 @@ pub fn step_particles(
         apply_signal_field(
             particle,
             substrate,
+            pattern_field,
             archetype,
             low_substrate,
             reaper_pressure_needed,
@@ -365,20 +368,20 @@ pub fn step_particles(
         report.cells_consumed += apply_substrate(
             particle,
             substrate,
+            pattern_field,
             archetype,
             low_substrate,
             harvester_overgrowth,
         );
-
         deposit_behavior_signal(
             particle,
             substrate,
+            pattern_field,
             archetype,
-            low_substrate,
             harvester_overgrowth,
             reaper_pressure_needed,
+            low_substrate,
         );
-
         let mass_drag = (1.0 + particle.mass * 0.13).clamp(1.0, 2.0);
 
         particle.vx = (particle.vx + fx * FORCE_SCALE) * FRICTION / mass_drag;
@@ -610,7 +613,8 @@ fn matrix_perception_factor(attraction: f32, pressure: f32, archetype: Option<Ar
 
 fn apply_signal_field(
     particle: &Particle,
-    substrate: &CellularAutomata,
+    substrate: &mut CellularAutomata,
+    pattern_field: &PatternField,
     archetype: Option<Archetype>,
     low_substrate: bool,
     reaper_pressure_needed: bool,
@@ -621,6 +625,25 @@ fn apply_signal_field(
 
     let mut seek = 0.0;
     let mut avoid = 0.0;
+
+    let field_sample = pattern_field.sample_world(particle.x, particle.y);
+    let field_strength = field_sample.influence_strength();
+
+    if field_sample.is_dangerous() {
+        substrate.deposit_signal(
+            particle.x,
+            particle.y,
+            SignalKind::Danger,
+            0.012 * field_strength.max(0.25),
+        );
+    } else if field_strength > 0.35 {
+        substrate.deposit_signal(
+            particle.x,
+            particle.y,
+            SignalKind::Growth,
+            0.010 * field_strength,
+        );
+    }
 
     match archetype {
         Some(Archetype::Harvester) => {
@@ -836,11 +859,31 @@ fn nudge_from_root(particle: &mut Particle, substrate: &CellularAutomata) {
 fn deposit_behavior_signal(
     particle: &Particle,
     substrate: &mut CellularAutomata,
+    pattern_field: &PatternField,
     archetype: Option<Archetype>,
     low_substrate: bool,
     harvester_overgrowth: bool,
     reaper_pressure_needed: bool,
 ) {
+    let field_sample = pattern_field.sample_world(particle.x, particle.y);
+    let field_strength = field_sample.influence_strength();
+
+    if field_sample.is_dangerous() {
+        substrate.deposit_signal(
+            particle.x,
+            particle.y,
+            SignalKind::Danger,
+            0.012 * field_strength.max(0.25),
+        );
+    } else if field_strength > 0.35 {
+        substrate.deposit_signal(
+            particle.x,
+            particle.y,
+            SignalKind::Growth,
+            0.010 * field_strength,
+        );
+    }
+
     match archetype {
         Some(Archetype::Harvester) => {
             substrate.deposit_signal(
@@ -910,12 +953,35 @@ fn predator_factor(a: Tribe, b: Tribe, archetype: Option<Archetype>) -> f32 {
 fn apply_substrate(
     particle: &mut Particle,
     substrate: &mut CellularAutomata,
+    pattern_field: &PatternField,
     archetype: Option<Archetype>,
     low_substrate: bool,
     harvester_overgrowth: bool,
 ) -> usize {
     let kind = substrate.influence_at(particle.x, particle.y);
     let mut consumed = 0usize;
+
+    let field_sample = pattern_field.sample_world(particle.x, particle.y);
+    let field_strength = field_sample.influence_strength();
+
+    if field_sample.is_dangerous() {
+        particle.energy -= 0.006 * field_strength.max(0.25);
+        particle.health -= 0.004 * field_strength.max(0.25);
+        substrate.deposit_signal(
+            particle.x,
+            particle.y,
+            SignalKind::Danger,
+            0.010 * field_strength.max(0.25),
+        );
+    } else if field_strength > 0.40 {
+        particle.energy += 0.004 * field_strength;
+        substrate.deposit_signal(
+            particle.x,
+            particle.y,
+            SignalKind::Growth,
+            0.008 * field_strength,
+        );
+    }
 
     let is_harvester = matches!(archetype, Some(Archetype::Harvester))
         || particle.rare_trait == RareTrait::Devourer;

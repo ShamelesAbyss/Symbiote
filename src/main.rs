@@ -3,6 +3,7 @@ mod automata;
 mod cluster;
 mod density;
 mod ecology;
+mod field;
 mod memory;
 mod particle;
 mod pattern;
