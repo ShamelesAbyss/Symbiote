@@ -1,0 +1,19 @@
+--- BEFORE ---
+cluster.drift_heat = (cluster.drift_heat * 0.90 + heat_target * 0.10).clamp(0.0, 100.0);
+
+--- AFTER ---
+let delta = heat_target - cluster.drift_heat;
+cluster.drift_heat += delta * 0.35; // MUCH more responsive
+cluster.drift_heat = cluster.drift_heat.clamp(0.0, 100.0);
+
+--- BEFORE ---
+let density = (cluster.size as f32 / 110.0).clamp(0.0, 1.0);
+
+--- AFTER ---
+let density = (cluster.size as f32 / 32.0).clamp(0.0, 1.0);
+
+--- ADD BELOW DENSITY ---
+let cohesion_boost = density * 0.6;
+
+--- MODIFY HEAT TARGET USAGE ---
+let heat_target = heat_target + cohesion_boost * 18.0;

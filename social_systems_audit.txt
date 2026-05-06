@@ -1,0 +1,736 @@
+
+===== src/particle.rs =====
+   5: pub enum Tribe {
+  14: impl Tribe {
+  93:     pub orbit: f32,
+  94:     pub membrane: f32,
+ 105:     pub tribe: Tribe,
+ 110:     pub cluster_id: Option<u64>,
+ 111:     pub species_id: Option<u64>,
+
+===== src/species.rs =====
+   1: use crate::particle::{Genome, RareTrait, Tribe};
+   5: pub enum Archetype {
+   6:     Swarmer,
+   9:     Orbiter,
+  10:     Parasite,
+  19: impl Archetype {
+  22:             Self::Swarmer => "Swarmer",
+  25:             Self::Orbiter => "Orbiter",
+  26:             Self::Parasite => "Parasite",
+  38:             Self::Swarmer => "SWR",
+  41:             Self::Orbiter => "ORB",
+  42:             Self::Parasite => "PAR",
+  54:             Self::Swarmer => 0,
+  57:             Self::Orbiter => 3,
+  58:             Self::Parasite => 4,
+  70: pub struct Species {
+  74:     pub dominant_tribe: Tribe,
+  75:     pub archetype: Archetype,
+  88: pub struct SpeciesBank {
+  89:     pub species: Vec<Species>,
+  93: impl SpeciesBank {
+  96:             species: Vec::new(),
+ 103:         dominant: Tribe,
+ 110:         let archetype = derive_archetype(genome, rare_trait, size);
+ 114:         for (idx, species) in self.species.iter().enumerate() {
+ 115:             if species.extinct || species.dominant_tribe != dominant {
+ 119:             let score = genome_distance(species.genome, genome);
+ 128:             let species = &mut self.species[idx];
+ 130:             species.last_seen_age = age;
+ 131:             species.peak_size = species.peak_size.max(size);
+ 132:             species.sightings += 1;
+ 133:             species.genome = blend_genome(species.genome, genome);
+ 135:             if species.rare_trait == RareTrait::None && rare_trait != RareTrait::None {
+ 136:                 species.rare_trait = rare_trait;
+ 139:             let derived = derive_archetype(species.genome, species.rare_trait, species.peak_size);
+ 140:             species.archetype = stabilize_archetype(species.archetype, derived, species.sightings);
+ 141:             species.name = rename_species(species.rare_trait, species.archetype, species.id);
+ 143:             return species.id;
+ 149:         let name = rename_species(rare_trait, archetype, id);
+ 153:                 .species
+ 155:                 .find(|species| species.id == parent_id)
+ 161:         self.species.push(Species {
+ 165:             dominant_tribe: dominant,
+ 166:             archetype,
+ 181:     pub fn record_birth(&mut self, species_id: Option<u64>) {
+ 182:         if let Some(id) = species_id {
+ 183:             if let Some(species) = self.species.iter_mut().find(|species| species.id == id) {
+ 184:                 species.births += 1;
+ 192:         for species in &mut self.species {
+ 193:             let stale_limit = match species.archetype {
+ 194:                 Archetype::Harvester | Archetype::Reaper => 4_200,
+ 195:                 Archetype::Leviathan | Archetype::Phantom => 3_800,
+ 199:             if !species.extinct && age.saturating_sub(species.last_seen_age) > stale_limit {
+ 200:                 species.extinct = true;
+ 209:         self.species
+ 211:             .filter(|species| !species.extinct)
+ 216: pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> Archetype {
+ 218:         Archetype::Reaper
+ 220:         Archetype::Phantom
+ 222:         Archetype::Mycelial
+ 224:         Archetype::Leviathan
+ 226:         Archetype::Harvester
+ 227:     } else if genome.orbit > 0.92 {
+ 228:         Archetype::Orbiter
+ 229:     } else if genome.membrane > 1.05 && genome.bonding > 1.22 {
+ 230:         Archetype::Architect
+ 232:         Archetype::Hunter
+ 234:         Archetype::Swarmer
+ 236:         Archetype::Grazer
+ 238:         Archetype::Parasite
+ 261: fn stabilize_archetype(current: Archetype, derived: Archetype, sightings: u64) -> Archetype {
+ 270:     if matches!(current, Archetype::Reaper | Archetype::Leviathan) && sightings < 12 {
+ 274:     if current == Archetype::Harvester && sightings < 9 {
+ 278:     if derived == Archetype::Harvester && sightings >= 7 {
+ 282:     if derived == Archetype::Reaper && sightings >= 8 {
+ 289: fn rename_species(rare_trait: RareTrait, archetype: Archetype, id: u64) -> String {
+ 291:         format!("{}-{}", archetype.short(), id)
+ 293:         format!("{}-{}-{}", rare_trait.short(), archetype.short(), id)
+ 302:     let orbit = (a.orbit - b.orbit).abs() * 0.45;
+ 303:     let membrane = (a.membrane - b.membrane).abs() * 0.45;
+ 307:     perception + hunger + bonding + volatility + orbit + membrane + metabolism + fertility
+ 316:         orbit: a.orbit * 0.94 + b.orbit * 0.06,
+ 317:         membrane: a.membrane * 0.94 + b.membrane * 0.06,
+
+===== src/cluster.rs =====
+   2:     particle::{Genome, Particle, RareTrait, Tribe},
+   3:     species::{Archetype, SpeciesBank},
+   7: const CLUSTER_WARMUP_AGE: u64 = 420;
+   9: const MIN_CLUSTER_SIZE: usize = 7;
+  12: pub struct Cluster {
+  14:     pub species_id: Option<u64>,
+  15:     pub archetype: Option<Archetype>,
+  16:     pub archetype_override: Option<Archetype>,
+  25:     pub dominant: Tribe,
+  28:     pub membrane: f32,
+  33: impl Cluster {
+  56:     pub fn effective_archetype(&self) -> Option<Archetype> {
+  57:         self.archetype_override.or(self.archetype)
+  62: pub struct ClusterTracker {
+  63:     pub clusters: Vec<Cluster>,
+  67: impl ClusterTracker {
+  70:             clusters: Vec::new(),
+  78:         species_bank: &mut SpeciesBank,
+  80:     ) -> ClusterEvents {
+  82:             particle.cluster_id = None;
+  86:         let mut next_clusters = Vec::new();
+  87:         let mut events = ClusterEvents::default();
+  89:         let active_species = species_bank.active_count().max(1) as f32;
+  91:         let root_pressure = species_bank
+  92:             .species
+  94:             .filter(|species| !species.extinct && is_root_adaptive_archetype(species.archetype))
+  96:             / active_species;
+  98:         let corridor_pressure = species_bank
+  99:             .species
+ 101:             .filter(|species| !species.extinct && is_corridor_archetype(species.archetype))
+ 103:             / active_species;
+ 106:             let min_size = if age < CLUSTER_WARMUP_AGE {
+ 107:                 MIN_CLUSTER_SIZE + 5
+ 109:                 MIN_CLUSTER_SIZE + 2
+ 111:                 MIN_CLUSTER_SIZE
+ 120:             if age < CLUSTER_WARMUP_AGE && measured.radius < 0.026 {
+ 127:             for existing in &self.clusters {
+ 132:                 let match_radius = if age < CLUSTER_WARMUP_AGE {
+ 146:             let parent_species = best_match.as_ref().and_then(|cluster| cluster.species_id);
+ 148:             let mut cluster = if let Some(old) = best_match {
+ 152:                 current.species_id = old.species_id;
+ 153:                 current.archetype = old.archetype;
+ 154:                 current.archetype_override = old.archetype_override;
+ 157:                 let stability_blend = if age < CLUSTER_WARMUP_AGE {
+ 162:                 let membrane_blend = if age < STRUCTURE_MATURITY_AGE {
+ 176:                 current.membrane = (old.membrane * (1.0 - membrane_blend)
+ 177:                     + current.membrane * membrane_blend)
+ 201:             let species_id = species_bank.assign_or_create(
+ 202:                 cluster.dominant,
+ 203:                 cluster.avg_genome,
+ 204:                 cluster.rare_trait,
+ 205:                 cluster.size,
+ 207:                 parent_species,
+ 210:             let species = species_bank
+ 211:                 .species
+ 213:                 .find(|species| species.id == species_id);
+ 215:             cluster.species_id = Some(species_id);
+ 216:             cluster.archetype = species.map(|species| species.archetype);
+ 218:             if age >= CLUSTER_WARMUP_AGE {
+ 220:                     root_adaptation_score(cluster.avg_genome, cluster.rare_trait, cluster.size);
+ 222:                     cluster.avg_genome,
+ 223:                     cluster.archetype.unwrap_or(Archetype::Parasite),
+ 226:                     cluster.avg_genome,
+ 227:                     cluster.archetype.unwrap_or(Archetype::Parasite),
+ 232:                 apply_cluster_drift(
+ 233:                     &mut cluster,
+ 242:                 cluster.archetype_override = None;
+ 243:                 cluster.drift_heat = (cluster.drift_heat * 0.72).clamp(0.0, 100.0);
+ 246:             if age >= STRUCTURE_MATURITY_AGE && cluster.age > 95 && cluster.size > 18 {
+ 247:                 cluster.membrane = (cluster.membrane + 0.55).min(100.0);
+ 250:             if age >= STRUCTURE_MATURITY_AGE && cluster.stability > 76.0 && cluster.size > 30 {
+ 251:                 cluster.membrane = (cluster.membrane + 0.42).min(100.0);
+ 256:                     particle.cluster_id = Some(cluster.id);
+ 257:                     particle.species_id = Some(species_id);
+ 259:                     let maturity = if age < CLUSTER_WARMUP_AGE {
+ 262:                         ((age - CLUSTER_WARMUP_AGE) as f32
+ 263:                             / (STRUCTURE_MATURITY_AGE - CLUSTER_WARMUP_AGE) as f32)
+ 269:                     let mass_gain = 0.0011 * cluster.size as f32 * maturity;
+ 272:                     if cluster.archetype_override.is_some() && age >= STRUCTURE_MATURITY_AGE {
+ 275:                         particle.genome.orbit = (particle.genome.orbit + 0.00008).clamp(0.0, 1.55);
+ 280:             next_clusters.push(cluster);
+ 283:         let old_count = self.clusters.len();
+ 284:         let new_count = next_clusters.len();
+ 286:         if age >= CLUSTER_WARMUP_AGE && new_count < old_count {
+ 290:         if age >= CLUSTER_WARMUP_AGE && new_count > old_count + events.births {
+ 294:         self.clusters = next_clusters;
+ 295:         events.extinctions += species_bank.mark_extinctions(age);
+ 302: pub struct ClusterEvents {
+ 309: fn apply_cluster_drift(
+ 310:     cluster: &mut Cluster,
+ 318:     let base = cluster.archetype;
+ 319:     let mobility = root_mobility_score(cluster.avg_genome);
+ 320:     let density = (cluster.size as f32 / 110.0).clamp(0.0, 1.0);
+ 322:         ((world_age.saturating_sub(CLUSTER_WARMUP_AGE)) as f32 / 1_800.0).clamp(0.0, 1.0);
+ 333:     cluster.drift_heat = (cluster.drift_heat * 0.90 + heat_target * 0.10).clamp(0.0, 100.0);
+ 335:     cluster.archetype_override = if cluster.drift_heat > 68.0 && pressure > 0.52 && maturity > 0.35
+ 338:             Some(Archetype::Harvester) => {
+ 339:                 if cluster.avg_genome.orbit > 0.48 || local_corridor_score > 0.62 {
+ 340:                     Some(Archetype::Orbiter)
+ 341:                 } else if cluster.avg_genome.bonding > 1.36 {
+ 342:                     Some(Archetype::Swarmer)
+ 344:                     Some(Archetype::Grazer)
+ 347:             Some(Archetype::Grazer | Archetype::Mycelial) => {
+ 348:                 if cluster.avg_genome.membrane > 0.88 {
+ 349:                     Some(Archetype::Architect)
+ 350:                 } else if cluster.avg_genome.orbit > 0.62 {
+ 351:                     Some(Archetype::Orbiter)
+ 356:             Some(Archetype::Parasite) => {
+ 357:                 if cluster.avg_genome.volatility > 1.36 && cluster.avg_genome.perception > 0.27 {
+ 358:                     Some(Archetype::Hunter)
+ 359:                 } else if cluster.avg_genome.orbit > 0.68 {
+ 360:                     Some(Archetype::Orbiter)
+ 365:             Some(Archetype::Swarmer) => {
+ 366:                 if local_corridor_score > 0.72 && cluster.avg_genome.orbit > 0.58 {
+ 367:                     Some(Archetype::Orbiter)
+ 372:             Some(Archetype::Hunter) => {
+ 374:                     && cluster.avg_genome.volatility > 1.54
+ 375:                     && cluster.avg_genome.hunger > 0.02
+ 377:                     Some(Archetype::Reaper)
+ 382:             Some(Archetype::Leviathan) => {
+ 383:                 if cluster.avg_genome.membrane > 1.05 {
+ 384:                     Some(Archetype::Architect)
+ 390:                 Archetype::Reaper | Archetype::Orbiter | Archetype::Architect | Archetype::Phantom,
+ 394:     } else if cluster.drift_heat < 34.0 {
+ 397:         cluster.archetype_override
+ 401: fn is_root_adaptive_archetype(archetype: Archetype) -> bool {
+ 403:         archetype,
+ 404:         Archetype::Swarmer
+ 405:             | Archetype::Orbiter
+ 406:             | Archetype::Architect
+ 407:             | Archetype::Leviathan
+ 408:             | Archetype::Phantom
+ 412: fn is_corridor_archetype(archetype: Archetype) -> bool {
+ 414:         archetype,
+ 415:         Archetype::Swarmer
+ 416:             | Archetype::Orbiter
+ 417:             | Archetype::Architect
+ 418:             | Archetype::Hunter
+ 419:             | Archetype::Phantom
+ 425:     let orbit = (genome.orbit / 1.35).clamp(0.0, 1.0);
+ 427:     let membrane = (genome.membrane / 1.45).clamp(0.0, 1.0);
+ 442:         + orbit * 0.26
+ 444:         + membrane * 0.16
+ 450: fn corridor_score(genome: Genome, archetype: Archetype) -> f32 {
+ 452:         (genome.orbit * 0.42 + genome.volatility * 0.22 + genome.perception * 1.15).clamp(0.0, 1.0);
+ 457:     let archetype_bonus = match archetype {
+ 458:         Archetype::Orbiter => 0.18,
+ 459:         Archetype::Swarmer => 0.13,
+ 460:         Archetype::Architect => 0.12,
+ 461:         Archetype::Phantom => 0.10,
+ 462:         Archetype::Hunter => 0.06,
+ 463:         Archetype::Reaper => 0.04,
+ 464:         Archetype::Leviathan => 0.04,
+ 465:         Archetype::Grazer => 0.02,
+ 466:         Archetype::Mycelial => 0.02,
+ 467:         Archetype::Parasite => 0.0,
+ 468:         Archetype::Harvester => -0.08,
+ 471:     (mobility * 0.50 + compactness * 0.26 + hunger_control * 0.16 + archetype_bonus).clamp(0.0, 1.0)
+ 476:     archetype: Archetype,
+ 481:     let specialization_pressure = match archetype {
+ 482:         Archetype::Harvester => 0.18,
+ 483:         Archetype::Reaper => 0.12,
+ 484:         Archetype::Leviathan => 0.10,
+ 485:         Archetype::Phantom => 0.10,
+ 486:         Archetype::Architect => 0.08,
+ 499:     let orbit = (genome.orbit / 1.35).clamp(0.0, 1.0);
+ 501:     let membrane = (genome.membrane / 1.45).clamp(0.0, 1.0);
+ 503:     (perception * 0.36 + orbit * 0.32 + volatility * 0.16 + membrane * 0.16).clamp(0.0, 1.0)
+ 510:     let warmup = (age as f32 / CLUSTER_WARMUP_AGE as f32).clamp(0.0, 1.0);
+ 556: fn measure_group(indices: &[usize], particles: &[Particle], age: u64) -> Cluster {
+ 561:     let mut tribe_counts = [0usize; 6];
+ 563:     let mut membrane = 0.0;
+ 570:         orbit: 0.0,
+ 571:         membrane: 0.0,
+ 583:         membrane += particle.genome.membrane;
+ 585:         tribe_counts[particle.tribe.index()] += 1;
+ 592:         genome.orbit += particle.genome.orbit;
+ 593:         genome.membrane += particle.genome.membrane;
+ 606:     membrane = (membrane / count * 48.0 * maturity).clamp(0.0, 100.0);
+ 612:     genome.orbit /= count;
+ 613:     genome.membrane /= count;
+ 629:     let mut best_tribe = 0;
+ 632:         if tribe_counts[i] > tribe_counts[best_tribe] {
+ 633:             best_tribe = i;
+ 645:     let warmup = (age as f32 / CLUSTER_WARMUP_AGE as f32).clamp(0.0, 1.0);
+ 650:     Cluster {
+ 652:         species_id: None,
+ 653:         archetype: None,
+ 654:         archetype_override: None,
+ 663:         dominant: Tribe::from_index(best_tribe),
+ 666:         membrane,
+
+===== src/sim.rs =====
+   2:     app::{Environment, TRIBE_COUNT},
+   5:     particle::{Genome, Particle, RareTrait, Tribe},
+   6:     species::Archetype,
+  12: pub type RuleMatrix = [[f32; TRIBE_COUNT]; TRIBE_COUNT];
+  42:     let mut matrix = [[0.0; TRIBE_COUNT]; TRIBE_COUNT];
+  71:     archetypes: &[Option<Archetype>],
+  75:     let snapshot_archetypes = snapshot
+  79:                 .species_id
+  80:                 .and_then(|id| archetypes.get(id as usize).copied().flatten())
+  88:             matches!(snapshot_archetypes[*idx], Some(Archetype::Harvester))
+  96:         .filter(|(idx, _)| matches!(snapshot_archetypes[*idx], Some(Archetype::Reaper)))
+ 111:     let matrix_attraction = matrix_attraction(rules);
+ 112:     let matrix_repulsion = matrix_repulsion(rules);
+ 135:         let mut orbit_x = 0.0;
+ 136:         let mut orbit_y = 0.0;
+ 138:         let archetype = snapshot_archetypes[idx];
+ 139:         let is_reaper = matches!(archetype, Some(Archetype::Reaper));
+ 140:         let is_harvester = matches!(archetype, Some(Archetype::Harvester))
+ 146:             archetype,
+ 156:             archetype,
+ 168:             let other_archetype = snapshot_archetypes[other_idx];
+ 169:             let other_is_harvester = matches!(other_archetype, Some(Archetype::Harvester))
+ 171:             let other_is_reaper = matches!(other_archetype, Some(Archetype::Reaper));
+ 182:             let attraction = rules[particle.tribe.index()][other.tribe.index()];
+ 183:             let predator_pressure = predator_factor(particle.tribe, other.tribe, archetype);
+ 185:                 attraction,
+ 186:                 particle.tribe,
+ 187:                 other.tribe,
+ 189:                 matrix_attraction,
+ 190:                 matrix_repulsion,
+ 198:                 if attraction >= 0.0 {
+ 204:                 let bond_mult = match archetype {
+ 205:                     Some(Archetype::Swarmer) => 1.20,
+ 206:                     Some(Archetype::Architect) => 1.34,
+ 207:                     Some(Archetype::Leviathan) => 1.48,
+ 208:                     Some(Archetype::Harvester) => 0.72,
+ 209:                     Some(Archetype::Reaper) => 0.46,
+ 210:                     Some(Archetype::Parasite) => 0.78,
+ 214:                 let matrix_bond = if attraction > 0.0 {
+ 215:                     1.0 + attraction.abs() * matrix_attraction * 0.18
+ 217:                     1.0 - attraction.abs() * matrix_repulsion * 0.12
+ 227:                 orbit_x += -dy / d;
+ 228:                 orbit_y += dx / d;
+ 234:                 archetype,
+ 236:                     Archetype::Grazer
+ 237:                         | Archetype::Hunter
+ 238:                         | Archetype::Harvester
+ 239:                         | Archetype::Reaper
+ 253:             perception *= matrix_perception_factor(attraction, matrix_pressure, archetype);
+ 261:                 let matrix_hunt_boost = 1.0 + matrix_repulsion * 0.20 + matrix_pressure * 0.14;
+ 289:                 let fear = (1.0 - d / perception).max(0.0) * 2.75 * (1.0 + matrix_repulsion * 0.24);
+ 303:                 attraction * predator_pressure * pair_pressure * (1.0 - d / perception)
+ 309:             if matches!(archetype, Some(Archetype::Hunter)) {
+ 310:                 force *= 1.18 + matrix_repulsion * 0.10;
+ 313:             if matches!(archetype, Some(Archetype::Reaper)) && !other_is_harvester {
+ 324:             if matches!(archetype, Some(Archetype::Hunter))
+ 333:             if matches!(archetype, Some(Archetype::Parasite))
+ 347:                 (1.0 + matrix_attraction * 0.14 - matrix_repulsion * 0.08).clamp(0.82, 1.20);
+ 352:             let orbit_boost = if matches!(archetype, Some(Archetype::Orbiter)) {
+ 358:             particle.vx += orbit_x * particle.genome.orbit * orbit_boost * 0.00042;
+ 359:             particle.vy += orbit_y * particle.genome.orbit * orbit_boost * 0.00042;
+ 367:             archetype,
+ 375:             archetype,
+ 431:         if particle.cluster_id.is_some() {
+ 442:         if matches!(archetype, Some(Archetype::Architect | Archetype::Leviathan)) {
+ 446:         if matches!(archetype, Some(Archetype::Harvester)) {
+ 472:         if matches!(archetype, Some(Archetype::Reaper)) {
+ 531:     (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0_f32, 1.0_f32)
+ 534: fn matrix_attraction(rules: &RuleMatrix) -> f32 {
+ 545:     (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0_f32, 1.0_f32)
+ 548: fn matrix_repulsion(rules: &RuleMatrix) -> f32 {
+ 559:     (total / (TRIBE_COUNT * TRIBE_COUNT) as f32).clamp(0.0_f32, 1.0_f32)
+ 563:     attraction: f32,
+ 564:     a: Tribe,
+ 565:     b: Tribe,
+ 567:     attraction_total: f32,
+ 568:     repulsion_total: f32,
+ 570:     let same_tribe = a.index() == b.index();
+ 571:     let predator_lane = (a.index() + 1) % TRIBE_COUNT == b.index();
+ 573:     let base = if attraction >= 0.0 {
+ 574:         1.0 + attraction.abs() * attraction_total * 0.34
+ 576:         1.0 + attraction.abs() * repulsion_total * 0.42
+ 579:     let identity = if same_tribe {
+ 582:         1.0 + repulsion_total * 0.18
+ 590: fn matrix_perception_factor(attraction: f32, pressure: f32, archetype: Option<Archetype>) -> f32 {
+ 591:     let base = if attraction.abs() > 0.62 {
+ 593:     } else if attraction.abs() < 0.16 {
+ 599:     let archetype_mult = match archetype {
+ 600:         Some(Archetype::Hunter | Archetype::Reaper | Archetype::Parasite) => 1.0 + pressure * 0.05,
+ 601:         Some(Archetype::Architect | Archetype::Leviathan | Archetype::Mycelial) => {
+ 607:     (base * archetype_mult).clamp(0.84, 1.18)
+ 613:     archetype: Option<Archetype>,
+ 624:     match archetype {
+ 625:         Some(Archetype::Harvester) => {
+ 632:         Some(Archetype::Reaper) => {
+ 639:         Some(Archetype::Grazer | Archetype::Mycelial) => {
+ 645:         Some(Archetype::Hunter | Archetype::Parasite) => {
+ 651:         Some(Archetype::Architect | Archetype::Leviathan) => {
+ 655:         Some(Archetype::Phantom) => {
+ 661:         Some(Archetype::Swarmer | Archetype::Orbiter) | None => {
+ 691:     archetype: Option<Archetype>,
+ 743:     let archetype_respect = match archetype {
+ 744:         Some(Archetype::Architect | Archetype::Leviathan) => 0.82,
+ 745:         Some(Archetype::Mycelial) => 0.74,
+ 746:         Some(Archetype::Harvester) => {
+ 753:         Some(Archetype::Reaper) => 1.02,
+ 754:         Some(Archetype::Hunter | Archetype::Parasite) => 1.10,
+ 755:         Some(Archetype::Phantom) => 0.68,
+ 756:         Some(Archetype::Grazer) => 1.18,
+ 757:         Some(Archetype::Swarmer | Archetype::Orbiter) | None => 1.0,
+ 768:         root_pressure * ROOT_FORCE_SCALE * archetype_respect * mass_resistance * panic;
+ 774:     // Root terrain repulsion
+ 838:     archetype: Option<Archetype>,
+ 843:     match archetype {
+ 844:         Some(Archetype::Harvester) => {
+ 856:         Some(Archetype::Reaper) => {
+ 864:         Some(Archetype::Grazer | Archetype::Mycelial) => {
+ 867:         Some(Archetype::Hunter | Archetype::Parasite) => {
+ 870:         Some(Archetype::Architect | Archetype::Leviathan) => {
+ 873:         Some(Archetype::Phantom) => {
+ 883:     if particle.energy > 110.0 && particle.cluster_id.is_some() {
+ 888: fn predator_factor(a: Tribe, b: Tribe, archetype: Option<Archetype>) -> f32 {
+ 892:     let base = if (ai + 1) % TRIBE_COUNT == bi {
+ 894:     } else if (bi + 1) % TRIBE_COUNT == ai {
+ 900:     if matches!(archetype, Some(Archetype::Hunter | Archetype::Reaper)) {
+ 902:     } else if matches!(archetype, Some(Archetype::Grazer | Archetype::Harvester)) {
+ 912:     archetype: Option<Archetype>,
+ 919:     let is_harvester = matches!(archetype, Some(Archetype::Harvester))
+1024:             particle.genome.orbit = (particle.genome.orbit + 0.00035).clamp(0.0, 1.55);
+1068:                 particle.genome.orbit =
+1069:                     (particle.genome.orbit + 0.0003 * 1.0/* ROOT_BIAS_DISABLED */).clamp(0.0, 1.55);
+1117:     child.cluster_id = None;
+1121:         child.tribe = Tribe::from_index(rng.gen_range(0..TRIBE_COUNT));
+1122:         child.species_id = None;
+1127:         child.species_id = None;
+1145:     child.cluster_id = None;
+1146:     child.species_id = None;
+1153:         orbit: (a.genome.orbit + b.genome.orbit) / 2.0,
+1154:         membrane: (a.genome.membrane + b.genome.membrane) / 2.0,
+1162:         child.tribe = b.tribe;
+1183:     genome.orbit = mutate_float(genome.orbit, 0.04, 0.0, 1.55, rng);
+1184:     genome.membrane = mutate_float(genome.membrane, 0.04, 0.0, 1.8, rng);
+1204:     } else if mass > 5.6 && genome.membrane > 1.1 {
+1210:     } else if genome.orbit > 1.25 {
+
+===== src/app.rs =====
+   3:     cluster::{ClusterEvents, ClusterTracker},
+   7:     particle::{Genome, Particle, RareTrait, Tribe},
+   9:     species::{Archetype, SpeciesBank},
+  21: pub const TRIBE_COUNT: usize = 6;
+  85:     clusters: ClusterTracker,
+  86:     species_bank: SpeciesBank,
+ 101:     pub clusters: ClusterTracker,
+ 102:     pub species_bank: SpeciesBank,
+ 112:     pub cohesion: f32,
+ 116:     pub matrix_attraction: f32,
+ 117:     pub matrix_repulsion: f32,
+ 143:             clusters: ClusterTracker::new(),
+ 144:             species_bank: SpeciesBank::new(),
+ 154:             cohesion: 0.0,
+ 158:             matrix_attraction: 0.0,
+ 159:             matrix_repulsion: 0.0,
+ 172:         app.push_event("adaptive attraction matrix online");
+ 179:         let archetype_lookup = self.build_archetype_lookup();
+ 187:             &archetype_lookup,
+ 257:             let before_species = self.species_bank.species.len();
+ 259:             let cluster_events =
+ 260:                 self.clusters
+ 261:                     .update(&mut self.particles, &mut self.species_bank, self.age);
+ 263:             let after_species = self.species_bank.species.len();
+ 265:             if after_species > before_species {
+ 266:                 self.memory.total_species_created += (after_species - before_species) as u64;
+ 269:                     "{} new species emerged",
+ 270:                     after_species - before_species
+ 274:             self.process_cluster_events(cluster_events);
+ 284:             self.reinforce_matrix_from_clusters();
+ 300:             let adaptive_mutation = 1.0 + self.memory.mutation_pressure() * 0.42;
+ 301:             let pressure_mutation = 1.0 + (self.matrix_pressure / 100.0) * 0.28;
+ 302:             let pathfinder_mutation = 1.0 + self.memory.pathfinder_bias() * 0.22;
+ 305:                 (base_intensity * adaptive_mutation * pressure_mutation * pathfinder_mutation)
+ 309:             self.evolve_attraction_matrix(intensity);
+ 315:                 self.matrix_pressure, self.matrix_attraction, self.matrix_repulsion
+ 329:         let lookup = self.build_archetype_lookup();
+ 341:             let archetype = particle
+ 342:                 .species_id
+ 345:             self.substrate.deposit_particle(particle, archetype);
+ 356:         let archetype_lookup = self.build_archetype_lookup();
+ 377:                         .species_id
+ 378:                         .and_then(|id| archetype_lookup.get(id as usize).copied().flatten())
+ 379:                         == Some(Archetype::Harvester)
+ 387:         let mutation_pressure = self.memory.mutation_pressure();
+ 400:             let clustered_bonus = if parent.cluster_id.is_some() {
+ 412:             let threshold = 118.0 - parent.genome.fertility * 11.5 - clustered_bonus * 14.0
+ 421:                 + clustered_bonus
+ 423:                 + mutation_pressure * 0.012
+ 434:                     other.species_id != parent.species_id
+ 462:                 child.species_id = None;
+ 470:                 child.genome.orbit =
+ 471:                     (child.genome.orbit + rng.gen_range(0.04..0.20)).clamp(0.0, 1.55);
+ 476:                 child.species_id = None;
+ 496:                 child.species_id = None;
+ 517:                 child.species_id = None;
+ 520:             if mutation_pressure > 0.45 && rng.gen_bool((mutation_pressure * 0.035) as f64) {
+ 523:                 child.genome.orbit =
+ 524:                     (child.genome.orbit + rng.gen_range(-0.06..0.12)).clamp(0.0, 1.55);
+ 525:                 child.genome.membrane =
+ 526:                     (child.genome.membrane + rng.gen_range(0.02..0.14)).clamp(0.0, 1.8);
+ 527:                 child.species_id = None;
+ 530:             self.species_bank.record_birth(parent.species_id);
+ 553:         let adaptive_stability = 1.0 - self.memory.mutation_pressure() * 0.08;
+ 560:             let clustered_bonus = if particle.cluster_id.is_some() {
+ 582:                 + clustered_bonus
+ 660:             particle.genome.orbit =
+ 661:                 (particle.genome.orbit + warmup_left * 0.00010).clamp(0.0, 1.55);
+ 722:             self.push_event("migration pressure loosened center swarm");
+ 733:     fn evolve_attraction_matrix(&mut self, intensity: f32) {
+ 737:         let mutation_pressure = self.memory.mutation_pressure();
+ 741:         for a in 0..TRIBE_COUNT {
+ 742:             for b in 0..TRIBE_COUNT {
+ 751:                 let predator_target = (a + 1) % TRIBE_COUNT == b;
+ 752:                 let prey_target = (b + 1) % TRIBE_COUNT == a;
+ 755:                     -(0.006 + reaper_urgency * 0.018 + mutation_pressure * 0.008)
+ 794:     fn reinforce_matrix_from_clusters(&mut self) {
+ 795:         if self.clusters.clusters.is_empty() {
+ 799:         let mut tribe_counts = [0usize; TRIBE_COUNT];
+ 801:         for cluster in &self.clusters.clusters {
+ 802:             if cluster.size >= 8 {
+ 803:                 tribe_counts[cluster.dominant.index()] += cluster.size;
+ 807:         let total: usize = tribe_counts.iter().sum();
+ 815:         for tribe in 0..TRIBE_COUNT {
+ 816:             let share = tribe_counts[tribe] as f32 / total as f32;
+ 823:             let neighbor = (tribe + 1) % TRIBE_COUNT;
+ 824:             let counter = (tribe + TRIBE_COUNT - 1) % TRIBE_COUNT;
+ 826:             self.rules[tribe][tribe] = (self.rules[tribe][tribe] + self_reinforce).clamp(-1.0, 1.0);
+ 827:             self.rules[tribe][neighbor] =
+ 828:                 (self.rules[tribe][neighbor] + share * 0.006).clamp(-1.0, 1.0);
+ 829:             self.rules[tribe][counter] =
+ 830:                 (self.rules[tribe][counter] - share * 0.005).clamp(-1.0, 1.0);
+ 840:         self.clusters = ClusterTracker::new();
+ 841:         self.species_bank = SpeciesBank::new();
+ 846:             let tribe = Tribe::from_index(i % TRIBE_COUNT);
+ 853:                 tribe,
+ 858:                 cluster_id: None,
+ 859:                 species_id: None,
+ 866:                     orbit: rng.gen_range(0.10..1.02),
+ 867:                     membrane: rng.gen_range(0.0..0.52),
+ 912:     fn build_archetype_lookup(&self) -> Vec<Option<Archetype>> {
+ 913:         let max_id = self.species_bank.next_id as usize + 1;
+ 916:         for species in &self.species_bank.species {
+ 917:             if let Some(slot) = lookup.get_mut(species.id as usize) {
+ 918:                 *slot = Some(species.archetype);
+ 922:         for cluster in &self.clusters.clusters {
+ 923:             if let (Some(species_id), Some(override_archetype)) =
+ 924:                 (cluster.species_id, cluster.archetype_override)
+ 926:                 if let Some(slot) = lookup.get_mut(species_id as usize) {
+ 927:                     *slot = Some(override_archetype);
+ 950:             clusters: state.clusters,
+ 951:             species_bank: state.species_bank,
+ 961:             cohesion: 0.0,
+ 965:             matrix_attraction: 0.0,
+ 966:             matrix_repulsion: 0.0,
+ 981:             clusters: ClusterTracker {
+ 982:                 clusters: self.clusters.clusters.clone(),
+ 983:                 next_id: self.clusters.next_id,
+ 985:             species_bank: self.species_bank.clone(),
+1002:     fn process_cluster_events(&mut self, events: ClusterEvents) {
+1005:             self.push_event(&format!("{} organism cluster(s) formed", events.births));
+1010:             self.push_event("clusters merged into a larger body");
+1017:             self.push_event("cluster split into daughter forms");
+1024:             self.push_event(&format!("{} species went extinct", events.extinctions));
+1083:         self.cohesion = ((1.52 - spread) * 70.0).clamp(0.0, 100.0);
+1091:         let mut attraction = 0.0;
+1092:         let mut repulsion = 0.0;
+1095:         for a in 0..TRIBE_COUNT {
+1096:             for b in 0..TRIBE_COUNT {
+1100:                     attraction += value;
+1102:                     repulsion += value.abs();
+1109:         let max = (TRIBE_COUNT * TRIBE_COUNT) as f32;
+1111:         self.matrix_attraction = ((attraction / max) * 100.0).clamp(0.0, 100.0);
+1112:         self.matrix_repulsion = ((repulsion / max) * 100.0).clamp(0.0, 100.0);
+1122:         self.memory.peak_clusters = self.memory.peak_clusters.max(self.clusters.clusters.len());
+1123:         self.memory.peak_species = self
+1125:             .peak_species
+1126:             .max(self.species_bank.active_count());
+1157:         for species in self
+1158:             .species_bank
+1159:             .species
+1161:             .filter(|species| !species.extinct)
+1163:             counts[species.archetype.index()] += 1;
+1169:             .max(counts[Archetype::Harvester.index()]);
+1174:             .max(counts[Archetype::Reaper.index()]);
+1176:         let archetypes = [
+1177:             Archetype::Swarmer,
+1178:             Archetype::Hunter,
+1179:             Archetype::Grazer,
+1180:             Archetype::Orbiter,
+1181:             Archetype::Parasite,
+1182:             Archetype::Architect,
+1183:             Archetype::Leviathan,
+1184:             Archetype::Mycelial,
+1185:             Archetype::Phantom,
+1186:             Archetype::Harvester,
+1187:             Archetype::Reaper,
+1198:         self.memory.dominant_archetype = archetypes[best].name().to_string();
+1208:         for cluster in &self.clusters.clusters {
+1209:             self.memory.strongest_cluster_size =
+1210:                 self.memory.strongest_cluster_size.max(cluster.size);
+1211:             self.memory.strongest_cluster_age = self.memory.strongest_cluster_age.max(cluster.age);
+1217:             "memory root:{:.2} corridor:{:.2} substrate:{:.2} mutation:{:.2}",
+1221:             self.memory.mutation_pressure()
+1240:         tribe: Tribe::from_index(rng.gen_range(0..TRIBE_COUNT)),
+1245:         cluster_id: None,
+1246:         species_id: None,
+1253:             orbit: rng.gen_range(0.10..1.02),
+1254:             membrane: rng.gen_range(0.0..0.52),
+
+===== src/render.rs =====
+   4:     particle::Tribe,
+   5:     species::Archetype,
+  63:     render_clusters(f, side[1], app);
+  64:     render_species(f, side[2], app);
+  75:         .clusters
+  76:         .clusters
+  78:         .filter(|cluster| cluster.archetype_override.is_some())
+ 111:             Span::styled(" | species: ", Style::default().fg(Color::DarkGray)),
+ 113:                 format!("{}", app.species_bank.active_count()),
+ 172:     draw_signal_trails(&mut cells, app, width, height);
+ 212:             let archetype = particle.species_id.and_then(|id| {
+ 213:                 app.clusters
+ 214:                     .clusters
+ 216:                     .find(|cluster| {
+ 217:                         cluster.species_id == Some(id) && cluster.archetype_override.is_some()
+ 219:                     .and_then(|cluster| cluster.archetype_override)
+ 221:                         app.species_bank
+ 222:                             .species
+ 224:                             .find(|species| species.id == id)
+ 225:                             .map(|species| species.archetype)
+ 232:             cell.tribe_counts[particle.tribe.index()] += 1;
+ 237:             if particle.cluster_id.is_some() {
+ 238:                 cell.clustered += 1;
+ 245:             if archetype == Some(Archetype::Harvester) {
+ 249:             if archetype == Some(Archetype::Reaper) {
+ 253:             if let Some(cluster_id) = particle.cluster_id {
+ 255:                     .clusters
+ 256:                     .clusters
+ 258:                     .any(|cluster| cluster.id == cluster_id && cluster.archetype_override.is_some())
+ 266:     draw_cluster_membranes(&mut cells, app, width, height);
+ 267:     draw_cluster_motion_trails(&mut cells, app, width, height);
+ 275:             if cell.trail {
+ 277:             } else if cell.membrane {
+ 294:                 let tribe = cell.dominant_tribe();
+ 327:                 } else if cell.clustered > 0 && avg_mass > 3.8 {
+ 335:                 } else if cell.clustered > 0 && cell.count >= 5 {
+ 378:                         .fg(tribe.color())
+ 641: fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
+ 701: fn draw_cluster_membranes(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
+ 702:     for cluster in &app.clusters.clusters {
+ 703:         if cluster.size < 18 || cluster.membrane < 34.0 || cluster.age < 80 {
+ 707:         let cx = (((cluster.x + 1.2) / 2.4) * width as f32) as i32;
+ 708:         let cy = (((cluster.y + 1.2) / 2.4) * height as f32) as i32;
+ 709:         let pulse = ((app.age as f32 / 18.0 + cluster.id as f32).sin() * 0.9) as i32;
+ 710:         let radius = ((cluster.radius * width as f32 * 0.72).max(2.0)).min(8.0) as i32 + pulse;
+ 714:             let wobble = ((app.age as f32 * 0.015 + deg as f32 + cluster.id as f32).sin() * 0.6)
+ 720:                 cells[y as usize][x as usize].membrane = true;
+ 726: fn draw_cluster_motion_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
+ 727:     for cluster in &app.clusters.clusters {
+ 728:         if cluster.speed() < 0.00035 || cluster.age < 45 {
+ 732:         let cx = (((cluster.x + 1.2) / 2.4) * width as f32) as i32;
+ 733:         let cy = (((cluster.y + 1.2) / 2.4) * height as f32) as i32;
+ 734:         let tx = cx - (cluster.vx * 780.0) as i32;
+ 735:         let ty = cy - (cluster.vy * 780.0) as i32;
+ 742:                 cells[y as usize][x as usize].trail = true;
+ 749:     let tribes = [
+ 750:         Tribe::Blood,
+ 751:         Tribe::Moss,
+ 752:         Tribe::Deep,
+ 753:         Tribe::Solar,
+ 754:         Tribe::Dream,
+ 755:         Tribe::Static,
+ 760:             "Adaptive Attraction Matrix",
+ 777:                 format!("{:.0}", app.matrix_attraction),
+ 782:                 format!("{:.0}", app.matrix_repulsion),
+ 790:             format!("{} ", tribes[a].name()),
+ 792:                 .fg(tribes[a].color())
+ 915:         Span::styled("○ membrane", Style::default().fg(Color::Gray)),
+ 930: fn render_clusters(f: &mut Frame<'_>, area: Rect, app: &App) {
+ 932:         .clusters
+ 933:         .clusters
+ 935:         .filter(|cluster| cluster.archetype_override.is_some())
+ 939:         Span::styled("Clusters: ", Style::default().fg(Color::DarkGray)),
+ 941:             format!("{}", app.clusters.clusters.len()),
+ 955:             format!("{}", app.memory.peak_clusters),
+ 960:     for cluster in app.clusters.clusters.iter().take(4) {
+ 961:         let base = cluster
+ 962:             .archetype
+ 965:         let effective = cluster
+ 966:             .effective_archetype()
+ 969:         let overridden = cluster.archetype_override.is_some();
+ 971:         let archetype_color = if effective == "RPR" {
+ 982:             if cluster.drift_heat > 80.0 {
+ 984:             } else if cluster.drift_heat > 60.0 {
+ 995:                 format!("#{} ", cluster.id),
+ 999:                 cluster.direction_glyph().to_string(),
+1006:                     .fg(archetype_color)
+1019:                 format!("{} ", cluster.size),
+1020:                 Style::default().fg(cluster.dominant.color()),
+1023:                 format!("a{} ", cluster.age),
+1027:                 format!("h{:.0}{}", cluster.drift_heat, drift_marker),
+1039:             .block(Block::default().borders(Borders::ALL).title(" CLUSTERS "))
+1045: fn render_species(f: &mut Frame<'_>, area: Rect, app: &App) {
+1047:         .species_bank
+1048:         .species
+1050:         .filter(|species| species.extinct)
+1054:         .species_bank
+1055:         .species
+1057:         .filter(|species| !species.extinct && species.archetype == Archetype::Harvester)
+1061:         .species_bank
+1062:         .species
+1064:         .filter(|species| !species.extinct && species.archetype == Archetype::Reaper)
+1070:             format!("{}", app.species_bank.active_count()),
+1089:     for species in app
+1090:         .species_bank
+1091:         .species
+1094:         .filter(|species| !species.extinct)
+1097:         let rare = species.rare_trait.short();
+1099:         let archetype_color = if species.archetype == Archetype::Reaper {
+1101:         } else if species.archetype == Archetype::Harvester {
+1109:                 format!("{} ", species.name),
+1110:                 Style::default().fg(species.dominant_tribe.color()),
+1113:                 species.archetype.short(),
+1114:                 Style::default().fg(archetype_color),
+1117:                 format!(" p{}", species.peak_size),
+1126:             .block(Block::default().borders(Borders::ALL).title(" SPECIES "))
+1171:         metric("COHESION", app.cohesion as u16, Color::Green),
+1218:     tribe_counts: [usize; 6],
+1222:     clustered: usize,
+1223:     membrane: bool,
+1224:     trail: bool,
+1238:             tribe_counts: [0; 6],
+1242:             clustered: 0,
+1243:             membrane: false,
+1244:             trail: false,
+1257:     fn dominant_tribe(&self) -> Tribe {
+1261:             if self.tribe_counts[i] > self.tribe_counts[best] {
+1266:         Tribe::from_index(best)
+1272:         value ^= self.clustered.wrapping_mul(131);
+1273:         value ^= self.dominant_tribe().index().wrapping_mul(389);
