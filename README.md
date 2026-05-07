@@ -2,9 +2,19 @@
 
 Persistent artificial life ecosystem written entirely in Rust.
 
-Symbiote is a real-time terminal-rendered biosphere focused on emergence, territorial memory, adaptive ecology, lineage evolution, and long-run ecosystem behavior.
+Symbiote is a real-time terminal-rendered biosphere focused on:
+- emergence
+- territorial memory
+- adaptive ecology
+- lineage evolution
+- morphology-aware behavior
+- long-run ecosystem persistence
+- migration topology
+- ecological reinforcement
+- ecosystem readability
+- procedural infrastructure growth
 
-This is not a traditional game and not a fixed simulation sandbox.
+This is not a traditional game.
 
 Symbiote is designed as a living procedural ecosystem where:
 - organisms evolve
@@ -20,7 +30,6 @@ Symbiote is designed as a living procedural ecosystem where:
 # Current Ecosystem Focus
 
 Symbiote now emphasizes:
-
 - adaptive ecological behavior
 - territorial reinforcement
 - long-run ecosystem persistence
@@ -30,6 +39,10 @@ Symbiote now emphasizes:
 - ecological memory fields
 - procedural infrastructure growth
 - ecosystem storytelling through behavior
+- morphology-aware rendering
+- behavioral readability
+- adaptive substrate density
+- field-responsive motion
 
 The ecosystem intentionally begins sparse and evolves naturally through:
 - survival
@@ -37,6 +50,9 @@ The ecosystem intentionally begins sparse and evolves naturally through:
 - migration
 - ecological pressure
 - adaptive reinforcement
+- territorial attraction
+- ecological avoidance
+- lineage adaptation
 
 Density is earned by the ecosystem itself over time.
 
@@ -57,8 +73,19 @@ It stores and reinforces:
 - migration traces
 - territorial pressure
 - ecosystem history
+- reinforcement corridors
+- ecological affinity pressure
 
-The field actively influences ecosystem behavior and long-run topology.
+The field actively influences:
+- ecosystem behavior
+- territorial formation
+- migration topology
+- ecological balancing
+- movement pressure
+- long-run world structure
+
+The field is evolving toward:
+> an ecosystem nervous system.
 
 ---
 
@@ -72,8 +99,26 @@ The world gradually develops:
 - persistent settlement regions
 - abandoned ecological zones
 - infrastructure-like reinforcement structures
+- stabilized organism lanes
+- corridor ecosystems
+- ecological bottlenecks
 
 The simulation preserves traces of prior ecological states, allowing the world to develop historical continuity.
+
+---
+
+## Morphology-Aware Organisms
+
+Organisms now visually express:
+- role specialization
+- density state
+- ecological pressure
+- territorial behavior
+- movement identity
+- cluster structure
+- adaptive behavior classes
+
+Rendering is now heavily behavior-first rather than pure particle density.
 
 ---
 
@@ -99,6 +144,8 @@ Symbiote intentionally avoids:
 - overwhelming particle spam
 - unreadable density
 - excessive visual clutter
+- brute-force rendering
+- meaningless chaos rendering
 
 Instead the ecosystem emphasizes:
 - contrast
@@ -107,6 +154,10 @@ Instead the ecosystem emphasizes:
 - persistent infrastructure
 - territorial behavior
 - ecosystem aging
+- foreground organism clarity
+- long-run readability
+- behavioral visualization
+- sparse-space ecology
 
 The empty space is part of the ecology.
 
@@ -116,41 +167,50 @@ The empty space is part of the ecology.
 
 ## Long-Run Ecosystem State
 
+Current mature worlds now visibly develop:
 - territorial lanes
 - persistent root infrastructure
 - adaptive migration behavior
 - ecological segmentation
 - long-run species turnover
+- corridor ecosystems
+- stable migration highways
+- ecological districts
+- reinforcement structures
+- colony-like formations
 
-(Add updated screenshots here from current builds.)
+(Add updated screenshots from current v0.13+ builds here.)
 
 ---
 
 # Architecture
 
-Core modules:
+## Core Modules
 
 ```text
 src/
-├── main.rs
-├── app.rs
-├── sim.rs
-├── render.rs
-├── field.rs
-├── pattern.rs
-├── cluster.rs
-├── species.rs
-├── particle.rs
-├── ecology.rs
-├── automata.rs
-├── memory.rs
-├── tree.rs
-└── density.rs
+├── main.rs        # ultra-thin boot entry
+├── app.rs         # ecosystem orchestration/runtime ownership
+├── sim.rs         # core simulation logic
+├── render.rs      # ecosystem rendering + readability systems
+├── field.rs       # PatternField ecosystem memory
+├── pattern.rs     # Conway-inspired pattern classification
+├── cluster.rs     # formations + colony systems
+├── species.rs     # lineage + mutation drift
+├── particle.rs    # organism behavior/state
+├── ecology.rs     # ecological balancing pressure
+├── automata.rs    # substrate/root cellular systems
+├── memory.rs      # ecosystem persistence systems
+├── tree.rs        # trunk/root generation
+└── density.rs     # adaptive density governance
 ```
+
+---
 
 ## Important System Roles
 
 ### app.rs
+
 Top-level ecosystem orchestration:
 - lifecycle management
 - spawning
@@ -158,8 +218,12 @@ Top-level ecosystem orchestration:
 - PatternField ownership
 - reproduction pressure
 - reset/randomization
+- runtime ecosystem governance
+
+---
 
 ### sim.rs
+
 Core simulation engine:
 - movement
 - ecology interaction
@@ -167,44 +231,65 @@ Core simulation engine:
 - field influence
 - behavioral pressure
 - archetype logic
+- territorial navigation
+- adaptive response behavior
+
+---
 
 ### field.rs
+
 Persistent ecological memory layer:
 - migration traces
 - stability fields
 - danger pressure
 - growth reinforcement
 - territorial memory
+- corridor persistence
+- ecological reinforcement
+
+---
 
 ### render.rs
+
 Terminal ecosystem visualization:
 - organism rendering
 - overlays
 - telemetry
 - cluster visualization
 - field underlays
+- substrate hierarchy
+- morphology-aware readability
+- behavioral foreground emphasis
+
+---
 
 ### ecology.rs
+
 Environmental pressure systems:
 - ecological balancing
 - adaptive ecosystem behavior
 - environmental pressure shaping
+- overcrowding response
+- ecosystem stabilization
 
 ---
 
 # Requirements
 
 Symbiote requires:
-
 - Rust
 - Cargo
-- A terminal that supports ANSI colors and Unicode rendering
+- a terminal supporting ANSI colors
+- Unicode rendering support
 
 Recommended:
 - Linux
 - macOS
 - Windows Terminal
-- modern terminal emulators with true color support
+- Kitty
+- Alacritty
+- WezTerm
+- modern true-color terminal emulators
 
 ---
 
@@ -241,9 +326,11 @@ https://rustup.rs/
 
 After installation:
 - restart terminal
-- verify:
+- restart VSCode/Windows Terminal if open
 
-```bash
+Verify:
+
+```powershell
 rustc --version
 cargo --version
 ```
@@ -252,14 +339,14 @@ cargo --version
 
 # Cloning Symbiote
 
-## HTTPS (recommended for most users)
+## HTTPS
 
 ```bash
 git clone https://github.com/ShamelesAbyss/Symbiote.git
 cd Symbiote
 ```
 
-## SSH (for contributors/dev environments)
+## SSH
 
 ```bash
 git clone git@github.com:ShamelesAbyss/Symbiote.git
@@ -270,14 +357,16 @@ cd Symbiote
 
 # Building Symbiote
 
-## Debug build
+## Debug Build
 
 ```bash
 cargo build
 cargo run
 ```
 
-## Optimized release build
+---
+
+## Optimized Release Build
 
 ```bash
 cargo build --release
@@ -302,7 +391,6 @@ cargo run --release
 # Ecosystem Evolution Roadmap
 
 Current active development targets:
-
 - adaptive population pressure
 - territorial intelligence
 - field-guided navigation
@@ -312,22 +400,65 @@ Current active development targets:
 - lineage inheritance
 - emergent sub-archetypes
 - ecosystem nervous system behavior
+- species adaptation pressure
+- field-responsive navigation
+- territorial migration fronts
+- ecology-aware population balancing
 
 ---
 
 # Release History
 
 ## v0.8.5 — Vertical Growth
+
 Introduced major vertical ecosystem expansion systems.
 
+---
+
 ## v0.8.6 — Root Growth Stable
+
 Stabilized root infrastructure and substrate reinforcement systems.
 
+---
+
 ## v0.9.0 — PatternField Emergence
+
 Integrated persistent ecological memory and territorial reinforcement behavior.
 
+---
+
 ## v0.10.0 — Territorial Intelligence
+
 Introduced ecosystem-aware movement pressure and territorial affinity drift.
+
+---
+
+## v0.11.0 — Field Polarity Response
+
+Added field polarity response systems and ecological corridor reinforcement.
+
+---
+
+## v0.11.1 — Visual Hierarchy Refinement
+
+Reduced substrate rendering density and improved long-run ecosystem readability.
+
+---
+
+## v0.12.0 — Morphology-Aware Rendering
+
+Introduced morphology-aware organism rendering and behavioral visual identity systems.
+
+---
+
+## v0.13.0 — Behavioral Readability
+
+Improved mature ecosystem readability through:
+- organism foreground clarity
+- territorial structure visibility
+- migration topology readability
+- adaptive substrate thinning
+- behavioral visualization refinement
 
 ---
 
@@ -340,6 +471,7 @@ Symbiote is an experiment in:
 - persistent digital environments
 - ecosystem intelligence
 - memory-driven simulation
+- behavior-first visualization
 
 The goal is not scripted gameplay.
 
