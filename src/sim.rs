@@ -1279,6 +1279,8 @@ fn apply_pattern_micro_rules(particle: &mut Particle) {
         crate::pattern::classify_pattern(age_seed, center, neighborhood, previous_pressure, config);
 
     let intensity = signature.intensity();
+    let role = signature.morphology_role();
+    let morphology_pressure = signature.morphology_pressure();
     let pulse = signature.pulse;
     let drift = signature.drift;
     let cohesion = signature.cohesion;
@@ -1343,10 +1345,86 @@ fn apply_pattern_micro_rules(particle: &mut Particle) {
         crate::pattern::PatternKind::Dormant => {}
     }
 
+    apply_morphology_role_pressure(particle, role, morphology_pressure, intensity, cohesion, drift);
+
     particle.health = particle.health.clamp(0.0, 140.0);
     particle.energy = particle.energy.clamp(0.0, 160.0);
     particle.mass = particle.mass.clamp(0.12, 18.0);
 }
+fn apply_morphology_role_pressure(
+    particle: &mut Particle,
+    role: crate::pattern::MorphologyRole,
+    pressure: f32,
+    intensity: f32,
+    cohesion: f32,
+    drift: f32,
+) {
+    let pressure = pressure.clamp(0.0, 1.0);
+    let role_phase =
+        (particle.x * 11.0 + particle.y * 17.0 + particle.genome.orbit * 3.0).sin();
+
+    match role {
+        crate::pattern::MorphologyRole::Dormant => {}
+
+        crate::pattern::MorphologyRole::Anchor => {
+            let settle = (0.9965 - pressure * 0.0022).clamp(0.992, 0.999);
+            particle.vx *= settle;
+            particle.vy *= settle;
+            particle.health += 0.004 * pressure;
+            particle.genome.bonding =
+                (particle.genome.bonding + 0.000018 * cohesion).clamp(0.5, 2.25);
+        }
+
+        crate::pattern::MorphologyRole::Oscillator => {
+            let pulse = role_phase * 0.00032 * (0.35 + pressure);
+            particle.vx += pulse;
+            particle.vy -= pulse * 0.72;
+            particle.energy += 0.0025 * intensity;
+            particle.genome.orbit =
+                (particle.genome.orbit + 0.000018 * pressure).clamp(0.0, 1.55);
+        }
+
+        crate::pattern::MorphologyRole::Migrator => {
+            let angle = particle.genome.orbit * std::f32::consts::TAU + role_phase;
+            let migration = 0.00036 * (0.28 + pressure + drift * 0.42);
+            particle.vx += angle.cos() * migration;
+            particle.vy += angle.sin() * migration;
+            particle.genome.volatility =
+                (particle.genome.volatility + 0.000016 * pressure).clamp(0.36, 1.95);
+        }
+
+        crate::pattern::MorphologyRole::Seeder => {
+            particle.energy += 0.0028 * pressure;
+            particle.health += 0.0014 * pressure;
+            particle.genome.fertility =
+                (particle.genome.fertility + 0.000022 * pressure).clamp(0.2, 2.4);
+            particle.genome.metabolism =
+                (particle.genome.metabolism + 0.000004 * pressure).clamp(0.004, 0.05);
+        }
+
+        crate::pattern::MorphologyRole::Membrane => {
+            let settle = (0.9975 - cohesion * 0.0018).clamp(0.993, 0.999);
+            particle.vx *= settle;
+            particle.vy *= settle;
+            particle.mass += 0.0008 * pressure;
+            particle.genome.membrane =
+                (particle.genome.membrane + 0.000026 * pressure).clamp(0.0, 1.8);
+            particle.genome.bonding =
+                (particle.genome.bonding + 0.000012 * cohesion).clamp(0.5, 2.25);
+        }
+
+        crate::pattern::MorphologyRole::PredatorFront => {
+            let angle = particle.genome.volatility * std::f32::consts::TAU + role_phase;
+            let strike = 0.00042 * (0.35 + pressure + drift * 0.55);
+            particle.vx += angle.cos() * strike;
+            particle.vy += angle.sin() * strike;
+            particle.energy -= 0.0018 * pressure;
+            particle.genome.hunger =
+                (particle.genome.hunger + 0.000012 * pressure).clamp(0.005, 0.04);
+        }
+    }
+}
+
 // PATTERN_MICRO_RULES_ACTIVE
 
 fn apply_ecology(particle: &mut Particle, ecology: &Ecology) {
