@@ -522,11 +522,37 @@ impl App {
                 child.species_id = None;
             }
 
-            if corridor_pressure > 0.38 && rng.gen_bool((corridor_pressure * 0.05) as f64) {
-                child.x = (child.x + rng.gen_range(-0.18..0.18)).clamp(-1.16, 1.16);
-                child.y = (child.y + rng.gen_range(-0.18..0.18)).clamp(-1.16, 1.16);
-                child.vx += rng.gen_range(-0.01..0.01);
-                child.vy += rng.gen_range(-0.01..0.01);
+            if corridor_pressure > 0.38 && rng.gen_bool((corridor_pressure * 0.08) as f64) {
+                let radial = (child.x * child.x + child.y * child.y).sqrt();
+
+                let mature_world = if self.age > STRUCTURE_WARMUP_TICKS {
+                    1.0
+                } else {
+                    0.0
+                };
+
+                let outward_bias = 0.08 + corridor_pressure * 0.16 + mature_world * 0.08;
+
+                if radial < 0.52 {
+                    let len = radial.max(0.001);
+
+                    child.x += (child.x / len) * outward_bias;
+                    child.y += (child.y / len) * outward_bias;
+                }
+
+                let orbital_bias = 0.015 + pathfinder_bias * 0.018 + corridor_pressure * 0.022;
+
+                child.vx += (-child.y) * orbital_bias;
+                child.vy += child.x * orbital_bias;
+
+                child.x += rng.gen_range(-0.12..0.12);
+                child.y += rng.gen_range(-0.12..0.12);
+
+                child.x = child.x.clamp(-1.16, 1.16);
+                child.y = child.y.clamp(-1.16, 1.16);
+
+                child.vx += rng.gen_range(-0.008..0.008);
+                child.vy += rng.gen_range(-0.008..0.008);
             }
 
             if child.genome.perception > 0.295
