@@ -249,11 +249,11 @@ impl App {
 
         self.ecology.tick(self.seed, self.age, self.environment);
 
-        if self.age % 8 == 0 {
+        if self.age % 24 == 0 {
             self.deposit_to_substrate();
         }
 
-        if self.age % 12 == 0 {
+        if self.age % 8 == 0 {
             self.substrate.tick();
         }
 

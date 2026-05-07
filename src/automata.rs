@@ -186,6 +186,7 @@ impl CellularAutomata {
                 let cell = snapshot[idx];
 
                 let neighbors = self.alive_neighbors(&snapshot, x, y);
+                let conway_neighbors = self.life_neighbors(&snapshot, x, y);
                 let nutrient_neighbors = self.kind_neighbors(&snapshot, x, y, CellKind::Nutrient);
                 let dead_neighbors = self.kind_neighbors(&snapshot, x, y, CellKind::Dead);
                 let spore_neighbors = self.kind_neighbors(&snapshot, x, y, CellKind::Spore);
@@ -248,9 +249,9 @@ impl CellularAutomata {
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
                             next.signal.growth = (next.signal.growth + 0.18).clamp(0.0, 1.0);
-                        } else if neighbors == 3 && nutrient_neighbors > 0 {
+                        } else if conway_neighbors == 3 {
                             next.kind = CellKind::Life;
-                            next.energy = 30.0 + nutrient_neighbors as f32 * 5.0;
+                            next.energy = 36.0 + nutrient_neighbors as f32 * 3.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
                         } else if recovery_mode && root_neighbors > 0 && nutrient_neighbors > 0 {
@@ -279,7 +280,15 @@ impl CellularAutomata {
                     }
 
                     CellKind::Life => {
-                        if root_neighbors > 1 {
+                        if conway_neighbors < 2 {
+                            next.kind = CellKind::Dead;
+                            next.energy = 14.0;
+                            next.signal.danger = (next.signal.danger + 0.16).clamp(0.0, 1.0);
+                        } else if conway_neighbors > 3 {
+                            next.kind = CellKind::Dead;
+                            next.energy = 18.0;
+                            next.signal.danger = (next.signal.danger + 0.22).clamp(0.0, 1.0);
+                        } else if root_neighbors > 1 {
                             next.kind = CellKind::Dead;
                             next.energy = 18.0;
                             next.signal.danger = (next.signal.danger + 0.18).clamp(0.0, 1.0);
@@ -316,7 +325,11 @@ impl CellularAutomata {
                     CellKind::Spore => {
                         next.signal.growth = (next.signal.growth + 0.012).clamp(0.0, 1.0);
 
-                        if root_neighbors > 1 {
+                        if conway_neighbors == 3 && root_neighbors == 0 {
+                            next.kind = CellKind::Life;
+                            next.energy = 34.0;
+                            next.age = 0;
+                        } else if root_neighbors > 1 {
                             next.kind = CellKind::Nutrient;
                             next.energy = 28.0;
                         } else if root_neighbors > 0 && recovery_mode && nutrient_neighbors > 0 {
@@ -343,7 +356,11 @@ impl CellularAutomata {
                     CellKind::Nutrient => {
                         next.signal.growth = (next.signal.growth + 0.006).clamp(0.0, 1.0);
 
-                        if root_neighbors > 1 && density > 0.14 {
+                        if conway_neighbors == 3 && root_neighbors == 0 {
+                            next.kind = CellKind::Life;
+                            next.energy = 38.0;
+                            next.age = 0;
+                        } else if root_neighbors > 1 && density > 0.14 {
                             next.kind = CellKind::Empty;
                             next.energy = 0.0;
                             next.age = 0;
@@ -371,10 +388,17 @@ impl CellularAutomata {
                     CellKind::Dead => {
                         next.signal.danger = (next.signal.danger + 0.006).clamp(0.0, 1.0);
 
-                        let decay = if recovery_mode { 0.10 } else { 0.30 };
-                        next.energy = (cell.energy - decay).max(0.0);
+                        if conway_neighbors == 3 {
+                            next.kind = CellKind::Life;
+                            next.energy = 34.0;
+                            next.age = 0;
+                            next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
+                            next.signal.growth = (next.signal.growth + 0.10).clamp(0.0, 1.0);
+                        } else {
+                            let decay = if recovery_mode { 0.10 } else { 0.30 };
+                            next.energy = (cell.energy - decay).max(0.0);
 
-                        if root_neighbors > 0 && recovery_mode {
+                            if root_neighbors > 0 && recovery_mode {
                             next.kind = CellKind::Nutrient;
                             next.energy = 30.0;
                             next.signal.growth = (next.signal.growth + 0.12).clamp(0.0, 1.0);
@@ -387,8 +411,9 @@ impl CellularAutomata {
                             next.energy = 24.0;
                             next.signal.growth = (next.signal.growth + 0.06).clamp(0.0, 1.0);
                         } else if next.energy <= 0.0 || dead_neighbors > 5 {
-                            next.kind = CellKind::Empty;
-                            next.age = 0;
+                                next.kind = CellKind::Empty;
+                                next.age = 0;
+                            }
                         }
                     }
 
@@ -838,6 +863,27 @@ impl CellularAutomata {
                 let ny = wrap(y as isize + dy, self.height);
 
                 if snapshot[self.idx(nx, ny)].kind.is_alive() {
+                    count += 1;
+                }
+            }
+        }
+
+        count
+    }
+
+    fn life_neighbors(&self, snapshot: &[Cell], x: usize, y: usize) -> usize {
+        let mut count = 0;
+
+        for dy in [-1isize, 0, 1] {
+            for dx in [-1isize, 0, 1] {
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
+
+                let nx = wrap(x as isize + dx, self.width);
+                let ny = wrap(y as isize + dy, self.height);
+
+                if snapshot[self.idx(nx, ny)].kind == CellKind::Life {
                     count += 1;
                 }
             }
