@@ -2,7 +2,10 @@ use crate::{
     app::{App, Environment},
     automata::{CellKind, SignalKind},
     particle::Tribe,
-    pattern::{pattern_glyph, pattern_strength_bar, PatternKind, PatternMotion, PatternSignature},
+    pattern::{
+        pattern_glyph, pattern_strength_bar, MorphologyRole, PatternKind, PatternMotion,
+        PatternSignature,
+    },
     species::Archetype,
     tree::{self, TreeStage, TreeVisualPolicy},
 };
@@ -300,7 +303,11 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                 let avg_mass = cell.mass / cell.count as f32;
                 let phase = cell.organic_phase(app.age);
 
-                let glyph = if cell.reaper {
+                let morphology_role = cell_morphology_role(&cell, avg_mass);
+                let morphology_flash =
+                    morphology_render_glyph(morphology_role, app.age, cell.organic_phase(app.age));
+
+                let mut glyph = if cell.reaper {
                     match phase % 4 {
                         0 => 'Ω',
                         1 => 'ϟ',
@@ -366,6 +373,10 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                         _ => 'o',
                     }
                 };
+
+                if let Some(morphology_glyph) = morphology_flash {
+                    glyph = morphology_glyph;
+                }
 
                 let mut style = if cell.reaper {
                     Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
@@ -1480,6 +1491,70 @@ impl Cell {
         value ^= self.dominant_tribe().index().wrapping_mul(389);
         value = (value ^ (value >> 11)).wrapping_mul(1_103_515_245);
         value ^ (value >> 15)
+    }
+}
+
+fn cell_morphology_role(cell: &Cell, avg_mass: f32) -> MorphologyRole {
+    if cell.reaper {
+        MorphologyRole::PredatorFront
+    } else if cell.drifting {
+        MorphologyRole::Migrator
+    } else if cell.harvester {
+        MorphologyRole::Seeder
+    } else if cell.clustered > 0 && avg_mass > 3.8 {
+        MorphologyRole::Membrane
+    } else if cell.clustered > 0 && cell.count >= 5 {
+        MorphologyRole::Oscillator
+    } else if cell.clustered > 0 {
+        MorphologyRole::Anchor
+    } else if cell.rare {
+        MorphologyRole::Migrator
+    } else {
+        MorphologyRole::Dormant
+    }
+}
+
+fn morphology_render_glyph(role: MorphologyRole, age: u64, phase: usize) -> Option<char> {
+    match role {
+        MorphologyRole::Dormant => None,
+        MorphologyRole::Anchor => {
+            if phase % 5 <= 3 {
+                Some('●')
+            } else {
+                Some('•')
+            }
+        }
+        MorphologyRole::Oscillator => {
+            if (age / 4 + phase as u64) % 2 == 0 {
+                Some('◐')
+            } else {
+                Some('◑')
+            }
+        }
+        MorphologyRole::Migrator => match phase % 4 {
+            0 => Some('›'),
+            1 => Some('»'),
+            2 => Some('·'),
+            _ => None,
+        },
+        MorphologyRole::Seeder => match phase % 5 {
+            0 => Some('✦'),
+            1 => Some('✧'),
+            2 => Some('∙'),
+            _ => None,
+        },
+        MorphologyRole::Membrane => match phase % 4 {
+            0 => Some('◎'),
+            1 => Some('◉'),
+            2 => Some('◌'),
+            _ => Some('○'),
+        },
+        MorphologyRole::PredatorFront => match phase % 4 {
+            0 => Some('▲'),
+            1 => Some('ϟ'),
+            2 => Some('Ω'),
+            _ => None,
+        },
     }
 }
 
