@@ -414,7 +414,6 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
     }
 
     let (field_width, field_height) = app.pattern_field.dimensions();
-
     if field_width == 0 || field_height == 0 {
         return;
     }
@@ -447,47 +446,107 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                 continue;
             }
 
-            screen_cell.signal = Some((
-                field_cell.glyph(),
-                field_color(field_cell.kind, field_cell.danger, field_cell.intensity),
-            ));
+            if !should_render_field_haze(
+                app.age,
+                x,
+                y,
+                field_cell.kind,
+                field_cell.danger,
+                field_cell.intensity,
+            ) {
+                continue;
+            }
+
+            let Some((glyph, color)) =
+                field_haze_visual(field_cell.kind, field_cell.danger, field_cell.intensity)
+            else {
+                continue;
+            };
+
+            screen_cell.signal = Some((glyph, color));
         }
     }
 }
 
-fn field_color(kind: PatternKind, danger: f32, intensity: f32) -> Color {
-    if danger > 0.35 {
-        return Color::Red;
+fn should_render_field_haze(
+    age: u64,
+    x: usize,
+    y: usize,
+    kind: PatternKind,
+    danger: f32,
+    intensity: f32,
+) -> bool {
+    let pressure = danger.max(intensity);
+
+    if pressure < 0.26 {
+        return false;
     }
 
-    if intensity > 0.82 {
-        return match kind {
-            PatternKind::Halo => Color::Cyan,
-            PatternKind::Nest => Color::Green,
-            PatternKind::Swarmfront => Color::Magenta,
-            PatternKind::Glider => Color::LightCyan,
-            PatternKind::Lattice => Color::Yellow,
-            PatternKind::Bloom => Color::LightGreen,
-            PatternKind::Chain => Color::LightMagenta,
-            PatternKind::Oscillator => Color::LightBlue,
-            PatternKind::StillLife => Color::Gray,
-            PatternKind::Dormant => Color::DarkGray,
-        };
-    }
+    let spacing = if danger > 0.76 || intensity > 0.92 {
+        3
+    } else if danger > 0.58 || intensity > 0.78 {
+        5
+    } else if intensity > 0.56 {
+        8
+    } else {
+        13
+    };
 
-    match kind {
-        PatternKind::Halo => Color::Blue,
-        PatternKind::Nest => Color::Green,
-        PatternKind::Swarmfront => Color::Magenta,
-        PatternKind::Glider => Color::Cyan,
-        PatternKind::Lattice => Color::Yellow,
-        PatternKind::Bloom => Color::Green,
-        PatternKind::Chain => Color::Magenta,
-        PatternKind::Oscillator => Color::Blue,
-        PatternKind::StillLife => Color::Gray,
-        PatternKind::Dormant => Color::DarkGray,
-    }
+    let kind_offset = match kind {
+        PatternKind::Halo => 1,
+        PatternKind::Nest => 2,
+        PatternKind::Swarmfront => 3,
+        PatternKind::Glider => 4,
+        PatternKind::Lattice => 5,
+        PatternKind::Bloom => 6,
+        PatternKind::Chain => 7,
+        PatternKind::Oscillator => 8,
+        PatternKind::StillLife => 9,
+        PatternKind::Dormant => 10,
+    };
+
+    visual_hash(age / 5 + kind_offset, x, y) % spacing == 0
 }
+
+fn field_haze_visual(kind: PatternKind, danger: f32, intensity: f32) -> Option<(char, Color)> {
+    if danger > 0.82 {
+        return Some(('·', Color::Red));
+    }
+
+    if danger > 0.58 {
+        return Some(('.', Color::DarkGray));
+    }
+
+    if intensity > 0.90 {
+        return Some((
+            '·',
+            match kind {
+                PatternKind::Nest | PatternKind::Bloom => Color::Green,
+                PatternKind::Glider | PatternKind::Halo => Color::Blue,
+                PatternKind::Swarmfront | PatternKind::Chain => Color::Magenta,
+                PatternKind::Oscillator => Color::Blue,
+                PatternKind::Lattice => Color::Gray,
+                PatternKind::StillLife | PatternKind::Dormant => Color::DarkGray,
+            },
+        ));
+    }
+
+    if intensity > 0.64 {
+        return Some((
+            match kind {
+                PatternKind::Swarmfront | PatternKind::Glider | PatternKind::Chain => ',',
+                PatternKind::Nest | PatternKind::Bloom => '·',
+                PatternKind::Halo | PatternKind::Oscillator => '.',
+                PatternKind::Lattice | PatternKind::StillLife | PatternKind::Dormant => '∙',
+            },
+            Color::DarkGray,
+        ));
+    }
+
+    Some(('.', Color::DarkGray))
+}
+
+
 
 fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
     if width == 0 || height == 0 {

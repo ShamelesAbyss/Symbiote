@@ -62,20 +62,6 @@ impl FieldCell {
         self.intensity > 0.035 || self.age > 0
     }
 
-    pub fn glyph(self) -> char {
-        match self.kind {
-            PatternKind::Dormant => '.',
-            PatternKind::StillLife => '■',
-            PatternKind::Oscillator => '◆',
-            PatternKind::Glider => '➤',
-            PatternKind::Halo => '○',
-            PatternKind::Lattice => '▦',
-            PatternKind::Bloom => '✦',
-            PatternKind::Chain => '⛓',
-            PatternKind::Swarmfront => '≫',
-            PatternKind::Nest => '◎',
-        }
-    }
 
     pub fn reinforce(
         &mut self,
