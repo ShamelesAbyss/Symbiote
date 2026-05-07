@@ -59,6 +59,79 @@ pub enum PatternMotion {
     Contract,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MorphologyRole {
+    Dormant,
+    Anchor,
+    Oscillator,
+    Migrator,
+    Seeder,
+    Membrane,
+    PredatorFront,
+}
+
+impl MorphologyRole {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Dormant => "dormant",
+            Self::Anchor => "anchor",
+            Self::Oscillator => "oscillator",
+            Self::Migrator => "migrator",
+            Self::Seeder => "seeder",
+            Self::Membrane => "membrane",
+            Self::PredatorFront => "predator-front",
+        }
+    }
+
+    pub fn short(self) -> &'static str {
+        match self {
+            Self::Dormant => "DRM",
+            Self::Anchor => "ANC",
+            Self::Oscillator => "OSC",
+            Self::Migrator => "MIG",
+            Self::Seeder => "SEE",
+            Self::Membrane => "MEM",
+            Self::PredatorFront => "PRD",
+        }
+    }
+
+    pub fn stability_bias(self) -> f32 {
+        match self {
+            Self::Dormant => 0.0,
+            Self::Anchor => 0.18,
+            Self::Oscillator => 0.08,
+            Self::Migrator => -0.04,
+            Self::Seeder => -0.08,
+            Self::Membrane => 0.14,
+            Self::PredatorFront => -0.10,
+        }
+    }
+
+    pub fn migration_bias(self) -> f32 {
+        match self {
+            Self::Dormant => 0.0,
+            Self::Anchor => -0.10,
+            Self::Oscillator => 0.02,
+            Self::Migrator => 0.18,
+            Self::Seeder => 0.08,
+            Self::Membrane => -0.04,
+            Self::PredatorFront => 0.14,
+        }
+    }
+
+    pub fn fertility_bias(self) -> f32 {
+        match self {
+            Self::Dormant => 0.0,
+            Self::Anchor => 0.02,
+            Self::Oscillator => 0.06,
+            Self::Migrator => 0.02,
+            Self::Seeder => 0.16,
+            Self::Membrane => 0.04,
+            Self::PredatorFront => -0.06,
+        }
+    }
+}
+
 impl PatternMotion {
     pub fn name(self) -> &'static str {
         match self {
@@ -198,6 +271,28 @@ impl PatternSignature {
             + self.drift * 0.18
             + self.cohesion * 0.22
             + self.fertility * 0.10)
+            .clamp(0.0, 1.0)
+    }
+
+    pub fn morphology_role(self) -> MorphologyRole {
+        match self.kind {
+            PatternKind::Dormant => MorphologyRole::Dormant,
+            PatternKind::StillLife => MorphologyRole::Anchor,
+            PatternKind::Oscillator | PatternKind::Halo => MorphologyRole::Oscillator,
+            PatternKind::Glider | PatternKind::Chain => MorphologyRole::Migrator,
+            PatternKind::Bloom => MorphologyRole::Seeder,
+            PatternKind::Lattice | PatternKind::Nest => MorphologyRole::Membrane,
+            PatternKind::Swarmfront => MorphologyRole::PredatorFront,
+        }
+    }
+
+    pub fn morphology_pressure(self) -> f32 {
+        let role = self.morphology_role();
+
+        (self.intensity()
+            + role.stability_bias().max(0.0)
+            + role.migration_bias().max(0.0)
+            + role.fertility_bias().max(0.0))
             .clamp(0.0, 1.0)
     }
 }
@@ -479,6 +574,15 @@ pub fn bootstrap_pattern_layer(tick: u64) -> PatternSignature {
 
     let _glyph = pattern_glyph(signature, tick);
     let _bar = pattern_strength_bar(signature.intensity(), 8);
+    let _role = signature.morphology_role();
+    let _role_name = _role.name();
+    let _role_short = _role.short();
+    let _role_pressure = signature.morphology_pressure();
+    let _role_biases = (
+        _role.stability_bias(),
+        _role.migration_bias(),
+        _role.fertility_bias(),
+    );
     let _harvest_pressure = neighborhood.harvest_pressure();
     let _motion_name = signature.motion.name();
     let _danger_level = signature.danger;
