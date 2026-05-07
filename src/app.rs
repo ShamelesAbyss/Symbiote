@@ -733,15 +733,20 @@ impl App {
         avg_radius /= self.particles.len() as f32;
 
         let root_bias = self.memory.pathfinder_bias();
-        let crowding_bias = if avg_radius < 0.56 { 1.0 } else { 0.0 };
+        let corridor_bias = self.memory.corridor_pressure();
+        let crowding_bias = if avg_radius < 0.62 { 1.0 } else { 0.0 };
         let early_bias = if self.age < STRUCTURE_WARMUP_TICKS {
             1.0
         } else {
             0.0
         };
-        let migration_strength =
-            (0.0025 + root_bias * 0.0075 + crowding_bias * 0.006 + early_bias * 0.006)
-                .clamp(0.0, 0.020);
+
+        let migration_strength = (0.0022
+            + root_bias * 0.007
+            + corridor_bias * 0.0035
+            + crowding_bias * 0.007
+            + early_bias * 0.006)
+            .clamp(0.0, 0.021);
 
         if migration_strength <= 0.0 {
             return;
@@ -752,20 +757,57 @@ impl App {
             let away_y = particle.y - cy;
             let len = (away_x * away_x + away_y * away_y).sqrt().max(0.001);
 
-            let edge_room = (1.18 - particle.x.abs().max(particle.y.abs())).clamp(0.0, 1.0);
-            let local_push = migration_strength * edge_room;
+            let radial = (particle.x * particle.x + particle.y * particle.y).sqrt();
 
-            particle.vx += (away_x / len) * local_push;
-            particle.vy += (away_y / len) * local_push;
+            let dish_room = (1.16 - radial).clamp(0.0, 1.0);
+            let edge_softener = if radial > 1.03 {
+                (1.18 - radial).clamp(0.0, 1.0)
+            } else {
+                1.0
+            };
 
-            if particle.x.abs() < 0.34 && particle.y.abs() < 0.34 {
-                particle.vx += (particle.x * 13.0 + self.age as f32 * 0.003).sin() * local_push;
-                particle.vy += (particle.y * 17.0 - self.age as f32 * 0.004).cos() * local_push;
+            let mid_dish_bonus = if radial > 0.44 && radial < 1.02 {
+                1.0
+            } else {
+                0.55
+            };
+
+            let local_push = migration_strength * dish_room.max(0.18) * edge_softener;
+
+            particle.vx += (away_x / len) * local_push * mid_dish_bonus;
+            particle.vy += (away_y / len) * local_push * mid_dish_bonus;
+
+            let lane_strength = migration_strength
+                * (0.10 + root_bias * 0.26 + corridor_bias * 0.32)
+                * mid_dish_bonus;
+
+            particle.vx += (-particle.y) * lane_strength;
+            particle.vy += particle.x * lane_strength;
+
+            if radial < 0.42 {
+                let center_release = migration_strength * (0.55 + early_bias * 0.45);
+                particle.vx += (away_x / len) * center_release;
+                particle.vy += (away_y / len) * center_release;
             }
+
+            if radial > 1.08 {
+                let boundary_nudge = (radial - 1.08).clamp(0.0, 0.22) * 0.018;
+                particle.vx -= (particle.x / radial.max(0.001)) * boundary_nudge;
+                particle.vy -= (particle.y / radial.max(0.001)) * boundary_nudge;
+            }
+
+            let organic_wander =
+                ((self.seed as f32 * 0.000003 + particle.x * 11.0 + self.age as f32 * 0.006).sin()
+                    + (particle.y * 13.0 - self.age as f32 * 0.004).cos())
+                    * migration_strength
+                    * 0.22;
+
+            particle.vx += organic_wander * particle.y.signum();
+            particle.vy -= organic_wander * particle.x.signum();
         }
 
         if self.age % 450 == 0 {
-            self.push_event("migration pressure loosened center swarm");
+            self.push_event("organic migration pressure broadened dish paths");
         }
     }
 
