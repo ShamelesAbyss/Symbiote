@@ -901,6 +901,48 @@ fn draw_cluster_motion_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, 
     }
 }
 
+fn archetype_short_from_index(index: usize) -> &'static str {
+    match index {
+        0 => "SWR",
+        1 => "HNT",
+        2 => "GRZ",
+        3 => "ORB",
+        4 => "PAR",
+        5 => "ARC",
+        6 => "LEV",
+        7 => "MYC",
+        8 => "PHM",
+        9 => "HRV",
+        10 => "RPR",
+        _ => "UNK",
+    }
+}
+
+fn ecosystem_phase_label(
+    app: &App,
+    active_species: usize,
+    harvesters: usize,
+    reapers: usize,
+    substrate_ratio: f32,
+    corridor_pressure: f32,
+) -> &'static str {
+    if reapers > 0 && harvesters > 0 {
+        "predator balance"
+    } else if harvesters > 0 {
+        "harvester bloom"
+    } else if substrate_ratio > 0.34 {
+        "substrate bloom"
+    } else if corridor_pressure > 0.62 && app.clusters.clusters.len() >= 16 {
+        "migration lattice"
+    } else if app.clusters.clusters.len() >= 18 {
+        "territorial"
+    } else if active_species < 12 {
+        "lineage bottleneck"
+    } else {
+        "adaptive drift"
+    }
+}
+
 fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
     let tribes = [
         Tribe::Blood,
@@ -910,6 +952,41 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
         Tribe::Dream,
         Tribe::Static,
     ];
+
+    let active_species = app.species_bank.active_count();
+    let mut archetype_counts = [0usize; 11];
+
+    for species in app
+        .species_bank
+        .species
+        .iter()
+        .filter(|species| !species.extinct)
+    {
+        archetype_counts[species.archetype.index()] += 1;
+    }
+
+    let mut dominant_archetype = 0usize;
+
+    for idx in 1..11 {
+        if archetype_counts[idx] > archetype_counts[dominant_archetype] {
+            dominant_archetype = idx;
+        }
+    }
+
+    let harvesters = archetype_counts[Archetype::Harvester.index()];
+    let reapers = archetype_counts[Archetype::Reaper.index()];
+    let substrate_ratio =
+        app.substrate.living_cells() as f32 / app.substrate.total_cells().max(1) as f32;
+    let corridor_pressure = app.memory.corridor_pressure();
+
+    let phase = ecosystem_phase_label(
+        app,
+        active_species,
+        harvesters,
+        reapers,
+        substrate_ratio,
+        corridor_pressure,
+    );
 
     let mut lines = vec![
         Line::from(Span::styled(
@@ -1001,6 +1078,48 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
         Span::styled(
             format!("{}", app.substrate.protected_cells()),
             Style::default().fg(Color::Blue),
+        ),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled("Eco: ", Style::default().fg(Color::Yellow)),
+        Span::styled(phase, Style::default().fg(env_color(app.environment))),
+        Span::styled(" | Dom ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            archetype_short_from_index(dominant_archetype),
+            Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("{}", archetype_counts[dominant_archetype]),
+            Style::default().fg(Color::Cyan),
+        ),
+        Span::styled(" | HRV ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", harvesters), Style::default().fg(Color::Green)),
+        Span::styled(" RPR ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{}", reapers), Style::default().fg(Color::Red)),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled("Field: ", Style::default().fg(Color::Yellow)),
+        Span::styled(
+            format!("{}", app.pattern_field.active_cells()),
+            Style::default().fg(Color::Cyan),
+        ),
+        Span::styled(" active avg ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("{:.2}", app.pattern_field.average_intensity()),
+            Style::default().fg(Color::Cyan),
+        ),
+        Span::styled(" ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            app.pattern_field.strongest_kind().short(),
+            Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" | corridor ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("{:.0}%", corridor_pressure * 100.0),
+            Style::default().fg(Color::Yellow),
         ),
     ]));
 
