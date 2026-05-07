@@ -299,7 +299,10 @@ impl CellularAutomata {
                             next.energy = (cell.energy + 3.0).min(85.0);
                             next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else {
-                            next.energy = (cell.energy + nutrient_neighbors as f32 * 0.55 - 1.05)
+                            let age_thin = if cell.age > 180 { 0.34 } else { 0.0 };
+                            let crowd_thin = if density > 0.24 { 0.28 } else { 0.0 };
+
+                            next.energy = (cell.energy + nutrient_neighbors as f32 * 0.48 - 1.22 - age_thin - crowd_thin)
                                 .clamp(0.0, 85.0);
 
                             if next.energy <= 0.0 {
@@ -324,7 +327,10 @@ impl CellularAutomata {
                             next.energy = 14.0;
                             next.signal.danger = (next.signal.danger + 0.14).clamp(0.0, 1.0);
                         } else {
-                            next.energy = (cell.energy - 0.85).max(0.0);
+                            let age_thin = if cell.age > 140 { 0.28 } else { 0.0 };
+                            let crowd_thin = if density > 0.24 { 0.32 } else { 0.0 };
+
+                            next.energy = (cell.energy - 1.02 - age_thin - crowd_thin).max(0.0);
 
                             if next.energy <= 0.0 {
                                 next.kind = CellKind::Dead;
