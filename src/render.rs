@@ -579,10 +579,11 @@ fn substrate_visual(
     match kind {
         CellKind::Empty => None,
         CellKind::Life => {
-            let shimmer = visual_hash(app.age, x, y) % 9;
-            if shimmer <= 1 {
+            let shimmer = visual_hash(app.age / 2, x, y) % 18;
+
+            if shimmer == 0 {
                 Some(('∙', Color::DarkGray))
-            } else if shimmer == 2 {
+            } else if shimmer == 1 {
                 Some(('·', Color::DarkGray))
             } else {
                 None
@@ -615,8 +616,9 @@ fn substrate_visual(
         }
         CellKind::Nest => Some(('◎', Color::Cyan)),
         CellKind::Spore => {
-            let shimmer = visual_hash(app.age, x, y) % 7;
-            if shimmer <= 1 {
+            let shimmer = visual_hash(app.age / 2, x, y) % 14;
+
+            if shimmer == 0 {
                 Some(('░', Color::DarkGray))
             } else {
                 None
