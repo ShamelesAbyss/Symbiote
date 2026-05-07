@@ -403,18 +403,29 @@ pub fn step_particles(
         let field_dx = field_east.influence_strength() - field_west.influence_strength();
         let field_dy = field_south.influence_strength() - field_north.influence_strength();
 
-        if field_here.is_dangerous() {
-            particle.vx -= field_dx * 0.0038;
-            particle.vy -= field_dy * 0.0038;
-        } else if field_strength > 0.18 {
-            let settlement_pull = (field_strength * 0.0026).clamp(0.0, 0.0042);
+        let (field_pull, field_calm, field_hunger) = field_polarity_response(
+            archetype,
+            particle.rare_trait,
+            field_here.is_dangerous(),
+            field_strength,
+            particle.energy,
+            particle.health,
+        );
 
-            particle.vx += field_dx * settlement_pull;
-            particle.vy += field_dy * settlement_pull;
+        if field_pull.abs() > 0.0 && field_strength > 0.08 {
+            particle.vx += field_dx * field_pull;
+            particle.vy += field_dy * field_pull;
+        }
 
-            let calm = (1.0 - field_strength * 0.0018).clamp(0.996, 1.0);
+        if field_calm > 0.0 {
+            let calm = (1.0 - field_calm).clamp(0.992, 1.0);
             particle.vx *= calm;
             particle.vy *= calm;
+        }
+
+        if field_hunger > 0.0 {
+            particle.energy -= field_hunger;
+            particle.health -= field_hunger * 0.42;
         }
 
         if particle.x < -1.0 {
@@ -549,6 +560,93 @@ pub fn step_particles(
     }
 
     report
+}
+
+fn field_polarity_response(
+    archetype: Option<Archetype>,
+    rare_trait: RareTrait,
+    dangerous: bool,
+    strength: f32,
+    energy: f32,
+    health: f32,
+) -> (f32, f32, f32) {
+    let strength = strength.clamp(0.0, 1.0);
+    let vulnerable = energy < 34.0 || health < 36.0;
+
+    let mut pull = if dangerous {
+        -0.0036 * strength
+    } else {
+        0.0024 * strength
+    };
+
+    let mut calm = if dangerous {
+        0.0
+    } else {
+        0.0014 * strength
+    };
+
+    let mut hunger = if dangerous {
+        0.0042 * strength
+    } else {
+        0.0
+    };
+
+    match archetype {
+        Some(Archetype::Harvester) => {
+            pull *= if dangerous { 1.34 } else { 1.18 };
+            calm *= 0.82;
+            hunger *= 1.12;
+        }
+        Some(Archetype::Reaper) => {
+            pull *= if dangerous { -0.48 } else { 0.42 };
+            calm *= 0.42;
+            hunger *= 0.55;
+        }
+        Some(Archetype::Architect | Archetype::Leviathan | Archetype::Mycelial) => {
+            pull *= if dangerous { 0.92 } else { 1.46 };
+            calm *= 1.62;
+            hunger *= 0.72;
+        }
+        Some(Archetype::Orbiter | Archetype::Phantom) => {
+            pull *= if dangerous { 0.72 } else { 1.08 };
+            calm *= 0.58;
+            hunger *= 0.62;
+        }
+        Some(Archetype::Hunter | Archetype::Parasite) => {
+            pull *= if dangerous { -0.28 } else { 0.74 };
+            calm *= 0.72;
+            hunger *= 0.86;
+        }
+        Some(Archetype::Swarmer | Archetype::Grazer) | None => {
+            pull *= if dangerous { 1.08 } else { 1.0 };
+        }
+    }
+
+    if rare_trait == RareTrait::Voidborne {
+        pull *= 0.62;
+        calm *= 0.48;
+        hunger *= 0.52;
+    } else if rare_trait == RareTrait::ElderCore || rare_trait == RareTrait::SymbioticCore {
+        pull *= if dangerous { 0.86 } else { 1.22 };
+        calm *= 1.22;
+    } else if rare_trait == RareTrait::Devourer {
+        pull *= if dangerous { 1.20 } else { 0.78 };
+        hunger *= 1.18;
+    }
+
+    if vulnerable && dangerous {
+        pull *= 1.38;
+        hunger *= 1.22;
+    } else if vulnerable && !dangerous {
+        pull *= 1.18;
+        calm *= 1.16;
+    }
+
+    (
+        pull.clamp(-0.0058, 0.0052),
+        calm.clamp(0.0, 0.0048),
+        hunger.clamp(0.0, 0.012),
+    )
 }
 
 fn matrix_pressure(rules: &RuleMatrix) -> f32 {
