@@ -389,6 +389,34 @@ pub fn step_particles(
 
         apply_environment_current(particle, env);
 
+        let field_here = pattern_field.sample_world(particle.x, particle.y);
+        let field_east =
+            pattern_field.sample_world((particle.x + 0.045).clamp(-1.2, 1.2), particle.y);
+        let field_west =
+            pattern_field.sample_world((particle.x - 0.045).clamp(-1.2, 1.2), particle.y);
+        let field_north =
+            pattern_field.sample_world(particle.x, (particle.y - 0.045).clamp(-1.2, 1.2));
+        let field_south =
+            pattern_field.sample_world(particle.x, (particle.y + 0.045).clamp(-1.2, 1.2));
+
+        let field_strength = field_here.influence_strength().clamp(0.0, 1.0);
+        let field_dx = field_east.influence_strength() - field_west.influence_strength();
+        let field_dy = field_south.influence_strength() - field_north.influence_strength();
+
+        if field_here.is_dangerous() {
+            particle.vx -= field_dx * 0.0038;
+            particle.vy -= field_dy * 0.0038;
+        } else if field_strength > 0.18 {
+            let settlement_pull = (field_strength * 0.0026).clamp(0.0, 0.0042);
+
+            particle.vx += field_dx * settlement_pull;
+            particle.vy += field_dy * settlement_pull;
+
+            let calm = (1.0 - field_strength * 0.0018).clamp(0.996, 1.0);
+            particle.vx *= calm;
+            particle.vy *= calm;
+        }
+
         if particle.x < -1.0 {
             particle.vx += WALL_FORCE;
         }
