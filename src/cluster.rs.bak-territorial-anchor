@@ -251,8 +251,6 @@ impl ClusterTracker {
                 cluster.membrane = (cluster.membrane + 0.42).min(100.0);
             }
 
-            let territorial_anchor = cluster_territorial_anchor(&cluster, age);
-
             for &idx in &group {
                 if let Some(particle) = particles.get_mut(idx) {
                     particle.cluster_id = Some(cluster.id);
@@ -270,23 +268,6 @@ impl ClusterTracker {
 
                     let mass_gain = 0.0018 * cluster.size as f32 * maturity;
                     particle.mass = (particle.mass + mass_gain).clamp(0.55, 6.5);
-
-                    if territorial_anchor > 0.0 {
-                        let dx = particle.x - cluster.x;
-                        let dy = particle.y - cluster.y;
-                        let orbit_x = -dy * territorial_anchor * 0.0018;
-                        let orbit_y = dx * territorial_anchor * 0.0018;
-                        let settle = 1.0 - territorial_anchor * 0.035;
-
-                        particle.vx = particle.vx * settle + orbit_x;
-                        particle.vy = particle.vy * settle + orbit_y;
-
-                        particle.genome.membrane =
-                            (particle.genome.membrane + territorial_anchor * 0.00018).clamp(0.0, 1.8);
-                        particle.genome.bonding =
-                            (particle.genome.bonding + territorial_anchor * 0.00010).clamp(0.5, 2.25);
-                    }
-
 
                     if cluster.archetype_override.is_some() && age >= STRUCTURE_MATURITY_AGE {
                         particle.genome.perception =
@@ -324,31 +305,6 @@ pub struct ClusterEvents {
     pub splits: usize,
     pub extinctions: usize,
 }
-
-fn cluster_territorial_anchor(cluster: &Cluster, world_age: u64) -> f32 {
-    if world_age < STRUCTURE_MATURITY_AGE || cluster.age < 72 {
-        return 0.0;
-    }
-
-    let maturity =
-        ((world_age.saturating_sub(STRUCTURE_MATURITY_AGE)) as f32 / 2_400.0).clamp(0.0, 1.0);
-    let age_memory = (cluster.age as f32 / 1_400.0).clamp(0.0, 1.0);
-    let stability = (cluster.stability / 100.0).clamp(0.0, 1.0);
-    let membrane = (cluster.membrane / 100.0).clamp(0.0, 1.0);
-    let drift = (cluster.drift_heat / 100.0).clamp(0.0, 1.0);
-    let density = (cluster.size as f32 / 46.0).clamp(0.0, 1.0);
-    let mobility = root_mobility_score(cluster.avg_genome);
-
-    (stability * 0.34
-        + membrane * 0.22
-        + density * 0.18
-        + age_memory * 0.18
-        + maturity * 0.16
-        - drift * 0.20
-        - mobility * 0.08)
-        .clamp(0.0, 0.42)
-}
-
 
 fn apply_cluster_drift(
     cluster: &mut Cluster,
