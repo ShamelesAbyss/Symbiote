@@ -1,159 +1,352 @@
-# 🧬 Symbiote
+# Symbiote
 
-### *A Living Artificial Ecosystem Written in Rust*
+Persistent artificial life ecosystem written entirely in Rust.
 
-![Rust](https://img.shields.io/badge/Rust-Systems%20Level-orange?style=for-the-badge&logo=rust)
-![Status](https://img.shields.io/badge/Status-Evolving-green?style=for-the-badge)
-![Simulation](https://img.shields.io/badge/Type-Artificial%20Life-blueviolet?style=for-the-badge)
-![Platform](https://img.shields.io/badge/Platform-Terminal-black?style=for-the-badge)
+Symbiote is a real-time terminal-rendered biosphere focused on emergence, territorial memory, adaptive ecology, lineage evolution, and long-run ecosystem behavior.
 
-> Conway’s Game of Life meets emergent artificial life, evolving ecosystems, predator-prey dynamics, root systems, spatial memory, and alien microbiology — all rendered live in the terminal.
+This is not a traditional game and not a fixed simulation sandbox.
 
----
-
-# 🌌 What Is Symbiote?
-
-**Symbiote** is a real-time artificial life simulation written entirely in Rust.
-
-Inside the simulation, thousands of autonomous entities evolve and interact inside a living digital ecosystem.
-
-- 🦠 Swarming organisms
-- 🌱 Root and fungal growth
-- 🧠 Spatial pattern memory
-- 🌊 Invisible ecological pressure fields
-- 👁 Emergent archetypes and behaviors
-- 🌀 Halo formations and oscillators
-- 🪺 Nest structures and colonies
-- 🐺 Predator/prey ecosystem loops
-- 🌐 Procedural ecosystem drift over long runtimes
-
-Nothing is scripted.
-
-The world evolves from layered systems interacting with each other over time.
-
-Every run becomes its own strange alien biosphere.
+Symbiote is designed as a living procedural ecosystem where:
+- organisms evolve
+- ecological pressure accumulates
+- migration lanes emerge
+- territory stabilizes
+- infrastructure persists
+- species rise and collapse
+- the world develops historical memory over time
 
 ---
 
-# ✨ Current Features
+# Current Ecosystem Focus
 
-## 🧬 Emergent Organisms
+Symbiote now emphasizes:
 
-Particles evolve into recognizable behavioral structures:
+- adaptive ecological behavior
+- territorial reinforcement
+- long-run ecosystem persistence
+- meaningful sparse-space readability
+- emergent migration systems
+- lineage drift and species turnover
+- ecological memory fields
+- procedural infrastructure growth
+- ecosystem storytelling through behavior
 
-- Halos
-- Swarmfronts
-- Oscillators
-- Membranes
-- Nests
-- Chains
-- Bloom regions
-- Drift colonies
-- Glider-like movement structures
+The ecosystem intentionally begins sparse and evolves naturally through:
+- survival
+- reproduction
+- migration
+- ecological pressure
+- adaptive reinforcement
 
-These behaviors are not hardcoded animations.
-They emerge from the simulation itself.
-
----
-
-## 🌱 Living Root Ecosystem
-
-Symbiote contains a fully simulated substrate/root layer:
-
-- Gradual root expansion
-- Tree-like growth
-- Root collision systems
-- Regenerative substrate zones
-- Cellular automata driven growth
-- Protected trunk structures
-- Organic upward propagation
+Density is earned by the ecosystem itself over time.
 
 ---
 
-## 🧠 PatternField System
+# Core Systems
 
-The simulation now contains a persistent low-resolution ecological memory layer called the PatternField.
+## PatternField Ecology
 
-The field stores:
-- Spatial memory
-- Danger zones
-- Migration pressure
-- Pattern persistence
-- Cohesion regions
-- Drift direction
-- Halo territories
-- Swarm signatures
-- Ecological intensity
+The PatternField system acts as persistent ecological memory.
 
----
+It stores and reinforces:
+- danger
+- growth
+- cohesion
+- drift
+- stability
+- migration traces
+- territorial pressure
+- ecosystem history
 
-## 🐺 Archetype Ecology
-
-Creatures evolve into ecosystem roles:
-
-- 🌿 Grazers
-- 🍄 Mycelials
-- 🧠 Architects
-- 👻 Phantoms
-- ⚔ Hunters
-- ☠ Reapers
-- 🌾 Harvesters
-- 🐉 Leviathans
-- 🪱 Parasites
-- 🌀 Orbiters
+The field actively influences ecosystem behavior and long-run topology.
 
 ---
 
-# 🚀 Running Symbiote
+## Territorial Reinforcement
+
+The world gradually develops:
+- ecological districts
+- migration corridors
+- root highways
+- territorial seams
+- persistent settlement regions
+- abandoned ecological zones
+- infrastructure-like reinforcement structures
+
+The simulation preserves traces of prior ecological states, allowing the world to develop historical continuity.
+
+---
+
+## Artificial Life Simulation
+
+Symbiote combines:
+- artificial life systems
+- Conway-inspired emergence pressure
+- ecological balancing
+- procedural biology
+- cluster intelligence
+- species mutation drift
+- substrate growth systems
+- terminal-rendered ecosystem visualization
+
+without becoming deterministic or scripted.
+
+---
+
+# Visual Identity
+
+Symbiote intentionally avoids:
+- overwhelming particle spam
+- unreadable density
+- excessive visual clutter
+
+Instead the ecosystem emphasizes:
+- contrast
+- migration readability
+- ecological topology
+- persistent infrastructure
+- territorial behavior
+- ecosystem aging
+
+The empty space is part of the ecology.
+
+---
+
+# Screenshots
+
+## Long-Run Ecosystem State
+
+- territorial lanes
+- persistent root infrastructure
+- adaptive migration behavior
+- ecological segmentation
+- long-run species turnover
+
+(Add updated screenshots here from current builds.)
+
+---
+
+# Architecture
+
+Core modules:
+
+```text
+src/
+├── main.rs
+├── app.rs
+├── sim.rs
+├── render.rs
+├── field.rs
+├── pattern.rs
+├── cluster.rs
+├── species.rs
+├── particle.rs
+├── ecology.rs
+├── automata.rs
+├── memory.rs
+├── tree.rs
+└── density.rs
+```
+
+## Important System Roles
+
+### app.rs
+Top-level ecosystem orchestration:
+- lifecycle management
+- spawning
+- telemetry
+- PatternField ownership
+- reproduction pressure
+- reset/randomization
+
+### sim.rs
+Core simulation engine:
+- movement
+- ecology interaction
+- reproduction
+- field influence
+- behavioral pressure
+- archetype logic
+
+### field.rs
+Persistent ecological memory layer:
+- migration traces
+- stability fields
+- danger pressure
+- growth reinforcement
+- territorial memory
+
+### render.rs
+Terminal ecosystem visualization:
+- organism rendering
+- overlays
+- telemetry
+- cluster visualization
+- field underlays
+
+### ecology.rs
+Environmental pressure systems:
+- ecological balancing
+- adaptive ecosystem behavior
+- environmental pressure shaping
+
+---
+
+# Requirements
+
+Symbiote requires:
+
+- Rust
+- Cargo
+- A terminal that supports ANSI colors and Unicode rendering
+
+Recommended:
+- Linux
+- macOS
+- Windows Terminal
+- modern terminal emulators with true color support
+
+---
+
+# Installing Rust
+
+If Rust is not already installed:
+
+## Linux / macOS
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+After installation:
+
+```bash
+source "$HOME/.cargo/env"
+```
+
+Verify installation:
+
+```bash
+rustc --version
+cargo --version
+```
+
+---
+
+## Windows
+
+Install Rust using:
+
+https://rustup.rs/
+
+After installation:
+- restart terminal
+- verify:
+
+```bash
+rustc --version
+cargo --version
+```
+
+---
+
+# Cloning Symbiote
+
+## HTTPS (recommended for most users)
+
+```bash
+git clone https://github.com/ShamelesAbyss/Symbiote.git
+cd Symbiote
+```
+
+## SSH (for contributors/dev environments)
 
 ```bash
 git clone git@github.com:ShamelesAbyss/Symbiote.git
 cd Symbiote
+```
 
+---
+
+# Building Symbiote
+
+## Debug build
+
+```bash
+cargo build
+cargo run
+```
+
+## Optimized release build
+
+```bash
 cargo build --release
 cargo run --release
 ```
 
 ---
 
-# 🎮 Controls
+# Controls
 
 | Key | Action |
-|---|---|
-| `q` | Quit |
-| `space` | Pause simulation |
-| `r` | Reset ecosystem |
-| `n` | Generate new world seed |
-| `+` | Increase simulation speed |
-| `-` | Slow simulation |
+|-----|--------|
+| q | Quit |
+| space | Pause simulation |
+| r | Reset ecosystem |
+| n | Generate new world seed |
+| + | Increase simulation speed |
+| - | Decrease simulation speed |
 
 ---
 
-# 🔮 Planned Systems
+# Ecosystem Evolution Roadmap
 
-- Migration lanes
-- Territory memory
-- Ecosystem currents
-- Pattern reproduction
-- Oscillation locking
-- Predator-prey balancing
-- Mega-scale multi-region worlds
+Current active development targets:
 
----
-
-# 👤 Creator
-
-Built by **ShamelesAbyss**
-
-GitHub:
-https://github.com/ShamelesAbyss/Symbiote
+- adaptive population pressure
+- territorial intelligence
+- field-guided navigation
+- migration reinforcement
+- ecological affinity systems
+- cluster colony behavior
+- lineage inheritance
+- emergent sub-archetypes
+- ecosystem nervous system behavior
 
 ---
 
-# ⭐ Final Note
+# Release History
 
-The goal isn’t to script life.
+## v0.8.5 — Vertical Growth
+Introduced major vertical ecosystem expansion systems.
 
-The goal is to create conditions where life-like behavior emerges on its own.
+## v0.8.6 — Root Growth Stable
+Stabilized root infrastructure and substrate reinforcement systems.
 
-🧬
+## v0.9.0 — PatternField Emergence
+Integrated persistent ecological memory and territorial reinforcement behavior.
+
+## v0.10.0 — Territorial Intelligence
+Introduced ecosystem-aware movement pressure and territorial affinity drift.
+
+---
+
+# Philosophy
+
+Symbiote is an experiment in:
+- living procedural systems
+- artificial ecology
+- long-run emergence
+- persistent digital environments
+- ecosystem intelligence
+- memory-driven simulation
+
+The goal is not scripted gameplay.
+
+The goal is believable artificial existence.
+
+---
+
+# License
+
+MIT License
