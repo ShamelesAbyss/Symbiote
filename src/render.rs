@@ -546,8 +546,6 @@ fn field_haze_visual(kind: PatternKind, danger: f32, intensity: f32) -> Option<(
     Some(('.', Color::DarkGray))
 }
 
-
-
 fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
     if width == 0 || height == 0 {
         return;

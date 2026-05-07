@@ -62,7 +62,6 @@ impl FieldCell {
         self.intensity > 0.035 || self.age > 0
     }
 
-
     pub fn reinforce(
         &mut self,
         signature: PatternSignature,

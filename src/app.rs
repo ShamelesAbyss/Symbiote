@@ -362,6 +362,29 @@ impl App {
         }
     }
 
+    fn population_pressure(&self) -> f32 {
+        let soft_start = MIN_PARTICLES as f32 + (MAX_PARTICLES - MIN_PARTICLES) as f32 * 0.52;
+        let soft_full = MAX_PARTICLES as f32;
+
+        ((self.particles.len() as f32 - soft_start) / (soft_full - soft_start)).clamp(0.0, 1.0)
+    }
+
+    fn fertility_pressure_multiplier(
+        &self,
+        population_pressure: f32,
+        substrate_density: f32,
+        root_density: f32,
+    ) -> f32 {
+        let refill_bias = self.memory.density_refill_pressure as f32 / 1000.0;
+        let crowding_bias = self.memory.density_crowding_pressure as f32 / 1000.0;
+        let earned_density = (substrate_density * 1.15 + root_density * 0.85).clamp(0.0, 0.38);
+
+        (1.0 + refill_bias * 0.26 + earned_density * 0.32
+            - crowding_bias * 0.34
+            - population_pressure * 0.42)
+            .clamp(0.42, 1.18)
+    }
+
     fn native_reproduction(&mut self) {
         if self.particles.len() >= MAX_PARTICLES {
             return;
@@ -403,6 +426,12 @@ impl App {
         let mutation_pressure = self.memory.mutation_pressure();
         let pathfinder_bias = self.memory.pathfinder_bias();
         let corridor_pressure = self.memory.corridor_pressure();
+        let population_pressure = self.population_pressure();
+        let fertility_pressure = self.fertility_pressure_multiplier(
+            population_pressure,
+            substrate_density,
+            root_density,
+        );
 
         let structure_maturity = ((self.age.saturating_sub(REPRODUCTION_WARMUP_TICKS)) as f32
             / (STRUCTURE_WARMUP_TICKS - REPRODUCTION_WARMUP_TICKS).max(1) as f32)
@@ -423,7 +452,7 @@ impl App {
             } else {
                 0.0
             };
-            let adaptive_fertility_drag = harvester_resistance * 4.5;
+            let adaptive_fertility_drag = harvester_resistance * 4.5 + population_pressure * 18.0;
 
             let threshold = 118.0 - parent.genome.fertility * 11.5 - clustered_bonus * 14.0
                 + adaptive_fertility_drag;
@@ -438,7 +467,8 @@ impl App {
                 + rare_bonus
                 + mutation_pressure * 0.012
                 + pathfinder_bias * 0.006)
-                .clamp(0.006, 0.30);
+                .clamp(0.006, 0.30)
+                * fertility_pressure;
 
             if !rng.gen_bool(chance as f64) {
                 continue;
