@@ -174,6 +174,7 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
     let mut cells: Vec<Vec<Cell>> = vec![vec![Cell::default(); width]; height];
 
     draw_substrate(&mut cells, app, width, height);
+    let ambient_color = background_color(app);
     draw_signal_trails(&mut cells, app, width, height);
     draw_ecology_zones(&mut cells, app, width, height);
     draw_pattern_field(&mut cells, app, width, height);
@@ -300,7 +301,7 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
             } else if cell.count == 0 {
                 spans.push(Span::styled(
                     background_glyph(app.environment),
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(ambient_color),
                 ));
             } else {
                 let tribe = cell.dominant_tribe();
@@ -539,6 +540,43 @@ fn axiom_state_offset(state: AxiomPatternState) -> u64 {
     }
 }
 
+#[derive(Clone, Copy)]
+struct VisualMood {
+    maturity: f32,
+    mutation: f32,
+    corridor: f32,
+    throttle: f32,
+    recovery: f32,
+    crowding: f32,
+    refill: f32,
+}
+
+impl VisualMood {
+    fn from_app(app: &App) -> Self {
+        Self {
+            maturity: (app.age as f32 / 4_800.0).clamp(0.0, 1.0),
+            mutation: app.memory.mutation_pressure(),
+            corridor: app.memory.corridor_pressure(),
+            throttle: app.memory.substrate_throttle_pressure(),
+            recovery: app.memory.substrate_recovery_bias(),
+            crowding: app.memory.density_crowding_pressure as f32 / 1_000.0,
+            refill: app.memory.density_refill_pressure as f32 / 1_000.0,
+        }
+    }
+
+    fn quieting(self) -> f32 {
+        (self.maturity * 0.22 + self.throttle * 0.26 + self.crowding * 0.18).clamp(0.0, 0.52)
+    }
+
+    fn volatility(self) -> f32 {
+        (self.mutation * 0.48 + self.refill * 0.20 + self.recovery * 0.16).clamp(0.0, 0.72)
+    }
+
+    fn corridor_bias(self) -> f32 {
+        self.corridor.clamp(0.0, 1.0)
+    }
+}
+
 fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
     if width == 0 || height == 0 {
         return;
@@ -549,11 +587,8 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
         return;
     }
 
+    let mood = VisualMood::from_app(app);
     let field_cells = app.pattern_field.cells();
-    let maturity = visual_maturity(app.age);
-    let density_pressure = app.memory.density_occupied_ratio.clamp(0.0, 1.0);
-    let corridor_pressure = app.memory.corridor_pressure();
-    let throttle_pressure = app.memory.substrate_throttle_pressure();
 
     for y in 0..height {
         for x in 0..width {
@@ -581,12 +616,6 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                 continue;
             }
 
-            let atmospheric_pressure = field_cell
-                .intensity
-                .max(field_cell.danger)
-                .max(field_cell.drift * 0.72)
-                .max(field_cell.pulse * 0.58);
-
             if !should_render_field_haze(
                 app.age,
                 x,
@@ -594,13 +623,7 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                 field_cell.kind,
                 field_cell.danger,
                 field_cell.intensity,
-                field_cell.stability,
-                field_cell.pulse,
-                field_cell.drift,
-                maturity,
-                density_pressure,
-                corridor_pressure,
-                throttle_pressure,
+                mood,
             ) {
                 continue;
             }
@@ -609,11 +632,7 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                 field_cell.kind,
                 field_cell.danger,
                 field_cell.intensity,
-                field_cell.stability,
-                field_cell.pulse,
-                field_cell.drift,
-                atmospheric_pressure,
-                maturity,
+                mood,
             ) else {
                 continue;
             };
@@ -623,7 +642,6 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn should_render_field_haze(
     age: u64,
     x: usize,
@@ -631,61 +649,41 @@ fn should_render_field_haze(
     kind: PatternKind,
     danger: f32,
     intensity: f32,
-    stability: f32,
-    pulse: f32,
-    drift: f32,
-    maturity: f32,
-    density_pressure: f32,
-    corridor_pressure: f32,
-    throttle_pressure: f32,
+    mood: VisualMood,
 ) -> bool {
-    let pressure = danger.max(intensity).max(pulse * 0.72).max(drift * 0.64);
+    let pressure = danger.max(intensity);
+    let quiet_floor = 0.28 + mood.quieting() * 0.20 - mood.volatility() * 0.08;
 
-    let floor = 0.28 + maturity * 0.10 + density_pressure * 0.06 - danger * 0.08;
-
-    if pressure < floor.clamp(0.22, 0.46) {
+    if pressure < quiet_floor {
         return false;
     }
 
-    let base_spacing: usize = if danger > 0.78 || intensity > 0.92 {
+    let spacing: usize = if danger > 0.76 || intensity > 0.92 {
         3
     } else if danger > 0.58 || intensity > 0.78 {
         5
-    } else if drift > 0.68 || pulse > 0.72 {
-        7
     } else if intensity > 0.56 {
         9
     } else {
         15
     };
 
-    let maturity_quiet = if stability > 0.62 && danger < 0.34 {
-        (maturity * 6.0).round() as usize
+    let quiet_extra = (mood.quieting() * 9.0).round() as usize;
+    let volatile_relief = (mood.volatility() * 4.0).round() as usize;
+    let corridor_relief = if matches!(
+        kind,
+        PatternKind::Chain | PatternKind::Glider | PatternKind::Swarmfront
+    ) {
+        (mood.corridor_bias() * 4.0).round() as usize
     } else {
         0
     };
 
-    let corridor_reveal = if corridor_pressure > 0.52
-        && matches!(
-            kind,
-            PatternKind::Glider | PatternKind::Swarmfront | PatternKind::Chain
-        ) {
-        2
-    } else {
-        0
-    };
-
-    let throttle_reveal = if throttle_pressure > 0.56 && danger > 0.42 {
-        2
-    } else {
-        0
-    };
-
-    let spacing = base_spacing
-        .saturating_add(maturity_quiet)
-        .saturating_sub(corridor_reveal)
-        .saturating_sub(throttle_reveal)
-        .max(2);
+    let spacing = spacing
+        .saturating_add(quiet_extra)
+        .saturating_sub(volatile_relief)
+        .saturating_sub(corridor_relief)
+        .max(3);
 
     let kind_offset = match kind {
         PatternKind::Halo => 1,
@@ -700,81 +698,42 @@ fn should_render_field_haze(
         PatternKind::Dormant => 10,
     };
 
-    let atmospheric_tick = if maturity > 0.68 { age / 9 } else { age / 5 };
-
-    visual_hash(atmospheric_tick + kind_offset, x, y) % spacing == 0
+    visual_hash(age / 6 + kind_offset, x, y) % spacing == 0
 }
 
-#[allow(clippy::too_many_arguments)]
 fn field_haze_visual(
     kind: PatternKind,
     danger: f32,
     intensity: f32,
-    stability: f32,
-    pulse: f32,
-    drift: f32,
-    atmospheric_pressure: f32,
-    maturity: f32,
+    mood: VisualMood,
 ) -> Option<(char, Color)> {
-    if atmospheric_pressure < 0.24 {
-        return None;
-    }
-
     if danger > 0.82 {
         return Some(('×', Color::Red));
     }
 
     if danger > 0.58 {
         return Some((
-            if pulse > 0.55 { '!' } else { '·' },
-            if maturity > 0.55 {
-                Color::Red
+            '.',
+            if mood.mutation > 0.42 {
+                Color::Magenta
             } else {
                 Color::DarkGray
             },
         ));
     }
 
-    if drift > 0.72 {
+    if intensity > 0.90 {
         return Some((
-            match kind {
-                PatternKind::Swarmfront | PatternKind::Glider => ',',
-                PatternKind::Chain => '╌',
-                _ => '˙',
-            },
-            Color::Magenta,
-        ));
-    }
-
-    if pulse > 0.76 {
-        return Some((
-            match kind {
-                PatternKind::Oscillator | PatternKind::Halo => '∴',
-                PatternKind::Bloom | PatternKind::Nest => '·',
-                _ => '.',
-            },
-            if intensity > 0.72 {
-                Color::Blue
+            if mood.corridor > 0.48
+                && matches!(
+                    kind,
+                    PatternKind::Chain | PatternKind::Glider | PatternKind::Swarmfront
+                )
+            {
+                ','
             } else {
-                Color::DarkGray
+                '·'
             },
-        ));
-    }
-
-    if stability > 0.70 && maturity > 0.42 {
-        return Some((
-            match kind {
-                PatternKind::Lattice | PatternKind::StillLife => '∙',
-                PatternKind::Nest => '·',
-                _ => '.',
-            },
-            Color::DarkGray,
-        ));
-    }
-
-    if intensity > 0.86 {
-        return Some((
-            '·',
             match kind {
                 PatternKind::Nest | PatternKind::Bloom => Color::Green,
                 PatternKind::Glider | PatternKind::Halo => Color::Blue,
@@ -786,7 +745,7 @@ fn field_haze_visual(
         ));
     }
 
-    if intensity > 0.58 {
+    if intensity > 0.64 {
         return Some((
             match kind {
                 PatternKind::Swarmfront | PatternKind::Glider | PatternKind::Chain => ',',
@@ -794,7 +753,11 @@ fn field_haze_visual(
                 PatternKind::Halo | PatternKind::Oscillator => '.',
                 PatternKind::Lattice | PatternKind::StillLife | PatternKind::Dormant => '∙',
             },
-            Color::DarkGray,
+            if mood.throttle > 0.55 {
+                Color::DarkGray
+            } else {
+                Color::Gray
+            },
         ));
     }
 
@@ -806,6 +769,8 @@ fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usiz
         return;
     }
 
+    let mood = VisualMood::from_app(app);
+
     for y in 0..height {
         for x in 0..width {
             let kind = app.substrate.sample_screen(x, y, width, height);
@@ -814,7 +779,8 @@ fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usiz
                 continue;
             }
 
-            let Some((glyph, color)) = substrate_visual(app, kind, x, y, width, height) else {
+            let Some((glyph, color)) = substrate_visual(app, kind, x, y, width, height, mood)
+            else {
                 continue;
             };
 
@@ -830,33 +796,49 @@ fn substrate_visual(
     y: usize,
     width: usize,
     height: usize,
+    mood: VisualMood,
 ) -> Option<(char, Color)> {
+    let quiet = mood.quieting();
+    let volatile = mood.volatility();
+
     match kind {
         CellKind::Empty => None,
         CellKind::Life => {
-            let shimmer = visual_hash(app.age / 2, x, y) % 18;
+            let spacing = (22.0 + quiet * 18.0 - volatile * 8.0).round().max(12.0) as u64;
+            let shimmer = visual_hash(app.age / 3, x, y) as u64 % spacing;
 
             if shimmer == 0 {
                 Some(('∙', Color::DarkGray))
-            } else if shimmer == 1 {
-                Some(('·', Color::DarkGray))
+            } else if shimmer == 1 && volatile > 0.36 {
+                Some(('·', Color::Gray))
             } else {
                 None
             }
         }
         CellKind::Nutrient => {
-            let shimmer = visual_hash(app.age / 2, x, y) % 6;
+            let spacing = (8.0 + quiet * 8.0 - mood.recovery * 3.0).round().max(5.0) as u64;
+            let shimmer = visual_hash(app.age / 2, x, y) as u64 % spacing;
+
             if shimmer == 0 {
                 Some(('+', Color::Green))
-            } else if shimmer <= 2 {
+            } else if shimmer <= 1 && mood.recovery > 0.30 {
                 Some(('.', Color::Green))
             } else {
                 None
             }
         }
         CellKind::Dead => {
-            if visual_hash(app.age / 3, x, y) % 5 == 0 {
-                Some(('×', Color::DarkGray))
+            let spacing = (7.0 + quiet * 8.0 - mood.mutation * 3.0).round().max(4.0) as u64;
+
+            if visual_hash(app.age / 4, x, y) as u64 % spacing == 0 {
+                Some((
+                    '×',
+                    if mood.mutation > 0.46 {
+                        Color::Magenta
+                    } else {
+                        Color::DarkGray
+                    },
+                ))
             } else {
                 None
             }
@@ -871,7 +853,10 @@ fn substrate_visual(
         }
         CellKind::Nest => Some(('◎', Color::Cyan)),
         CellKind::Spore => {
-            let shimmer = visual_hash(app.age / 2, x, y) % 14;
+            let spacing = (18.0 + quiet * 10.0 - mood.recovery * 5.0)
+                .round()
+                .max(10.0) as u64;
+            let shimmer = visual_hash(app.age / 2, x, y) as u64 % spacing;
 
             if shimmer == 0 {
                 Some(('░', Color::DarkGray))
@@ -1716,38 +1701,55 @@ fn render_species(f: &mut Frame<'_>, area: Rect, app: &App) {
 
 fn render_events(f: &mut Frame<'_>, area: Rect, app: &App) {
     let density_status = app.memory.density_status_line();
+    let mood = VisualMood::from_app(app);
+    let phase = memory_phase_label(mood);
 
     let mut items = vec![
         ListItem::new(Line::from(vec![
-            Span::styled("density ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                "density ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(
                 density_status,
-                Style::default()
-                    .fg(density_band_color(&app.memory.density_band))
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(density_color(&app.memory.density_band)),
             ),
         ])),
         ListItem::new(Line::from(vec![
-            Span::styled("field ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                "memory ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(
                 format!(
-                    "active:{} avg:{:.2} strongest:{} mature:{:.0}%",
-                    app.pattern_field.active_cells(),
-                    app.pattern_field.average_intensity(),
-                    app.pattern_field.strongest_kind().short(),
-                    visual_maturity(app.age) * 100.0
+                    "{} root:{:.2} cor:{:.2} sub:{:.2} mut:{:.2}",
+                    phase,
+                    app.memory.root_avoidance_pressure(),
+                    app.memory.corridor_pressure(),
+                    app.memory.substrate_throttle_pressure(),
+                    app.memory.mutation_pressure()
                 ),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(memory_phase_color(mood)),
             ),
         ])),
     ];
 
-    items.extend(app.events.iter().rev().map(|event| {
-        ListItem::new(Line::from(Span::styled(
-            event.clone(),
-            Style::default().fg(Color::Cyan),
-        )))
-    }));
+    items.extend(
+        app.events
+            .iter()
+            .rev()
+            .map(|event| {
+                ListItem::new(Line::from(Span::styled(
+                    event.clone(),
+                    Style::default().fg(Color::Cyan),
+                )))
+            })
+            .collect::<Vec<_>>(),
+    );
 
     f.render_widget(
         List::new(items).block(
@@ -1757,6 +1759,57 @@ fn render_events(f: &mut Frame<'_>, area: Rect, app: &App) {
         ),
         area,
     );
+}
+
+fn memory_phase_label(mood: VisualMood) -> &'static str {
+    if mood.mutation > 0.58 {
+        "unstable"
+    } else if mood.corridor > 0.54 {
+        "channeling"
+    } else if mood.throttle > 0.58 {
+        "cooling"
+    } else if mood.recovery > 0.48 {
+        "recovering"
+    } else if mood.maturity > 0.62 {
+        "settled"
+    } else {
+        "adapting"
+    }
+}
+
+fn memory_phase_color(mood: VisualMood) -> Color {
+    if mood.mutation > 0.58 {
+        Color::Magenta
+    } else if mood.corridor > 0.54 {
+        Color::Blue
+    } else if mood.throttle > 0.58 {
+        Color::DarkGray
+    } else if mood.recovery > 0.48 {
+        Color::Green
+    } else {
+        Color::Cyan
+    }
+}
+
+fn density_color(label: &str) -> Color {
+    match label {
+        "Starved" => Color::Red,
+        "Sparse" => Color::Yellow,
+        "Balanced" => Color::Green,
+        "Crowded" => Color::Magenta,
+        "Saturated" => Color::Red,
+        _ => Color::DarkGray,
+    }
+}
+
+fn background_color(app: &App) -> Color {
+    let mood = VisualMood::from_app(app);
+
+    if mood.mutation > 0.62 && app.age % 9 < 2 {
+        Color::Gray
+    } else {
+        Color::DarkGray
+    }
 }
 
 fn render_metrics(f: &mut Frame<'_>, area: Rect, app: &App) {
@@ -1967,10 +2020,12 @@ fn matrix_color(value: f32) -> Color {
     }
 }
 
+#[allow(dead_code)]
 fn visual_maturity(age: u64) -> f32 {
     (age as f32 / 4_800.0).clamp(0.0, 1.0)
 }
 
+#[allow(dead_code)]
 fn density_band_color(band: &str) -> Color {
     match band {
         "Starved" => Color::Red,
