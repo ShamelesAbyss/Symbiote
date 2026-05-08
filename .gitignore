@@ -5,3 +5,7 @@
 .env
 .DS_Store
 **/*.rs.bk
+
+# Symbiote runtime memory/state
+memory/
+src/memory/
