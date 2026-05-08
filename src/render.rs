@@ -808,9 +808,9 @@ fn substrate_visual(
             let shimmer = visual_hash(app.age / 3, x, y) as u64 % spacing;
 
             if shimmer == 0 {
-                Some(('∙', Color::DarkGray))
+                None
             } else if shimmer == 1 && volatile > 0.36 {
-                Some(('·', Color::Gray))
+                None
             } else {
                 None
             }
@@ -859,7 +859,7 @@ fn substrate_visual(
             let shimmer = visual_hash(app.age / 2, x, y) as u64 % spacing;
 
             if shimmer == 0 {
-                Some(('░', Color::DarkGray))
+                None
             } else {
                 None
             }
