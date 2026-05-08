@@ -1,40 +1,51 @@
+```Markdown
 # Symbiote
 
-Persistent artificial life ecosystem written entirely in Rust.
+Rust Powered Terminal Artificial Life SIM
 
-Symbiote is a real-time terminal-rendered biosphere focused on:
+Symbiote is a persistent artificial life ecosystem written entirely in Rust.
+
+It is a real-time terminal-rendered biosphere focused on:
+
 - emergence
 - territorial memory
 - adaptive ecology
 - lineage evolution
+- morphology-aware behavior
+- long-run ecosystem persistence
+- migration topology
+- ecological reinforcement
+- ecosystem readability
+- procedural infrastructure growth
 - Conway-inspired substrate behavior
-- colony formation
-- long-run ecosystem intelligence
-- trophic pressure
-- live ecological observability
-- exploratory camera navigation
+- axiom-driven evolutionary pressure
+- open-ended artificial life experimentation
 
-This is not a traditional game and not a fixed simulation sandbox.
+This is not a traditional game.
 
 Symbiote is designed as a living procedural ecosystem where:
+
 - organisms evolve
 - ecological pressure accumulates
 - migration lanes emerge
 - territory stabilizes
 - infrastructure persists
 - species rise and collapse
-- cells form Conway-inspired patterns
-- colonies develop behavioral memory
-- the world develops historical memory over time
-- predators and herbivores create trophic cycling
-- structural organisms emerge from long-run pressure
-- the observer can zoom and pan through the living world
+- roots become geography
+- archetypes form ecological roles
+- lineages become persistent history
+- the world develops memory over time
 
----
+The goal is not scripted gameplay.
 
-# Current Ecosystem Focus
+The goal is believable artificial existence.
 
-Symbiote now emphasizes:
+---------------------------------------------------------------------------------
+
+## Current Ecosystem Focus
+
+Symbiote currently emphasizes:
+
 - adaptive ecological behavior
 - territorial reinforcement
 - long-run ecosystem persistence
@@ -43,38 +54,46 @@ Symbiote now emphasizes:
 - lineage drift and species turnover
 - ecological memory fields
 - procedural infrastructure growth
-- Conway-inspired cellular emergence
-- colony propagation and behavioral pressure
 - ecosystem storytelling through behavior
-- trophic ecological cycling
-- live ecological telemetry
-- archetype observability
-- computational biome readability
-- local ecosystem inspection through camera controls
+- morphology-aware rendering
+- behavioral readability
+- adaptive substrate density
+- field-responsive motion
+- invisible ecology pressure systems
+- computational weather-like ecosystem influence
+- movement-first rendering philosophy
+- archetype inheritance
+- primitive-to-evolved life progression
+- regional archetype cohesion
+- axiom divergence telemetry
+- Conway-inspired evolutionary pressure
 
 The ecosystem intentionally begins sparse and evolves naturally through:
+
 - survival
 - reproduction
 - migration
 - ecological pressure
 - adaptive reinforcement
-- local cell birth/survival rules
-- cluster persistence
-- colony memory
-- trophic role pressure
-- long-run territorial development
+- territorial attraction
+- ecological avoidance
+- lineage adaptation
+- archetype specialization
+- maturity-based persistence
+- axiom-imprinted mutation pressure
 
 Density is earned by the ecosystem itself over time.
 
----
+-----------------------------------------------------------------------------------
 
-# Core Systems
+## Core Systems
 
-## PatternField Ecology
+### PatternField Ecology
 
 The PatternField system acts as persistent ecological memory.
 
 It stores and reinforces:
+
 - danger
 - growth
 - cohesion
@@ -83,23 +102,94 @@ It stores and reinforces:
 - migration traces
 - territorial pressure
 - ecosystem history
+- reinforcement corridors
+- ecological affinity pressure
 
-The field actively influences ecosystem behavior and long-run topology while remaining visually restrained to preserve readability.
+The field actively influences:
 
-The field is not meant to dominate the viewport.
+- ecosystem behavior
+- territorial formation
+- migration topology
+- ecological balancing
+- movement pressure
+- long-run world structure
 
-It works best as an invisible or subtle ecological pressure layer whose effects are revealed through:
-- organism movement
-- settlement patterns
-- migration flow
-- collapse and recovery
-- territorial clustering
+The field is evolving toward:
 
----
+> an ecosystem nervous system.
 
-## Territorial Reinforcement
+Importantly, the field layer is now treated primarily as:
+
+- invisible atmospheric pressure
+- ecological memory
+- migration influence
+- behavioral guidance
+- computational weather
+
+rather than a dominant visual overlay.
+
+-------------------------------------------------------------------------------------------------------
+
+### Conway-Style Cellular Ecology
+
+Symbiote includes Conway-inspired propagation systems integrated directly into substrate ecology.
+
+Core automata behavior includes:
+
+- survival with 2–3 neighboring live cells
+- underpopulation death
+- overpopulation collapse
+- birth from exactly 3 neighboring live neighbors
+- propagation reinforcement
+- ecological fronts
+- substrate terraces
+- oscillation pockets
+- dead-cell wake formation
+
+Additional ecological propagation pressure exists for:
+
+- spores
+- nutrients
+- dead substrate
+- mutagen spread
+- nest formation
+
+These systems transformed Symbiote from random particle activity into:
+
+- persistent ecosystem topology
+- emergent infrastructure
+- migration terrain
+- ecological seam formation
+- long-run propagation behavior
+
+--------------------------------------------------------------------------------------------------------
+
+### Axiom Lattice
+
+The Axiom Lattice is a Conway-inspired abstract pattern layer used for evolutionary interpretation.
+
+It tracks pattern states such as:
+
+- Dormant
+- Static
+- Oscillating
+- Translating
+- Expanding
+- Collapsing
+- Chaotic
+
+These states provide a foundation for axiom-driven heredity and future open-ended mutation pressure.
+
+The Axiom Lattice does not directly script life.
+
+It acts as an abstract ecological signal that can influence how mature lineages diverge over time.
+
+---------------------------------------------------------------------------------------------------------
+
+### Territorial Reinforcement
 
 The world gradually develops:
+
 - ecological districts
 - migration corridors
 - root highways
@@ -107,644 +197,699 @@ The world gradually develops:
 - persistent settlement regions
 - abandoned ecological zones
 - infrastructure-like reinforcement structures
+- stabilized organism lanes
+- corridor ecosystems
+- ecological bottlenecks
 
 The simulation preserves traces of prior ecological states, allowing the world to develop historical continuity.
 
----
+-----------------------------------------------------------------------------------------------------------------------------
 
-## Conway-Inspired Cellular Ecology
+### Colony Pressure Systems
 
-The substrate layer includes simple but fundamental cellular emergence rules:
-- live cells survive with 2 or 3 live neighbors
-- live cells die from underpopulation
-- live cells die from overpopulation
-- dead or empty substrate can birth life with exactly 3 live neighbors
-- spores, nutrients, and dead cells can support near-birth propagation
-- roots remain structural barriers instead of becoming ordinary cells
+Cluster systems evolve behavior pressure from:
 
-This gives the cell system room to generate:
-- spontaneous local structures
-- oscillating pockets
-- propagation fronts
-- terraces
-- dead-cell wakes
-- substrate recovery regions
-- ecological chambers
-
-without hardcoding specific pattern types.
-
----
-
-## Colony Propagation Ecology
-
-Clusters now act as a bridge between individual organisms and emergent species behavior.
-
-Colonies can develop pressure based on:
 - age
-- stability
 - density
-- membrane strength
 - movement speed
-- territorial anchoring
+- membrane strength
 - drift heat
+- territorial anchoring
+- stability
+- reinforcement pressure
 
-This allows:
-- old settled colonies to stabilize
-- moving fronts to become more distinct
-- dense clusters to reinforce membrane-like structures
-- structural archetypes to emerge naturally
-- long-run colony behavior to become visible through motion instead of overlays
+This enables naturally emerging:
 
-without adding hardcoded behavior scripting.
+- settled colonies
+- migration fronts
+- adaptive swarm behavior
+- membrane structures
+- ecological expansion waves
+- reinforcement corridors
 
----
+without hardcoded scripted species roles.
 
-## Trophic Ecology
+------------------------------------------------------
 
-Symbiote now supports emergent trophic pressure cycles.
+### Archetype Ecology
 
-The ecosystem can naturally develop:
-- prey blooms
-- grazer pressure
-- harvester cleanup behavior
-- apex predator emergence
-- collapse and recovery cycles
-- ecological succession
+Creatures evolve into ecosystem roles:
 
-Current trophic archetypes include:
-- Grazers
-- Harvesters
-- Hunters
-- Reapers
-- Parasites
-- structural colony organisms
-- drifting ecological specialists
+- Grazer
+- Mycelial
+- Swarmer
+- Hunter
+- Architect
+- Parasite
+- Orbiter
+- Leviathan
+- Phantom
+- Harvester
+- Reaper
 
-The ecosystem now visibly transitions through:
+Archetypes are not just visual labels.
 
-```text
-substrate growth
-→ population bloom
-→ harvester cleanup pressure
-→ biological crowding
-→ reaper emergence
-→ collapse
-→ recovery
-→ regrowth
-```
+They are ecological strategies shaped by genome, environment, pressure, inheritance, and survival.
 
-Harvesters now act as gentler ecological cleanup organisms.
+----------------------------------------------------------------------------------------------------------
 
-Reapers now behave as unstable apex pressure rather than permanent ecosystem deletion.
+### Evolutionary Hierarchy
 
----
+Symbiote follows a clear artificial-life ladder:
 
-## Structural Archetypes
 
-Symbiote now has improved emergence for structural and rare ecological roles.
+primitive particles
+→ evolved archetypes
+→ persistent inherited lineages
+→ mature regional populations
+→ axiom-imprinted descendants
 
-Important archetypes include:
-- SWR — Swarmer
-- HNT — Hunter
-- GRZ — Grazer
-- ORB — Orbiter
-- PAR — Parasite
-- ARC — Architect
-- LEV — Leviathan
-- MYC — Mycelial
-- PHM — Phantom
-- HRV — Harvester
-- RPR — Reaper
 
-Recent updates improved visibility and viability for:
-- Mycelial organisms
-- Architects
-- Leviathans
-- Phantoms
-- Swarmers
+Particles are the earliest life form.
 
-These roles are now easier to observe through live telemetry and improved glyph identity.
+Archetypes are evolved life forms.
 
----
+Axiom-imprinted descendants are the beginning of higher-order emergent life.
 
-## Artificial Life Simulation
+---------------------------------------------------------------------------------------
+
+### Morphology-Aware Organisms
+
+Organisms visually express:
+
+* role specialization
+* density state
+* ecological pressure
+* territorial behavior
+* movement identity
+* cluster structure
+* adaptive behavior classes
+
+Rendering is behavior-first rather than pure particle density.
+
+------------------------------------------------------------------------------------------------
+
+### Living Root Ecosystem
+
+Symbiote contains a fully simulated substrate and root layer featuring:
+
+* gradual root expansion
+* tree-like growth
+* root collision systems
+* regenerative substrate zones
+* cellular automata-driven growth
+* protected trunk structures
+* organic upward propagation
+* persistent environmental geography
+
+Roots act as static ecological infrastructure once formed.
+
+They behave as terrain, walls, pathways, and geography that life must navigate around or learn to survive near.
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+### Artificial Life Simulation
 
 Symbiote combines:
-- artificial life systems
-- Conway-inspired emergence pressure
-- ecological balancing
-- procedural biology
-- cluster intelligence
-- species mutation drift
-- substrate growth systems
-- terminal-rendered ecosystem visualization
-- trophic cycling
-- persistent ecological memory
-- exploratory world inspection
+
+* artificial life systems
+* Conway-inspired emergence pressure
+* ecological balancing
+* procedural biology
+* cluster intelligence
+* species mutation drift
+* substrate growth systems
+* terminal-rendered ecosystem visualization
+* lineage inheritance
+* axiom divergence telemetry
 
 without becoming deterministic or scripted.
 
----
+---------------------------------------------------------------------------------------------------------------------------------
 
-# Observability and Telemetry
-
-The ecosystem now includes live ecological instrumentation.
-
-Current telemetry includes:
-- active archetype counts
-- peak archetype counts
-- trophic balance reporting
-- live species emergence tracking
-- ecological density reporting
-- cluster telemetry
-- substrate telemetry
-- corridor pressure analysis
-- root pressure observation
-- long-run ecological memory
-- active particle archetype accounting
-- predator/herbivore/prey balance summaries
-
-This allows the simulation to function like a readable computational ecology console instead of opaque particle noise.
-
-The side panel now acts as an instrument cluster for:
-- population analysis
-- trophic balance
-- ecological role diversity
-- structural archetype emergence
-- collapse and recovery observation
-- long-run tuning
-
----
-
-# Exploratory Camera System
-
-Symbiote now includes an exploratory camera.
-
-The camera allows the observer to:
-- zoom into local regions
-- pan through the ecosystem
-- inspect Leviathans up close
-- follow Reaper hunting behavior
-- watch Harvesters clean dense cell beds
-- study root highways and corridors
-- inspect colony membranes
-- observe migration fronts
-- examine local trophic interactions
-
-Camera behavior:
-- mouse wheel zooms in and out
-- arrow keys pan the viewport
-- `0` resets the camera
-- zoom range is 1.0x to 6.0x
-- panning scales with zoom for fine control
-- the view clamps inside the world bounds
-
-The camera affects rendering only.
-
-It does not affect:
-- particle movement
-- reproduction
-- species evolution
-- roots
-- Conway substrate
-- field memory
-- telemetry counts
-- trophic behavior
-- ecology logic
-
-Before the camera, the observer watched the biosphere from orbit.
-
-Now the observer can fly through it.
-
----
-
-# Visual Identity
+## Visual Identity
 
 Symbiote intentionally avoids:
-- overwhelming particle spam
-- unreadable density
-- excessive visual clutter
-- over-rendered atmosphere layers
+
+* overwhelming particle spam
+* unreadable density
+* excessive visual clutter
+* brute-force rendering
+* meaningless chaos rendering
+* visible render lattices
+* ecology oversaturation
+* overlay dominance
 
 Instead the ecosystem emphasizes:
-- contrast
-- migration readability
-- ecological topology
-- persistent infrastructure
-- territorial behavior
-- ecosystem aging
-- meaningful negative space
-- readable cellular emergence
-- structural readability
-- organism motion clarity
-- distinct archetype identity
-- clean telemetry instead of noisy overlays
+
+* contrast
+* migration readability
+* ecological topology
+* persistent infrastructure
+* territorial behavior
+* ecosystem aging
+* foreground organism clarity
+* long-run readability
+* behavioral visualization
+* sparse-space ecology
+* movement-first rendering
+* negative-space hierarchy
+* invisible atmospheric pressure systems
+* ecology-driven cinematography
 
 The empty space is part of the ecology.
 
-The renderer now trusts the simulation.
+--------------------------------------------------------------------------------------------------------------------------------
 
-The world shows consequences instead of constantly painting the machinery underneath.
+## Invisible Ecology Rendering
 
----
+Recent renderer evolution fundamentally changed how Symbiote communicates ecosystem intelligence.
 
-# Architecture
+The renderer treats:
 
-Core modules:
+* field memory
+* pattern analysis
+* ecological pressure
+* migration influence
+* atmospheric systems
+* density balancing
 
-```text
+as mostly invisible systems that shape organism behavior rather than constantly painting the viewport.
+
+This dramatically improved:
+
+* movement readability
+* migration interpretation
+* ecological clarity
+* territorial segmentation
+* front-edge visibility
+* long-run watchability
+* substrate topology readability
+* computational biome appearance
+
+The renderer philosophy is:
+
+> show consequences, not machinery
+
+The ecosystem increasingly resembles:
+
+* living terrain
+* computational weather
+* procedural ecology
+* artificial environmental pressure
+
+instead of a flat particle renderer.
+
+-----------------------------------------------------------------------------------------------------------------
+
+## Exploratory Camera Systems
+
+Symbiote supports exploratory camera behavior for deeper ecosystem inspection.
+
+The camera system improves:
+
+* viewport readability
+* fine-grained ecosystem analysis
+* large-world navigation
+* local behavior inspection
+* zoomed-in pattern observation
+* desktop readability
+
+This makes it easier to study mature worlds without losing sight of localized ecological behavior.
+
+----------------------------------------------------------------------------------------------------------------------
+
+## Architecture
+
+### Core Modules
+
 src/
-├── main.rs
-├── app.rs
-├── sim.rs
-├── render.rs
-├── field.rs
-├── pattern.rs
-├── cluster.rs
-├── species.rs
-├── particle.rs
-├── ecology.rs
-├── automata.rs
-├── memory.rs
-├── tree.rs
-├── density.rs
-└── life.rs
-```
+├── main.rs      # ultra-thin boot entry
+├── app.rs       # ecosystem orchestration/runtime ownership
+├── sim.rs       # core simulation logic
+├── render.rs    # ecosystem rendering + readability systems
+├── field.rs     # PatternField ecosystem memory
+├── pattern.rs   # Conway-inspired pattern classification
+├── life.rs      # Axiom lattice + evolutionary pattern telemetry
+├── cluster.rs   # formations + colony systems
+├── species.rs   # lineage + mutation drift
+├── particle.rs  # organism behavior/state
+├── ecology.rs   # ecological balancing pressure
+├── automata.rs  # substrate/root cellular systems
+├── memory.rs    # ecosystem persistence systems
+├── tree.rs      # trunk/root generation
+└── density.rs   # adaptive density governance
 
-## Important System Roles
+-------------------------------------------------------------------------------------------------------------------------
+### Important System Roles
 
-### main.rs
-
-Ultra-thin boot and input layer:
-- module wiring
-- terminal setup
-- event loop
-- keyboard controls
-- mouse capture
-- zoom input
-- pan input
-- clean shutdown
-
-### app.rs
+#### app.rs
 
 Top-level ecosystem orchestration:
-- lifecycle management
-- spawning
-- telemetry
-- PatternField ownership
-- reproduction pressure
-- substrate cadence
-- Conway generation timing
-- reset/randomization
-- archetype accounting
-- ecological observation routing
-- camera state
-- camera zoom/pan helpers
 
-### sim.rs
+* lifecycle management
+* spawning
+* telemetry
+* PatternField ownership
+* AxiomLattice ownership
+* reproduction pressure
+* reset and randomization
+* runtime ecosystem governance
+* cadence balancing
+* adaptive reinforcement staging
+* environmental pressure timing
+
+#### sim.rs
 
 Core simulation engine:
-- movement
-- ecology interaction
-- reproduction
-- field influence
-- behavioral pressure
-- archetype logic
-- particle/cell interaction
-- field polarity response
-- trophic pressure
-- substrate cleanup behavior
-- apex predator pressure
-- root collision and surface flow
 
-### field.rs
+* movement
+* ecology interaction
+* reproduction
+* field influence
+* behavioral pressure
+* archetype logic
+* territorial navigation
+* adaptive response behavior
+* corridor pressure navigation
+* migration response
+* invisible field pressure influence
+* archetype inheritance helpers
+* axiom imprint helper functions
+
+#### life.rs
+
+Axiom and Conway-inspired evolutionary layer:
+
+* B3/S23 cellular rules
+* known seed patterns
+* pattern-state classification
+* AxiomStats telemetry
+* AxiomImprint pressure model
+* current_imprint sampling
+* oscillation and translation detection
+* abstract heredity groundwork
+
+#### field.rs
 
 Persistent ecological memory layer:
-- migration traces
-- stability fields
-- danger pressure
-- growth reinforcement
-- territorial memory
-- motion memory
 
-### pattern.rs
+* migration traces
+* stability fields
+* danger pressure
+* growth reinforcement
+* territorial memory
+* corridor persistence
+* ecological reinforcement
+* atmospheric behavioral pressure
+* invisible ecosystem guidance
 
-Morphology interpretation layer:
-- Conway-inspired pattern signatures
-- oscillator/still life/front classification
-- morphology roles
-- structural pressure
-- pattern glyph/readout support
-
-### render.rs
+#### render.rs
 
 Terminal ecosystem visualization:
-- organism rendering
-- restrained overlays
-- telemetry
-- cluster visualization
-- substrate thinning
-- visual hierarchy refinement
-- archetype observability
-- trophic telemetry
-- camera-aware sampling
-- zoomed rendering
-- pan-aware viewport transforms
-- readability-first rendering philosophy
 
-### cluster.rs
+* organism rendering
+* overlays
+* telemetry
+* cluster visualization
+* substrate hierarchy
+* morphology-aware readability
+* behavioral foreground emphasis
+* adaptive attenuation
+* negative-space hierarchy
+* movement-first rendering
+* invisible ecology rendering philosophy
 
-Colony and group identity layer:
-- cluster detection
-- colony age
-- stability
-- membranes
-- drift heat
-- territorial anchoring
-- behavioral colony pressure
+#### automata.rs
 
-### species.rs
+Conway-inspired substrate ecology:
 
-Lineage and taxonomy layer:
-- species creation
-- genome blending
-- archetype derivation
-- extinction tracking
-- lineage naming
-- trophic role emergence
-- structural archetype emergence
-- environmental identity drift
+* live/dead cellular propagation
+* nutrient spread
+* ecological front generation
+* substrate evolution
+* oscillation behavior
+* ecological seam formation
+* root interaction
+* terrain-like ecosystem topology
 
-### ecology.rs
+#### cluster.rs
+
+Colony and structure behavior:
+
+* cluster tracking
+* formation pressure
+* colony drift
+* structure maturity
+* archetype override behavior
+* corridor scoring
+* settlement logic
+
+#### species.rs
+
+Species and archetype derivation:
+
+* genome classification
+* archetype assignment
+* rare traits
+* lineage pressure
+* evolved-role interpretation
+
+#### memory.rs
+
+Long-term ecosystem telemetry:
+
+* archetype live counts
+* archetype peak counts
+* trophic balance
+* extinction tracking
+* primitive/evolved/mature population telemetry
+* long-run ecosystem memory
+
+#### ecology.rs
 
 Environmental pressure systems:
-- ecological balancing
-- adaptive ecosystem behavior
-- environmental pressure shaping
-- sparse macro-pressure zones
 
-### automata.rs
+* ecological balancing
+* adaptive ecosystem behavior
+* environmental pressure shaping
+* overcrowding response
+* ecosystem stabilization
 
-Cellular substrate layer:
-- root barriers
-- life cells
-- nutrients
-- dead cells
-- spores
-- mutagens
-- nests
-- Conway-style survival/birth rules
-- near-birth propagation pressure
+-------------------------------------------------------------------------------------------------
 
-### tree.rs
-
-Root infrastructure policy:
-- root growth
-- trunk/branch/canopy staging
-- root caps
-- directional growth pressure
-- barriers and surface flow
-
-### density.rs
-
-Density observation layer:
-- cell density
-- root density
-- particle pressure
-- crowding/refill signals
-- ecological occupancy analysis
-
-### memory.rs
-
-Long-run ecosystem memory:
-- peak population
-- peak cells
-- peak clusters
-- dominant archetype
-- historical pressure
-- adaptive substrate/corridor signals
-- archetype telemetry
-- trophic state tracking
-- long-run ecological statistics
-
-### life.rs
-
-Secondary cellular/axiom layer:
-- Conway-style organism lattice support
-- long-run cellular pattern state
-- quiet pattern analysis
-- invisible emergence pressure
-- behavioral structure support
-
----
-
-# Requirements
+## Requirements
 
 Symbiote requires:
-- Rust
-- Cargo
-- a terminal that supports ANSI colors and Unicode rendering
 
-Recommended:
-- Linux
-- macOS
-- Windows Terminal
-- modern terminal emulators with true color support
-- desktop terminal for full camera exploration
+* Rust
+* Cargo
+* a terminal supporting ANSI colors
+* Unicode rendering support
 
----
+Recommended terminals:
 
-# Installing Rust
+* Linux terminal
+* macOS Terminal
+* Windows Terminal
+* Kitty
+* Alacritty
+* WezTerm
 
-## Linux / macOS
+-------------------------------------------------------------------
 
-```bash
+## Installing Rust
+
+### Linux / macOS
+
+## bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-After installation:
-
-```bash
 source "$HOME/.cargo/env"
-```
-
-Verify installation:
-
-```bash
 rustc --version
 cargo --version
-```
 
----
 
-## Windows
+### Windows
 
-Install Rust using:
-https://rustup.rs/
+Install Rust from:
 
-After installation:
-- restart terminal
-- verify:
+[https://rustup.rs/](https://rustup.rs/)
 
-```bash
+Then restart your terminal and verify:
+
+## bash
 rustc --version
 cargo --version
-```
 
----
+-------------------------------------------------------------------
 
-# Cloning Symbiote
+## Cloning Symbiote
 
-## HTTPS
+### HTTPS
 
-```bash
+## bash
 git clone https://github.com/ShamelesAbyss/Symbiote.git
 cd Symbiote
-```
 
-## SSH
 
-```bash
+### SSH
+
+## bash
 git clone git@github.com:ShamelesAbyss/Symbiote.git
 cd Symbiote
-```
 
----
+---------------------------------------------------------------------
 
-# Building Symbiote
+## Building Symbiote
 
-## Debug build
+### Debug Build
 
-```bash
+## bash
 cargo build
 cargo run
-```
 
-## Optimized release build
 
-```bash
+### Optimized Release Build
+
+## bash
 cargo build --release
 cargo run --release
-```
 
----
+-------------------------------------------------------------------------
 
-# Controls
+## Controls
+| Key         | Action                    |
+| ----------- | ------------------------- |
+| q           | Quit                      |
+| Space       | Pause simulation          |
+| r           | Reset ecosystem           |
+| n           | Generate new world seed   |
+| +           | Increase simulation speed |
+| -           | Decrease simulation speed |
+| Arrow Keys  | Pan viewport              |
+| Mouse Wheel | Zoom in/out               |
 
-| Key / Input | Action |
-|------------|--------|
-| q | Quit and save |
-| space | Pause simulation |
-| r | Reset ecosystem |
-| n | Generate new world seed |
-| + / = | Increase simulation speed |
-| - | Decrease simulation speed |
-| Mouse wheel up | Zoom in |
-| Mouse wheel down | Zoom out |
-| Arrow keys | Pan camera |
-| 0 | Reset camera |
+-----------------------------------------------------------------------------
 
----
-
-# Ecosystem Evolution Roadmap
+## Ecosystem Evolution Roadmap
 
 Current active development targets:
-- adaptive population pressure
-- territorial intelligence
-- field-guided navigation
-- migration reinforcement
-- ecological affinity systems
-- cluster colony behavior
-- lineage inheritance
-- emergent sub-archetypes
-- ecosystem nervous system behavior
-- Conway-style substrate emergence
-- spontaneous pattern propagation
-- colony memory pressure
-- behavioral species drift
-- long-run ecological succession
-- structural ecology
-- biome-scale adaptation
-- ecosystem observability
-- trophic evolution
-- local camera-guided ecological inspection
-- richer world exploration tools
 
----
+* adaptive population pressure
+* territorial intelligence
+* field-guided navigation
+* migration reinforcement
+* ecological affinity systems
+* cluster colony behavior
+* lineage inheritance
+* emergent sub-archetypes
+* ecosystem nervous system behavior
+* species adaptation pressure
+* field-responsive navigation
+* territorial migration fronts
+* ecology-aware population balancing
+* computational ecology maturation
+* invisible pressure ecosystems
+* ecology cinematography
+* long-run artificial biome evolution
+* axiom-driven heredity
+* Conway-guided divergence
+* higher-order emergent life forms
 
-# Release History
+-----------------------------------------------------------------------------------------------------------------------------
 
-## v0.8.5 — Vertical Growth
-Introduced major vertical ecosystem expansion systems.
+## Release History
 
-## v0.8.6 — Root Growth Stable
-Stabilized root infrastructure and substrate reinforcement systems.
+### v0.19.0 — Axiom Divergence
 
-## v0.9.0 — PatternField Emergence
-Integrated persistent ecological memory and territorial reinforcement behavior.
+Phase 6 introduces the Axiom Divergence foundation.
 
-## v0.10.0 — Territorial Intelligence
-Introduced ecosystem-aware movement pressure and territorial affinity drift.
+This release adds Conway-inspired evolutionary telemetry and axiom imprint infrastructure for future heredity systems.
 
-## v0.11.0 — Field Polarity Response
-Added archetype-aware PatternField polarity response, improving territorial settlement, danger corridor differentiation, and stable-region inhabitation.
+Major additions:
 
-## v0.12.0 — Morphology-Aware Rendering
-Improved pattern visibility and ecosystem readability through morphology-driven visual refinement.
+* AxiomImprint pressure model
+* AxiomLattice current imprint sampling
+* mature lineage imprint strength helpers
+* genome imprint helper functions
+* axiom divergence event telemetry
+* primitive/evolved/mature population tracking
+* reproduction-ready axiom hooks
+* zero-warning cleanup
 
-## v0.13.0 — Observability and Visual Hierarchy
-Improved readouts, visual hierarchy, substrate thinning, negative space clarity, and long-run ecosystem observation.
+Evolutionary hierarchy now points toward:
 
-## v0.14.0 — Emergent Colony Propagation
-Added Conway-style cell survival and birth pressure, near-birth propagation support, reduced particle overwrite pressure, and behavioral colony emergence pressure.
+particles
+→ archetypes
+→ persistent lineages
+→ axiom-imprinted descendants
 
-## v0.15.0 — Trophic Ecology Foundations
-Introduced early trophic balancing systems, archetype ecological restructuring, and predator/prey emergence tuning.
 
-## v0.16.0 — Emergent Trophic Ecology
-Expanded ecological role emergence, renderer restraint philosophy, and long-run trophic pressure cycling.
+This is the beginning of Conway-driven open-ended evolution inside the Symbiote ecosystem.
 
-## v0.16.1 — Trophic Emergence Rebalance
-Rebalanced Harvester and Reaper emergence thresholds, improved archetype stabilization, and enabled healthier ecological cycling.
+-------------------------------------------------------------------------------------------------------------------------------
 
-## v0.17.0 — Observable Computational Ecology
-Introduced full live archetype accounting, trophic telemetry, structural archetype emergence improvements, renderer readability breakthroughs, and long-run ecological observability.
+### v0.18.0 — Exploratory Camera Systems
 
-## v0.18.0 — Exploratory Camera Systems
-Added mouse wheel zoom, arrow-key camera panning, camera-aware rendering, world-bound viewport clamping, and local ecosystem inspection.
+Introduced exploratory camera controls for ecosystem analysis.
 
-This release transforms Symbiote from a fixed terminal viewport into an explorable computational biosphere.
+Major additions:
 
----
+* mouse-wheel zoom support
+* arrow-key panning
+* deeper viewport exploration
+* improved desktop readability
+* better inspection of mature ecosystems
+* large-world observational control
 
-# Philosophy
+---------------------------------------------------------------------
+
+### v0.17.0 — Evolution Inheritance, Cohesion, and Telemetry
+
+Major artificial-life progression update.
+
+Added:
+
+* archetype inheritance
+* primitive-only spawn hygiene
+* mature archetype blessing
+* regional archetype cohesion
+* primitive/evolved/mature telemetry
+* improved live role accounting
+* cleaner field glossary readability
+
+----------------------------------------------------
+
+### v0.16.1 — README and Release Polish
+
+Documentation and release-history refinement pass.
+
+--------------------------------------------
+
+### v0.16.0 — Invisible Ecology
+
+Major renderer philosophy shift emphasizing:
+
+* movement
+* spacing
+* migration flow
+* substrate topology
+* cluster behavior
+* territorial pressure
+* ecological silence
+* negative space
+
+-------------------------------------------
+
+### v0.15.0 — Emergent Colony Propagation
+
+Added:
+
+* Conway-style cellular rules
+* propagation ecology
+* cadence rebalance
+* colony behavioral pressure
+* reduced overwrite pressure
+* improved emergence readability
+
+--------------------------------------------
+
+### v0.14.0 — Conway Ecology Integration
+
+Introduced:
+
+* live/dead substrate propagation
+* spontaneous cellular emergence
+* ecological front formation
+* oscillation pockets
+* propagation seams
+* substrate terrace development
+* ecological wake generation
+
+----------------------------------------------------------------------------------
+
+### v0.13.0 — Behavioral Readability
+
+Improved mature ecosystem readability.
+
+### v0.12.0 — Morphology-Aware Rendering
+
+Introduced behavior-aware organism visuals.
+
+### v0.11.1 — Visual Hierarchy Refinement
+
+Reduced substrate density and improved readability.
+
+### v0.11.0 — Field Polarity Response
+
+Added corridor reinforcement behavior.
+
+### v0.10.0 — Territorial Intelligence
+
+Introduced ecosystem-aware movement pressure.
+
+### v0.9.0 — PatternField Emergence
+
+Integrated persistent ecological memory.
+
+### v0.8.6 — Root Growth Stable
+
+Stabilized root infrastructure systems.
+
+### v0.8.5 — Vertical Growth
+
+Introduced major vertical ecosystem expansion.
+
+-------------------------------------------------------------------------------------------
+
+## Philosophy
 
 Symbiote is an experiment in:
-- living procedural systems
-- artificial ecology
-- long-run emergence
-- persistent digital environments
-- ecosystem intelligence
-- memory-driven simulation
-- Conway-inspired cellular propagation
-- colony behavior emerging from local pressure
-- observable computational ecosystems
-- exploratory artificial worlds
+
+* living procedural systems
+* artificial ecology
+* long-run emergence
+* persistent digital environments
+* ecosystem intelligence
+* memory-driven simulation
+* behavior-first visualization
+* computational ecology
+* invisible environmental pressure
+* artificial biome evolution
+* lineage inheritance
+* axiom-driven divergence
 
 The goal is not scripted gameplay.
 
 The goal is believable artificial existence.
 
-The project is guided by one core principle:
+--------------------------------------------------------------------------------------------------
 
-```text
-Complex life should emerge from simple interacting pressure systems.
-```
+## Creator
 
-Symbiote is now entering a phase where development is less about adding isolated features and more about discovering what the ecosystem naturally wants to become.
+Built by ShamelesAbyss
 
----
+GitHub: [https://github.com/ShamelesAbyss/Symbiote](https://github.com/ShamelesAbyss/Symbiote)
 
-# License
+-----------------------------------------------------------------------------------------------------
+
+## Final Note
+
+Symbiote is a laboratory for digital evolution.
+
+Every particle is a primitive life form.
+
+Every archetype is an evolutionary strategy.
+
+Every lineage is a persistent experiment.
+
+And now, with Axiom Divergence, the ecosystem is beginning to discover abstract rules of existence.
+
+--------------------------------------------------------------------------------------------------------
+
+## License
 
 MIT License
+
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
