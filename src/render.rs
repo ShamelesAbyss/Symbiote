@@ -457,69 +457,68 @@ fn draw_axiom_lattice(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                 continue;
             }
 
-            if !should_render_axiom_cell(app.age, x, y, stats.state) {
+            if !should_render_axiom_cell(stats.generation, x, y, stats.state) {
                 continue;
             }
 
-            screen_cell.axiom = Some(axiom_visual(app.age, x, y, stats.state));
+            screen_cell.axiom = Some(axiom_visual(stats.generation, x, y, stats.state));
         }
     }
 }
 
-fn should_render_axiom_cell(age: u64, x: usize, y: usize, state: AxiomPatternState) -> bool {
+fn should_render_axiom_cell(generation: u64, x: usize, y: usize, state: AxiomPatternState) -> bool {
     let spacing = match state {
-        AxiomPatternState::Dormant => 19,
-        AxiomPatternState::Static => 11,
-        AxiomPatternState::Oscillating => 3,
+        AxiomPatternState::Dormant => 29,
+        AxiomPatternState::Static => 13,
+        AxiomPatternState::Oscillating => 2,
         AxiomPatternState::Translating => 2,
-        AxiomPatternState::Expanding => 4,
-        AxiomPatternState::Collapsing => 7,
-        AxiomPatternState::Chaotic => 9,
+        AxiomPatternState::Expanding => 3,
+        AxiomPatternState::Collapsing => 11,
+        AxiomPatternState::Chaotic => 17,
     };
 
-    visual_hash(age / 3 + axiom_state_offset(state), x, y) % spacing == 0
+    let stable_epoch = generation / 6 + axiom_state_offset(state);
+
+    match state {
+        AxiomPatternState::Oscillating | AxiomPatternState::Translating => {
+            visual_hash(stable_epoch, x, y) % spacing == 0
+        }
+        AxiomPatternState::Expanding => {
+            visual_hash(stable_epoch, x, y) % spacing == 0
+                || visual_hash(stable_epoch + 17, x / 2, y / 2) % 23 == 0
+        }
+        _ => visual_hash(stable_epoch, x, y) % spacing == 0,
+    }
 }
 
-fn axiom_visual(age: u64, x: usize, y: usize, state: AxiomPatternState) -> (char, Color) {
-    let phase = visual_hash(age / 2 + axiom_state_offset(state), x, y) % 6;
+fn axiom_visual(generation: u64, x: usize, y: usize, state: AxiomPatternState) -> (char, Color) {
+    let slow_phase = visual_hash(generation / 8 + axiom_state_offset(state), x, y) % 8;
 
     match state {
         AxiomPatternState::Dormant => ('·', Color::DarkGray),
-        AxiomPatternState::Static => {
-            if phase % 2 == 0 {
-                ('∙', Color::DarkGray)
-            } else {
-                ('·', Color::DarkGray)
-            }
-        }
+        AxiomPatternState::Static => ('∙', Color::DarkGray),
         AxiomPatternState::Oscillating => {
-            if phase % 2 == 0 {
+            if slow_phase < 4 {
                 ('◦', Color::Cyan)
             } else {
                 ('∘', Color::Blue)
             }
         }
-        AxiomPatternState::Translating => match phase {
-            0 | 3 => ('⊚', Color::Magenta),
-            1 | 4 => ('◌', Color::Cyan),
+        AxiomPatternState::Translating => match slow_phase {
+            0 | 1 | 2 => ('⊚', Color::Magenta),
+            3 | 4 | 5 => ('◌', Color::Cyan),
             _ => ('°', Color::Blue),
         },
         AxiomPatternState::Expanding => {
-            if phase <= 2 {
+            if slow_phase < 3 {
                 ('✦', Color::White)
             } else {
                 ('°', Color::Cyan)
             }
         }
-        AxiomPatternState::Collapsing => {
-            if phase <= 2 {
-                ('·', Color::Gray)
-            } else {
-                ('∙', Color::DarkGray)
-            }
-        }
+        AxiomPatternState::Collapsing => ('∙', Color::DarkGray),
         AxiomPatternState::Chaotic => {
-            if phase == 0 {
+            if slow_phase == 0 {
                 ('░', Color::DarkGray)
             } else {
                 ('·', Color::DarkGray)
