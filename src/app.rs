@@ -187,6 +187,7 @@ impl App {
 
         if self.age % 4 == 0 {
             self.axiom_lattice.tick_b3s23();
+            self.reinforce_pattern_field_from_clusters();
         }
 
         if self.age > 0 && self.age % 360 == 0 {

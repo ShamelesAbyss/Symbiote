@@ -550,6 +550,10 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
     }
 
     let field_cells = app.pattern_field.cells();
+    let maturity = visual_maturity(app.age);
+    let density_pressure = app.memory.density_occupied_ratio.clamp(0.0, 1.0);
+    let corridor_pressure = app.memory.corridor_pressure();
+    let throttle_pressure = app.memory.substrate_throttle_pressure();
 
     for y in 0..height {
         for x in 0..width {
@@ -577,6 +581,12 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                 continue;
             }
 
+            let atmospheric_pressure = field_cell
+                .intensity
+                .max(field_cell.danger)
+                .max(field_cell.drift * 0.72)
+                .max(field_cell.pulse * 0.58);
+
             if !should_render_field_haze(
                 app.age,
                 x,
@@ -584,13 +594,27 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                 field_cell.kind,
                 field_cell.danger,
                 field_cell.intensity,
+                field_cell.stability,
+                field_cell.pulse,
+                field_cell.drift,
+                maturity,
+                density_pressure,
+                corridor_pressure,
+                throttle_pressure,
             ) {
                 continue;
             }
 
-            let Some((glyph, color)) =
-                field_haze_visual(field_cell.kind, field_cell.danger, field_cell.intensity)
-            else {
+            let Some((glyph, color)) = field_haze_visual(
+                field_cell.kind,
+                field_cell.danger,
+                field_cell.intensity,
+                field_cell.stability,
+                field_cell.pulse,
+                field_cell.drift,
+                atmospheric_pressure,
+                maturity,
+            ) else {
                 continue;
             };
 
@@ -599,6 +623,7 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn should_render_field_haze(
     age: u64,
     x: usize,
@@ -606,22 +631,61 @@ fn should_render_field_haze(
     kind: PatternKind,
     danger: f32,
     intensity: f32,
+    stability: f32,
+    pulse: f32,
+    drift: f32,
+    maturity: f32,
+    density_pressure: f32,
+    corridor_pressure: f32,
+    throttle_pressure: f32,
 ) -> bool {
-    let pressure = danger.max(intensity);
+    let pressure = danger.max(intensity).max(pulse * 0.72).max(drift * 0.64);
 
-    if pressure < 0.26 {
+    let floor = 0.28 + maturity * 0.10 + density_pressure * 0.06 - danger * 0.08;
+
+    if pressure < floor.clamp(0.22, 0.46) {
         return false;
     }
 
-    let spacing = if danger > 0.76 || intensity > 0.92 {
+    let base_spacing: usize = if danger > 0.78 || intensity > 0.92 {
         3
     } else if danger > 0.58 || intensity > 0.78 {
         5
+    } else if drift > 0.68 || pulse > 0.72 {
+        7
     } else if intensity > 0.56 {
-        8
+        9
     } else {
-        13
+        15
     };
+
+    let maturity_quiet = if stability > 0.62 && danger < 0.34 {
+        (maturity * 6.0).round() as usize
+    } else {
+        0
+    };
+
+    let corridor_reveal = if corridor_pressure > 0.52
+        && matches!(
+            kind,
+            PatternKind::Glider | PatternKind::Swarmfront | PatternKind::Chain
+        ) {
+        2
+    } else {
+        0
+    };
+
+    let throttle_reveal = if throttle_pressure > 0.56 && danger > 0.42 {
+        2
+    } else {
+        0
+    };
+
+    let spacing = base_spacing
+        .saturating_add(maturity_quiet)
+        .saturating_sub(corridor_reveal)
+        .saturating_sub(throttle_reveal)
+        .max(2);
 
     let kind_offset = match kind {
         PatternKind::Halo => 1,
@@ -636,19 +700,79 @@ fn should_render_field_haze(
         PatternKind::Dormant => 10,
     };
 
-    visual_hash(age / 5 + kind_offset, x, y) % spacing == 0
+    let atmospheric_tick = if maturity > 0.68 { age / 9 } else { age / 5 };
+
+    visual_hash(atmospheric_tick + kind_offset, x, y) % spacing == 0
 }
 
-fn field_haze_visual(kind: PatternKind, danger: f32, intensity: f32) -> Option<(char, Color)> {
+#[allow(clippy::too_many_arguments)]
+fn field_haze_visual(
+    kind: PatternKind,
+    danger: f32,
+    intensity: f32,
+    stability: f32,
+    pulse: f32,
+    drift: f32,
+    atmospheric_pressure: f32,
+    maturity: f32,
+) -> Option<(char, Color)> {
+    if atmospheric_pressure < 0.24 {
+        return None;
+    }
+
     if danger > 0.82 {
-        return Some(('·', Color::Red));
+        return Some(('×', Color::Red));
     }
 
     if danger > 0.58 {
-        return Some(('.', Color::DarkGray));
+        return Some((
+            if pulse > 0.55 { '!' } else { '·' },
+            if maturity > 0.55 {
+                Color::Red
+            } else {
+                Color::DarkGray
+            },
+        ));
     }
 
-    if intensity > 0.90 {
+    if drift > 0.72 {
+        return Some((
+            match kind {
+                PatternKind::Swarmfront | PatternKind::Glider => ',',
+                PatternKind::Chain => '╌',
+                _ => '˙',
+            },
+            Color::Magenta,
+        ));
+    }
+
+    if pulse > 0.76 {
+        return Some((
+            match kind {
+                PatternKind::Oscillator | PatternKind::Halo => '∴',
+                PatternKind::Bloom | PatternKind::Nest => '·',
+                _ => '.',
+            },
+            if intensity > 0.72 {
+                Color::Blue
+            } else {
+                Color::DarkGray
+            },
+        ));
+    }
+
+    if stability > 0.70 && maturity > 0.42 {
+        return Some((
+            match kind {
+                PatternKind::Lattice | PatternKind::StillLife => '∙',
+                PatternKind::Nest => '·',
+                _ => '.',
+            },
+            Color::DarkGray,
+        ));
+    }
+
+    if intensity > 0.86 {
         return Some((
             '·',
             match kind {
@@ -662,7 +786,7 @@ fn field_haze_visual(kind: PatternKind, danger: f32, intensity: f32) -> Option<(
         ));
     }
 
-    if intensity > 0.64 {
+    if intensity > 0.58 {
         return Some((
             match kind {
                 PatternKind::Swarmfront | PatternKind::Glider | PatternKind::Chain => ',',
@@ -1591,18 +1715,39 @@ fn render_species(f: &mut Frame<'_>, area: Rect, app: &App) {
 }
 
 fn render_events(f: &mut Frame<'_>, area: Rect, app: &App) {
-    let _density_status = app.memory.density_status_line();
-    let items = app
-        .events
-        .iter()
-        .rev()
-        .map(|event| {
-            ListItem::new(Line::from(Span::styled(
-                event.clone(),
-                Style::default().fg(Color::Cyan),
-            )))
-        })
-        .collect::<Vec<_>>();
+    let density_status = app.memory.density_status_line();
+
+    let mut items = vec![
+        ListItem::new(Line::from(vec![
+            Span::styled("density ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                density_status,
+                Style::default()
+                    .fg(density_band_color(&app.memory.density_band))
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ])),
+        ListItem::new(Line::from(vec![
+            Span::styled("field ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format!(
+                    "active:{} avg:{:.2} strongest:{} mature:{:.0}%",
+                    app.pattern_field.active_cells(),
+                    app.pattern_field.average_intensity(),
+                    app.pattern_field.strongest_kind().short(),
+                    visual_maturity(app.age) * 100.0
+                ),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ])),
+    ];
+
+    items.extend(app.events.iter().rev().map(|event| {
+        ListItem::new(Line::from(Span::styled(
+            event.clone(),
+            Style::default().fg(Color::Cyan),
+        )))
+    }));
 
     f.render_widget(
         List::new(items).block(
@@ -1819,6 +1964,21 @@ fn matrix_color(value: f32) -> Color {
         Color::Cyan
     } else {
         Color::Green
+    }
+}
+
+fn visual_maturity(age: u64) -> f32 {
+    (age as f32 / 4_800.0).clamp(0.0, 1.0)
+}
+
+fn density_band_color(band: &str) -> Color {
+    match band {
+        "Starved" => Color::Red,
+        "Sparse" => Color::Yellow,
+        "Balanced" => Color::Green,
+        "Crowded" => Color::Magenta,
+        "Saturated" => Color::Red,
+        _ => Color::DarkGray,
     }
 }
 
