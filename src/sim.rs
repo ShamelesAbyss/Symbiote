@@ -163,6 +163,85 @@ pub fn step_particles(
             &mut fy,
         );
 
+        if is_reaper {
+            let mut best_target: Option<(f32, f32, f32, bool)> = None;
+
+            for (other_idx, other) in snapshot.iter().enumerate() {
+                if idx == other_idx {
+                    continue;
+                }
+
+                let other_archetype = snapshot_archetypes[other_idx];
+
+                if matches!(other_archetype, Some(Archetype::Reaper)) {
+                    continue;
+                }
+
+                let other_is_harvester =
+                    matches!(other_archetype, Some(Archetype::Harvester))
+                        || other.rare_trait == RareTrait::Devourer;
+
+                let dx = other.x - particle.x;
+                let dy = other.y - particle.y;
+                let d2 = dx * dx + dy * dy;
+
+                if d2 <= 0.000001 {
+                    continue;
+                }
+
+                let d = d2.sqrt();
+
+                let prey_value = if other_is_harvester {
+                    if d < 0.86 { 5.0 } else { 0.0 }
+                } else if reaper_pressure_needed && other.health < 42.0 && d < 0.34 {
+                    1.35
+                } else if reaper_pressure_needed && other.cluster_id.is_some() && d < 0.30 {
+                    1.10
+                } else {
+                    0.0
+                };
+
+                if prey_value <= 0.0 {
+                    continue;
+                }
+
+                let score = prey_value / d2.max(0.0025);
+
+                if best_target
+                    .map(|(_, _, best_score, _)| score > best_score)
+                    .unwrap_or(true)
+                {
+                    best_target = Some((dx, dy, score, other_is_harvester));
+                }
+            }
+
+            if let Some((dx, dy, _, target_is_harvester)) = best_target {
+                let d = (dx * dx + dy * dy).sqrt().max(0.001);
+                let hunt_radius = if target_is_harvester { 0.86 } else { 0.34 };
+                let urgency = if target_is_harvester {
+                    if reaper_pressure_needed { 1.45 } else { 1.10 }
+                } else {
+                    0.42
+                };
+
+                let scent = (1.0 - d / hunt_radius).clamp(0.0, 1.0);
+                let hunt_force = scent * urgency * if target_is_harvester { 2.8 } else { 0.95 };
+
+                fx += (dx / d) * hunt_force;
+                fy += (dy / d) * hunt_force;
+
+                particle.vx += (dx / d) * 0.00020 * urgency;
+                particle.vy += (dy / d) * 0.00020 * urgency;
+
+                substrate.deposit_signal(
+                    particle.x,
+                    particle.y,
+                    SignalKind::Fear,
+                    if target_is_harvester { 0.035 } else { 0.014 },
+                );
+            }
+        }
+
         for (other_idx, other) in snapshot.iter().enumerate() {
             if idx == other_idx {
                 continue;

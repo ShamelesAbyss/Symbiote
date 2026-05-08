@@ -239,6 +239,11 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
 
             cell.count += 1;
             cell.tribe_counts[particle.tribe.index()] += 1;
+
+            if let Some(archetype) = archetype {
+                cell.archetype_counts[archetype.index()] += 1;
+            }
+
             cell.health += particle.health;
             cell.energy += particle.energy;
             cell.mass += particle.mass;
@@ -309,7 +314,29 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                 let morphology_flash =
                     morphology_render_glyph(morphology_role, app.age, cell.organic_phase(app.age));
 
-                let mut glyph = if cell.reaper {
+                let dominant_archetype = cell
+                    .archetype_counts
+                    .iter()
+                    .enumerate()
+                    .max_by_key(|(_, count)| *count)
+                    .and_then(|(idx, count)| if *count > 0 { Some(idx) } else { None });
+
+                let archetype_render_ready = cell.clustered > 0
+                    || cell.count >= 3
+                    || cell.harvester
+                    || cell.reaper
+                    || cell.drifting
+                    || cell.rare;
+
+                let archetype_visual = if archetype_render_ready {
+                    dominant_archetype.and_then(archetype_visual)
+                } else {
+                    None
+                };
+
+                let mut glyph = if let Some((glyph, _)) = archetype_visual {
+                    glyph
+                } else if cell.reaper {
                     match phase % 4 {
                         0 => 'Ω',
                         1 => 'ϟ',
@@ -380,7 +407,9 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                     glyph = morphology_glyph;
                 }
 
-                let mut style = if cell.reaper {
+                let mut style = if let Some((_, color)) = archetype_visual {
+                    Style::default().fg(color).add_modifier(Modifier::BOLD)
+                } else if cell.reaper {
                     Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
                 } else if cell.harvester {
                     Style::default()
@@ -1750,6 +1779,23 @@ fn memory_phase_color(mood: VisualMood) -> Color {
     }
 }
 
+fn archetype_visual(index: usize) -> Option<(char, Color)> {
+    match index {
+        0 => Some(('≋', Color::Cyan)),       // Swarmer
+        1 => Some(('⌁', Color::Red)),        // Hunter
+        2 => Some(('˖', Color::Green)),      // Grazer
+        3 => Some(('⊙', Color::Blue)),       // Orbiter
+        4 => Some(('⁘', Color::Magenta)),    // Parasite
+        5 => Some(('▧', Color::Yellow)),     // Architect
+        6 => Some(('◈', Color::White)),      // Leviathan
+        7 => Some(('✣', Color::Green)),      // Mycelial
+        8 => Some(('⟡', Color::Gray)),       // Phantom
+        9 => Some(('♻', Color::LightGreen)), // Harvester
+        10 => Some(('Ω', Color::Red)),       // Reaper
+        _ => None,
+    }
+}
+
 fn density_color(label: &str) -> Color {
     match label {
         "Starved" => Color::Red,
@@ -1824,6 +1870,7 @@ fn metric(title: &'static str, value: u16, color: Color) -> Gauge<'static> {
 struct Cell {
     count: usize,
     tribe_counts: [usize; 6],
+    archetype_counts: [usize; 11],
     health: f32,
     energy: f32,
     mass: f32,
@@ -1845,6 +1892,7 @@ impl Default for Cell {
         Self {
             count: 0,
             tribe_counts: [0; 6],
+            archetype_counts: [0; 11],
             health: 0.0,
             energy: 0.0,
             mass: 0.0,
