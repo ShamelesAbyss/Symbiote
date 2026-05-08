@@ -1891,7 +1891,7 @@ fn archetype_visual(index: usize) -> Option<(char, Color)> {
         2 => Some(('˖', Color::Green)),      // Grazer
         3 => Some(('⊙', Color::Blue)),       // Orbiter
         4 => Some(('⁘', Color::Magenta)),    // Parasite
-        5 => Some(('▧', Color::Yellow)),     // Architect
+        5 => Some(('▣', Color::Yellow)),     // Architect
         6 => Some(('◈', Color::White)),      // Leviathan
         7 => Some(('✣', Color::Green)),      // Mycelial
         8 => Some(('⟡', Color::Gray)),       // Phantom

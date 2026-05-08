@@ -225,35 +225,44 @@ pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> A
         Archetype::Phantom
     } else if rare_trait == RareTrait::SporeKing {
         Archetype::Mycelial
-    } else if rare_trait == RareTrait::ElderCore || size > 82 {
+    } else if rare_trait == RareTrait::ElderCore
+        || size > 58
+        || (genome.membrane > 1.24 && genome.bonding > 1.18 && genome.fertility > 0.88)
+    {
         Archetype::Leviathan
-    } else if pressure.birth && genome.membrane > 0.68 && genome.fertility > 1.04 {
+    } else if genome.membrane > 0.82 && genome.bonding > 0.92 && size > 6 {
+        Archetype::Architect
+    } else if genome.membrane > 0.52 && genome.fertility > 0.78 && genome.metabolism < 0.040 {
         Archetype::Mycelial
-    } else if pressure.birth && genome.orbit > 0.66 && genome.perception > 0.198 {
+    } else if pressure.birth && genome.membrane > 0.48 && genome.fertility > 0.76 {
+        Archetype::Mycelial
+    } else if pressure.birth && genome.orbit > 0.58 && genome.perception > 0.182 {
         Archetype::Orbiter
-    } else if pressure.birth && genome.bonding > 1.04 {
+    } else if pressure.birth && genome.bonding > 0.84 {
+        Archetype::Swarmer
+    } else if genome.bonding > 1.02 && genome.volatility < 1.55 && genome.hunger < 0.026 {
         Archetype::Swarmer
     } else if pressure.overcrowded && genome.volatility > 1.22 && genome.hunger > 0.015 {
         Archetype::Hunter
-    } else if pressure.overcrowded && genome.orbit > 0.92 {
+    } else if pressure.overcrowded && genome.orbit > 0.80 {
         Archetype::Phantom
     } else if pressure.underpopulated && genome.perception > 0.245 && genome.metabolism < 0.020 {
         Archetype::Grazer
     } else if pressure.underpopulated {
         Archetype::Parasite
-    } else if genome.membrane > 0.92 && genome.bonding > 1.12 {
+    } else if genome.membrane > 0.72 && genome.bonding > 0.88 {
         Archetype::Architect
     } else if genome.orbit > 0.84 && genome.perception > 0.205 {
         Archetype::Orbiter
     } else if genome.volatility > 1.34 && genome.metabolism > 0.018 {
         Archetype::Hunter
-    } else if genome.bonding > 1.46 {
+    } else if genome.bonding > 1.20 {
         Archetype::Swarmer
     } else if genome.perception > 0.238 && genome.metabolism < 0.021 {
         Archetype::Grazer
-    } else if genome.membrane > 0.72 && genome.fertility > 1.18 {
+    } else if genome.membrane > 0.46 && genome.fertility > 0.74 {
         Archetype::Mycelial
-    } else if genome.orbit > 1.16 || rare_trait == RareTrait::Radiant {
+    } else if genome.orbit > 0.98 || rare_trait == RareTrait::Radiant {
         Archetype::Phantom
     } else {
         Archetype::Parasite
