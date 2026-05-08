@@ -125,6 +125,9 @@ pub struct App {
     pub matrix_pressure: f32,
     pub environment: Environment,
     pub events: VecDeque<String>,
+    pub camera_x: f32,
+    pub camera_y: f32,
+    pub camera_zoom: f32,
 }
 
 impl App {
@@ -168,6 +171,9 @@ impl App {
             matrix_pressure: 0.0,
             environment: Environment::Calm,
             events: VecDeque::new(),
+            camera_x: 0.0,
+            camera_y: 0.0,
+            camera_zoom: 1.0,
         };
 
         app.reset_particles();
@@ -1035,6 +1041,56 @@ impl App {
         self.tick_ms = (self.tick_ms + 4).min(220);
     }
 
+    pub fn zoom_in(&mut self) {
+        self.camera_zoom = (self.camera_zoom * 1.16).clamp(1.0, 6.0);
+        self.clamp_camera();
+    }
+
+    pub fn zoom_out(&mut self) {
+        self.camera_zoom = (self.camera_zoom / 1.16).clamp(1.0, 6.0);
+        self.clamp_camera();
+    }
+
+    pub fn pan_left(&mut self) {
+        self.camera_x -= self.camera_pan_step();
+        self.clamp_camera();
+    }
+
+    pub fn pan_right(&mut self) {
+        self.camera_x += self.camera_pan_step();
+        self.clamp_camera();
+    }
+
+    pub fn pan_up(&mut self) {
+        self.camera_y -= self.camera_pan_step();
+        self.clamp_camera();
+    }
+
+    pub fn pan_down(&mut self) {
+        self.camera_y += self.camera_pan_step();
+        self.clamp_camera();
+    }
+
+    pub fn reset_camera(&mut self) {
+        self.camera_x = 0.0;
+        self.camera_y = 0.0;
+        self.camera_zoom = 1.0;
+    }
+
+    fn camera_pan_step(&self) -> f32 {
+        (0.12 / self.camera_zoom.max(1.0)).clamp(0.018, 0.12)
+    }
+
+    fn clamp_camera(&mut self) {
+        self.camera_zoom = self.camera_zoom.clamp(1.0, 6.0);
+
+        let half_view = 1.2 / self.camera_zoom;
+        let max_center = (1.2 - half_view).max(0.0);
+
+        self.camera_x = self.camera_x.clamp(-max_center, max_center);
+        self.camera_y = self.camera_y.clamp(-max_center, max_center);
+    }
+
     pub fn save_all(&mut self) {
         self.update_memory();
 
@@ -1152,6 +1208,9 @@ impl App {
             matrix_pressure: 0.0,
             environment: state.environment,
             events: VecDeque::from(state.events),
+            camera_x: 0.0,
+            camera_y: 0.0,
+            camera_zoom: 1.0,
         })
     }
 

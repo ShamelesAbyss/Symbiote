@@ -650,40 +650,6 @@ impl CellularAutomata {
         }
     }
 
-    pub fn sample_screen(
-        &self,
-        sx: usize,
-        sy: usize,
-        screen_w: usize,
-        screen_h: usize,
-    ) -> CellKind {
-        if screen_w == 0 || screen_h == 0 {
-            return CellKind::Empty;
-        }
-
-        let x = (sx * self.width / screen_w).min(self.width.saturating_sub(1));
-        let y = (sy * self.height / screen_h).min(self.height.saturating_sub(1));
-
-        self.cells[self.idx(x, y)].kind
-    }
-
-    pub fn sample_signal_screen(
-        &self,
-        sx: usize,
-        sy: usize,
-        screen_w: usize,
-        screen_h: usize,
-    ) -> Signal {
-        if screen_w == 0 || screen_h == 0 {
-            return Signal::default();
-        }
-
-        let x = (sx * self.width / screen_w).min(self.width.saturating_sub(1));
-        let y = (sy * self.height / screen_h).min(self.height.saturating_sub(1));
-
-        self.cells[self.idx(x, y)].signal
-    }
-
     pub fn living_cells(&self) -> usize {
         self.cells
             .iter()

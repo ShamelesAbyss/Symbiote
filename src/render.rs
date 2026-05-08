@@ -181,7 +181,7 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
     // force root layer to overwrite everything (no flicker)
     for y in 0..height {
         for x in 0..width {
-            if app.substrate.sample_screen(x, y, width, height) == CellKind::Root {
+            if camera_sample_substrate(app, x, y, width, height) == CellKind::Root {
                 cells[y][x].substrate = Some((
                     match (x + y) % 4 {
                         0 => "│",
@@ -206,14 +206,23 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
         if px >= 0 && py >= 0 {
             let (px, py) = (px as usize, py as usize);
             if py < height && px < width {
-                if app.substrate.sample_screen(px, py, width, height) == CellKind::Root {
+                if camera_sample_substrate(app, px, py, width, height) == CellKind::Root {
                     continue; // do not draw particle over root
                 }
             }
         }
 
-        let x = (((particle.x + 1.2) / 2.4) * width as f32) as isize;
-        let y = (((particle.y + 1.2) / 2.4) * height as f32) as isize;
+        let Some((sx, sy)) = camera_world_to_screen(app, particle.x, particle.y, width, height)
+        else {
+            continue;
+        };
+
+        if camera_sample_substrate(app, sx, sy, width, height) == CellKind::Root {
+            continue;
+        }
+
+        let x = sx as isize;
+        let y = sy as isize;
 
         if x >= 0 && y >= 0 && x < width as isize && y < height as isize {
             let archetype = particle
@@ -448,6 +457,102 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
             .wrap(Wrap { trim: false }),
         area,
     );
+}
+
+fn camera_bounds(app: &App) -> (f32, f32, f32, f32) {
+    let zoom = app.camera_zoom.clamp(1.0, 6.0);
+    let half = 1.2 / zoom;
+
+    let max_center = (1.2 - half).max(0.0);
+    let cx = app.camera_x.clamp(-max_center, max_center);
+    let cy = app.camera_y.clamp(-max_center, max_center);
+
+    (cx - half, cx + half, cy - half, cy + half)
+}
+
+fn camera_screen_to_world(
+    app: &App,
+    sx: usize,
+    sy: usize,
+    width: usize,
+    height: usize,
+) -> Option<(f32, f32)> {
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    let (min_x, max_x, min_y, max_y) = camera_bounds(app);
+
+    let fx = if width <= 1 {
+        0.5
+    } else {
+        sx as f32 / width.saturating_sub(1).max(1) as f32
+    };
+
+    let fy = if height <= 1 {
+        0.5
+    } else {
+        sy as f32 / height.saturating_sub(1).max(1) as f32
+    };
+
+    Some((min_x + (max_x - min_x) * fx, min_y + (max_y - min_y) * fy))
+}
+
+fn camera_world_to_screen(
+    app: &App,
+    wx: f32,
+    wy: f32,
+    width: usize,
+    height: usize,
+) -> Option<(usize, usize)> {
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    let (min_x, max_x, min_y, max_y) = camera_bounds(app);
+
+    if wx < min_x || wx > max_x || wy < min_y || wy > max_y {
+        return None;
+    }
+
+    let nx = ((wx - min_x) / (max_x - min_x)).clamp(0.0, 1.0);
+    let ny = ((wy - min_y) / (max_y - min_y)).clamp(0.0, 1.0);
+
+    let sx = (nx * width.saturating_sub(1).max(1) as f32).round() as usize;
+    let sy = (ny * height.saturating_sub(1).max(1) as f32).round() as usize;
+
+    Some((
+        sx.min(width.saturating_sub(1)),
+        sy.min(height.saturating_sub(1)),
+    ))
+}
+
+fn camera_sample_substrate(
+    app: &App,
+    sx: usize,
+    sy: usize,
+    width: usize,
+    height: usize,
+) -> CellKind {
+    let Some((wx, wy)) = camera_screen_to_world(app, sx, sy, width, height) else {
+        return CellKind::Empty;
+    };
+
+    app.substrate.influence_at(wx, wy)
+}
+
+fn camera_sample_signal(
+    app: &App,
+    sx: usize,
+    sy: usize,
+    width: usize,
+    height: usize,
+) -> crate::automata::Signal {
+    let Some((wx, wy)) = camera_screen_to_world(app, sx, sy, width, height) else {
+        return crate::automata::Signal::default();
+    };
+
+    app.substrate.signal_at(wx, wy)
 }
 
 fn draw_axiom_lattice(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
@@ -753,7 +858,7 @@ fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usiz
 
     for y in 0..height {
         for x in 0..width {
-            let kind = app.substrate.sample_screen(x, y, width, height);
+            let kind = camera_sample_substrate(app, x, y, width, height);
 
             if kind == CellKind::Empty {
                 continue;
@@ -868,12 +973,12 @@ fn root_color(y: usize, height: usize) -> Color {
 }
 
 fn root_screen_visual(app: &App, x: usize, y: usize, width: usize, height: usize) -> (char, Color) {
-    let up = y > 0 && app.substrate.sample_screen(x, y - 1, width, height) == CellKind::Root;
+    let up = y > 0 && camera_sample_substrate(app, x, y - 1, width, height) == CellKind::Root;
     let down =
-        y + 1 < height && app.substrate.sample_screen(x, y + 1, width, height) == CellKind::Root;
-    let left = x > 0 && app.substrate.sample_screen(x - 1, y, width, height) == CellKind::Root;
+        y + 1 < height && camera_sample_substrate(app, x, y + 1, width, height) == CellKind::Root;
+    let left = x > 0 && camera_sample_substrate(app, x - 1, y, width, height) == CellKind::Root;
     let right =
-        x + 1 < width && app.substrate.sample_screen(x + 1, y, width, height) == CellKind::Root;
+        x + 1 < width && camera_sample_substrate(app, x + 1, y, width, height) == CellKind::Root;
 
     let stage = tree::tree_stage_for_height(y, height);
     let visuals = TreeVisualPolicy::default();
@@ -1011,7 +1116,7 @@ fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                 continue;
             }
 
-            let signal = app.substrate.sample_signal_screen(x, y, width, height);
+            let signal = camera_sample_signal(app, x, y, width, height);
 
             if let Some((kind, value)) = signal.strongest() {
                 let threshold = match kind {
@@ -1047,8 +1152,13 @@ fn draw_ecology_zones(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
             continue;
         }
 
-        let x = (((zone.x + 1.2) / 2.4) * width as f32) as i32;
-        let y = (((zone.y + 1.2) / 2.4) * height as f32) as i32;
+        let Some((zone_x, zone_y)) = camera_world_to_screen(app, zone.x, zone.y, width, height)
+        else {
+            continue;
+        };
+
+        let x = zone_x as i32;
+        let y = zone_y as i32;
 
         let rare_flash = visual_hash(app.age / 10, x.max(0) as usize, y.max(0) as usize) % 19 == 0;
         if !rare_flash {
@@ -1077,8 +1187,14 @@ fn draw_cluster_membranes(cells: &mut [Vec<Cell>], app: &App, width: usize, heig
             continue;
         }
 
-        let cx = (((cluster.x + 1.2) / 2.4) * width as f32) as i32;
-        let cy = (((cluster.y + 1.2) / 2.4) * height as f32) as i32;
+        let Some((cluster_x, cluster_y)) =
+            camera_world_to_screen(app, cluster.x, cluster.y, width, height)
+        else {
+            continue;
+        };
+
+        let cx = cluster_x as i32;
+        let cy = cluster_y as i32;
         let pulse = ((app.age as f32 / 18.0 + cluster.id as f32).sin() * 0.9) as i32;
         let radius = ((cluster.radius * width as f32 * 1.15).max(2.0)).min(12.0) as i32 + pulse;
 
@@ -1102,8 +1218,14 @@ fn draw_cluster_motion_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, 
             continue;
         }
 
-        let cx = (((cluster.x + 1.2) / 2.4) * width as f32) as i32;
-        let cy = (((cluster.y + 1.2) / 2.4) * height as f32) as i32;
+        let Some((cluster_x, cluster_y)) =
+            camera_world_to_screen(app, cluster.x, cluster.y, width, height)
+        else {
+            continue;
+        };
+
+        let cx = cluster_x as i32;
+        let cy = cluster_y as i32;
         let tx = cx - (cluster.vx * 1180.0) as i32;
         let ty = cy - (cluster.vy * 1180.0) as i32;
 
@@ -1953,7 +2075,7 @@ fn render_footer(f: &mut Frame<'_>, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            " space pause | r restart | n new ecosystem | +/- speed | q save+quit ",
+            " space pause | arrows pan | wheel zoom | 0 reset view | r restart | n new | +/- speed | q save+quit ",
             Style::default().fg(Color::Gray),
         ),
     ]);
