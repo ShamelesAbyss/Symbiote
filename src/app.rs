@@ -4,6 +4,7 @@ use crate::{
     density::DensitySnapshot,
     ecology::Ecology,
     field::{FieldConfig, PatternField},
+    life::AxiomLattice,
     memory::MemoryBank,
     particle::{Genome, Particle, RareTrait, Tribe},
     pattern::{PatternKind, PatternMotion, PatternSignature},
@@ -105,6 +106,7 @@ pub struct App {
     pub ecology: Ecology,
     pub substrate: CellularAutomata,
     pub pattern_field: PatternField,
+    pub axiom_lattice: AxiomLattice,
     pub memory: MemoryBank,
     pub seed: u64,
     pub age: u64,
@@ -148,6 +150,7 @@ impl App {
             ecology: Ecology::new(seed),
             substrate: CellularAutomata::new(seed ^ 0xC011, 96, 48),
             pattern_field: PatternField::new(96, 48, FieldConfig::default()),
+            axiom_lattice: AxiomLattice::new(seed ^ 0xA011_0C1C, 96, 48),
             memory: MemoryBank::load_or_new(seed),
             seed,
             age: 0,
@@ -181,6 +184,19 @@ impl App {
 
     pub fn step(&mut self) {
         self.pattern_field.step();
+
+        if self.age % 4 == 0 {
+            self.axiom_lattice.tick_b3s23();
+        }
+
+        if self.age > 0 && self.age % 360 == 0 {
+            let axiom = self.axiom_lattice.stats();
+            self.push_event(&format!(
+                "axiom lattice {:?} gen:{} live:{} birth:{} death:{}",
+                axiom.state, axiom.generation, axiom.alive, axiom.births, axiom.deaths
+            ));
+        }
+
         self.reinforce_pattern_field_from_clusters();
         if self.age % 240 == 0 {
             self.push_event(&format!(
@@ -956,6 +972,7 @@ impl App {
         self.ecology = Ecology::new(self.seed ^ self.age);
         self.substrate = CellularAutomata::new(self.seed ^ self.age ^ 0xC011, 96, 48);
         self.pattern_field = PatternField::new(96, 48, FieldConfig::default());
+        self.axiom_lattice = AxiomLattice::new(self.seed ^ self.age ^ 0xA011_0C1C, 96, 48);
 
         for i in 0..PARTICLE_COUNT {
             let tribe = Tribe::from_index(i % TRIBE_COUNT);
@@ -1116,6 +1133,7 @@ impl App {
             ecology: state.ecology,
             substrate: state.substrate,
             pattern_field: PatternField::new(96, 48, FieldConfig::default()),
+            axiom_lattice: AxiomLattice::new(state.seed ^ state.age ^ 0xA011_0C1C, 96, 48),
             memory: state.memory,
             seed: state.seed,
             age: state.age,
