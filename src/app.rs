@@ -198,6 +198,15 @@ impl App {
 
         if self.age > 0 && self.age % 360 == 0 {
             let axiom = self.axiom_lattice.stats();
+
+            if self.age % 360 == 0
+                && !matches!(axiom.state, crate::life::AxiomPatternState::Dormant)
+            {
+                self.push_event(&format!(
+                    "axiom imprint {:?} shaping offspring | live:{} birth:{} death:{}",
+                    axiom.state, axiom.alive, axiom.births, axiom.deaths
+                ));
+            }
             self.push_event(&format!(
                 "axiom lattice {:?} gen:{} live:{} birth:{} death:{}",
                 axiom.state, axiom.generation, axiom.alive, axiom.births, axiom.deaths

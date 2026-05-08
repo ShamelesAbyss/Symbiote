@@ -28,6 +28,29 @@ pub enum AxiomPatternState {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct AxiomImprint {
+    pub stability: f32,
+    pub oscillation: f32,
+    pub translation: f32,
+    pub expansion: f32,
+    pub collapse: f32,
+    pub chaos: f32,
+}
+
+impl Default for AxiomImprint {
+    fn default() -> Self {
+        Self {
+            stability: 0.0,
+            oscillation: 0.0,
+            translation: 0.0,
+            expansion: 0.0,
+            collapse: 0.0,
+            chaos: 0.0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct AxiomStats {
     pub generation: u64,
     pub alive: usize,
@@ -246,6 +269,40 @@ impl AxiomLattice {
 
     pub fn alive_cells(&self) -> usize {
         self.cells.iter().filter(|cell| cell.is_alive()).count()
+    }
+
+    pub fn current_imprint(&self) -> AxiomImprint {
+        let mut imprint = AxiomImprint::default();
+
+        let intensity = if self.stats.peak_alive > 0 {
+            (self.stats.alive as f32 / self.stats.peak_alive as f32).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        match self.stats.state {
+            AxiomPatternState::Dormant => {}
+            AxiomPatternState::Static => {
+                imprint.stability = 1.0 * intensity;
+            }
+            AxiomPatternState::Oscillating => {
+                imprint.oscillation = 1.0 * intensity;
+            }
+            AxiomPatternState::Translating => {
+                imprint.translation = 1.0 * intensity;
+            }
+            AxiomPatternState::Expanding => {
+                imprint.expansion = 1.0 * intensity;
+            }
+            AxiomPatternState::Collapsing => {
+                imprint.collapse = 1.0 * intensity;
+            }
+            AxiomPatternState::Chaotic => {
+                imprint.chaos = 1.0 * intensity;
+            }
+        }
+
+        imprint
     }
 
     pub fn axiom_status_line(&self) -> String {
