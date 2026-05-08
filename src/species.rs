@@ -217,10 +217,10 @@ impl SpeciesBank {
 pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> Archetype {
     let pressure = conway_species_pressure(genome, rare_trait, size);
 
-    if is_reaper_genome(genome) {
-        Archetype::Reaper
-    } else if is_harvester_genome(genome, rare_trait) {
+    if is_harvester_genome(genome, rare_trait) {
         Archetype::Harvester
+    } else if is_reaper_genome(genome) {
+        Archetype::Reaper
     } else if rare_trait == RareTrait::Voidborne {
         Archetype::Phantom
     } else if rare_trait == RareTrait::SporeKing {
@@ -344,22 +344,23 @@ fn species_match_threshold(genome: Genome, rare_trait: RareTrait, size: usize) -
 }
 
 fn is_reaper_genome(genome: Genome) -> bool {
-    let predator_drive = genome.volatility > 1.40 && genome.hunger > 0.0175;
-    let perception_gate = genome.perception > 0.265;
-    let fertility_gate = genome.fertility < 1.72;
-    let metabolic_edge = genome.metabolism > 0.017 || genome.volatility > 1.58;
+    let predator_drive = genome.volatility > 1.26 && genome.hunger > 0.0158;
+    let perception_gate = genome.perception > 0.235;
+    let fertility_gate = genome.fertility < 2.05;
+    let metabolic_edge =
+        genome.metabolism > 0.0145 || genome.volatility > 1.44 || genome.hunger > 0.022;
 
     predator_drive && perception_gate && fertility_gate && metabolic_edge
 }
 
 fn is_harvester_genome(genome: Genome, rare_trait: RareTrait) -> bool {
     if rare_trait == RareTrait::Devourer {
-        genome.perception > 0.270 && genome.fertility > 1.16 && genome.hunger < 0.022
+        genome.perception > 0.225 && genome.fertility > 0.90 && genome.hunger < 0.030
     } else {
-        let forager_drive = genome.perception > 0.274 && genome.fertility > 1.24;
-        let hunger_gate = genome.hunger < 0.0215;
-        let metabolic_gate = genome.metabolism < 0.031;
-        let volatility_gate = genome.volatility < 1.62;
+        let forager_drive = genome.perception > 0.224 && genome.fertility > 0.92;
+        let hunger_gate = genome.hunger < 0.030;
+        let metabolic_gate = genome.metabolism < 0.042;
+        let volatility_gate = genome.volatility < 1.92;
 
         forager_drive && hunger_gate && metabolic_gate && volatility_gate
     }
@@ -370,30 +371,30 @@ fn stabilize_archetype(current: Archetype, derived: Archetype, sightings: u64) -
         return current;
     }
 
-    if sightings < 4 {
+    if sightings < 2 {
         return current;
     }
 
-    if matches!(current, Archetype::Reaper | Archetype::Leviathan) && sightings < 10 {
-        return current;
-    }
-
-    if current == Archetype::Harvester && sightings < 7 {
-        return current;
-    }
-
-    if derived == Archetype::Harvester && sightings >= 5 {
+    if derived == Archetype::Harvester && sightings >= 3 {
         return derived;
     }
 
-    if derived == Archetype::Reaper && sightings >= 6 {
+    if derived == Archetype::Reaper && sightings >= 3 {
         return derived;
+    }
+
+    if matches!(current, Archetype::Reaper | Archetype::Leviathan) && sightings < 5 {
+        return current;
+    }
+
+    if current == Archetype::Harvester && sightings < 5 {
+        return current;
     }
 
     if matches!(
         derived,
         Archetype::Architect | Archetype::Orbiter | Archetype::Mycelial | Archetype::Phantom
-    ) && sightings >= 5
+    ) && sightings >= 4
     {
         return derived;
     }
