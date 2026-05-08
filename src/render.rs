@@ -496,8 +496,8 @@ fn axiom_visual(generation: u64, x: usize, y: usize, state: AxiomPatternState) -
     let slow_phase = visual_hash(generation / 8 + axiom_state_offset(state), x, y) % 8;
 
     match state {
-        AxiomPatternState::Dormant => ('·', Color::DarkGray),
-        AxiomPatternState::Static => ('∙', Color::DarkGray),
+        AxiomPatternState::Dormant => (' ', Color::DarkGray),
+        AxiomPatternState::Static => (' ', Color::DarkGray),
         AxiomPatternState::Oscillating => {
             if slow_phase < 4 {
                 ('◦', Color::Cyan)
@@ -517,7 +517,7 @@ fn axiom_visual(generation: u64, x: usize, y: usize, state: AxiomPatternState) -
                 ('°', Color::Cyan)
             }
         }
-        AxiomPatternState::Collapsing => ('∙', Color::DarkGray),
+        AxiomPatternState::Collapsing => (' ', Color::DarkGray),
         AxiomPatternState::Chaotic => {
             if slow_phase == 0 {
                 ('░', Color::DarkGray)
@@ -761,7 +761,7 @@ fn field_haze_visual(
         ));
     }
 
-    Some(('.', Color::DarkGray))
+    None
 }
 
 fn draw_substrate(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
