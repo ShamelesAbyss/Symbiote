@@ -469,24 +469,18 @@ fn draw_axiom_lattice(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
 
 fn should_render_axiom_cell(generation: u64, x: usize, y: usize, state: AxiomPatternState) -> bool {
     let spacing = match state {
-        AxiomPatternState::Dormant => 89,
-        AxiomPatternState::Static => 47,
-        AxiomPatternState::Oscillating => 19,
-        AxiomPatternState::Translating => 23,
-        AxiomPatternState::Expanding => 29,
-        AxiomPatternState::Collapsing => 53,
-        AxiomPatternState::Chaotic => 61,
+        AxiomPatternState::Oscillating => 31,
+        AxiomPatternState::Translating => 37,
+        AxiomPatternState::Expanding => 43,
+        _ => return false,
     };
 
-    let stable_epoch = generation / 6 + axiom_state_offset(state);
+    let stable_epoch = generation / 18 + axiom_state_offset(state);
 
     match state {
-        AxiomPatternState::Oscillating | AxiomPatternState::Translating => {
-            visual_hash(stable_epoch, x, y) % spacing == 0
-        }
         AxiomPatternState::Expanding => {
             visual_hash(stable_epoch, x, y) % spacing == 0
-                || visual_hash(stable_epoch + 17, x / 2, y / 2) % 67 == 0
+                && visual_hash(stable_epoch + 17, x / 2, y / 2) % 11 == 0
         }
         _ => visual_hash(stable_epoch, x, y) % spacing == 0,
     }
@@ -651,39 +645,29 @@ fn should_render_field_haze(
     intensity: f32,
     mood: VisualMood,
 ) -> bool {
-    let pressure = danger.max(intensity);
-    let quiet_floor = 0.58 + mood.quieting() * 0.30 - mood.volatility() * 0.05;
+    let directional = matches!(
+        kind,
+        PatternKind::Chain | PatternKind::Glider | PatternKind::Swarmfront
+    );
 
-    if danger < 0.70 && pressure < quiet_floor {
+    let extreme_danger = danger > 0.86;
+    let extreme_front = directional && intensity > 0.92 && mood.corridor_bias() > 0.50;
+    let extreme_mutation = mood.mutation > 0.66 && intensity > 0.88;
+
+    if !(extreme_danger || extreme_front || extreme_mutation) {
         return false;
     }
 
-    let spacing: usize = if danger > 0.82 {
-        11
-    } else if danger > 0.64 || intensity > 0.92 {
-        19
-    } else if intensity > 0.78 {
-        37
+    let spacing: usize = if extreme_danger {
+        13
+    } else if extreme_front {
+        17
     } else {
-        71
+        23
     };
 
-    let quiet_extra = (mood.quieting() * 18.0).round() as usize;
-    let volatile_relief = (mood.volatility() * 3.0).round() as usize;
-    let corridor_relief = if matches!(
-        kind,
-        PatternKind::Chain | PatternKind::Glider | PatternKind::Swarmfront
-    ) {
-        (mood.corridor_bias() * 2.0).round() as usize
-    } else {
-        0
-    };
-
-    let spacing = spacing
-        .saturating_add(quiet_extra)
-        .saturating_sub(volatile_relief)
-        .saturating_sub(corridor_relief)
-        .max(3);
+    let quiet_extra = (mood.quieting() * 22.0).round() as usize;
+    let spacing = spacing.saturating_add(quiet_extra).max(9);
 
     let kind_offset = match kind {
         PatternKind::Halo => 1,
@@ -698,7 +682,7 @@ fn should_render_field_haze(
         PatternKind::Dormant => 10,
     };
 
-    visual_hash(age / 6 + kind_offset, x, y) % spacing == 0
+    visual_hash(age / 12 + kind_offset, x, y) % spacing == 0
 }
 
 fn field_haze_visual(
@@ -707,54 +691,29 @@ fn field_haze_visual(
     intensity: f32,
     mood: VisualMood,
 ) -> Option<(char, Color)> {
-    if danger > 0.82 {
-        return Some(('×', Color::Red));
-    }
-
-    if danger > 0.58 {
+    if danger > 0.86 {
         return Some((
-            '.',
-            if mood.mutation > 0.42 {
+            '×',
+            if mood.mutation > 0.50 {
                 Color::Magenta
             } else {
-                Color::DarkGray
+                Color::Red
             },
         ));
     }
 
-    if intensity > 0.90 {
-        return Some((
-            if mood.corridor > 0.48
-                && matches!(
-                    kind,
-                    PatternKind::Chain | PatternKind::Glider | PatternKind::Swarmfront
-                )
-            {
-                ','
-            } else {
-                '·'
-            },
-            match kind {
-                PatternKind::Nest | PatternKind::Bloom => Color::Green,
-                PatternKind::Glider | PatternKind::Halo => Color::Blue,
-                PatternKind::Swarmfront | PatternKind::Chain => Color::Magenta,
-                PatternKind::Oscillator => Color::Blue,
-                PatternKind::Lattice => Color::Gray,
-                PatternKind::StillLife | PatternKind::Dormant => Color::DarkGray,
-            },
-        ));
+    if mood.corridor > 0.50
+        && intensity > 0.92
+        && matches!(
+            kind,
+            PatternKind::Chain | PatternKind::Glider | PatternKind::Swarmfront
+        )
+    {
+        return Some((',', Color::DarkGray));
     }
 
-    if intensity > 0.78 && mood.corridor > 0.58 {
-        return Some((
-            match kind {
-                PatternKind::Swarmfront | PatternKind::Glider | PatternKind::Chain => ',',
-                PatternKind::Nest | PatternKind::Bloom => '·',
-                PatternKind::Halo | PatternKind::Oscillator => '.',
-                PatternKind::Lattice | PatternKind::StillLife | PatternKind::Dormant => '∙',
-            },
-            Color::DarkGray,
-        ));
+    if mood.mutation > 0.66 && intensity > 0.88 {
+        return Some(('.', Color::Magenta));
     }
 
     None
@@ -1019,6 +978,8 @@ fn root_screen_visual(app: &App, x: usize, y: usize, width: usize, height: usize
 }
 
 fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
+    let mood = VisualMood::from_app(app);
+
     for y in 0..height {
         for x in 0..width {
             if cells[y][x].substrate.is_some() {
@@ -1028,7 +989,23 @@ fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
             let signal = app.substrate.sample_signal_screen(x, y, width, height);
 
             if let Some((kind, value)) = signal.strongest() {
-                if value < 0.18 {
+                let threshold = match kind {
+                    SignalKind::Danger | SignalKind::Fear => 0.42 - mood.mutation * 0.08,
+                    SignalKind::Hunger => 0.48 - mood.recovery * 0.06,
+                    SignalKind::Growth => 0.56 - mood.recovery * 0.08,
+                }
+                .clamp(0.34, 0.62);
+
+                if value < threshold {
+                    continue;
+                }
+
+                let urgent = value > 0.72
+                    || matches!(kind, SignalKind::Danger | SignalKind::Fear)
+                        && value > 0.54
+                        && mood.mutation > 0.38;
+
+                if !urgent && visual_hash(app.age / 7, x, y) % 9 != 0 {
                     continue;
                 }
 
@@ -1040,28 +1017,18 @@ fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
 }
 
 fn draw_ecology_zones(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
-    // force root layer to overwrite everything (no flicker)
-    for y in 0..height {
-        for x in 0..width {
-            if app.substrate.sample_screen(x, y, width, height) == CellKind::Root {
-                cells[y][x].substrate = Some((
-                    match (x + y) % 4 {
-                        0 => "│",
-                        1 => "─",
-                        2 => "┼",
-                        _ => "┤",
-                    }
-                    .chars()
-                    .next()
-                    .unwrap(),
-                    Color::Blue,
-                ));
-            }
-        }
-    }
     for zone in &app.ecology.zones {
+        if zone.strength < 0.82 {
+            continue;
+        }
+
         let x = (((zone.x + 1.2) / 2.4) * width as f32) as i32;
         let y = (((zone.y + 1.2) / 2.4) * height as f32) as i32;
+
+        let rare_flash = visual_hash(app.age / 10, x.max(0) as usize, y.max(0) as usize) % 19 == 0;
+        if !rare_flash {
+            continue;
+        }
 
         let color = match zone.kind.name() {
             "nutrient" => Color::Green,
