@@ -110,6 +110,7 @@ impl SpeciesBank {
         let archetype = derive_archetype(genome, rare_trait, size);
         let mut best_index = None;
         let mut best_score = f32::MAX;
+        let match_threshold = species_match_threshold(genome, rare_trait, size);
 
         for (idx, species) in self.species.iter().enumerate() {
             if species.extinct || species.dominant_tribe != dominant {
@@ -118,7 +119,7 @@ impl SpeciesBank {
 
             let score = genome_distance(species.genome, genome);
 
-            if score < 0.34 && score < best_score {
+            if score < match_threshold && score < best_score {
                 best_score = score;
                 best_index = Some(idx);
             }
@@ -214,6 +215,8 @@ impl SpeciesBank {
 }
 
 pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> Archetype {
+    let pressure = conway_species_pressure(genome, rare_trait, size);
+
     if is_reaper_genome(genome) {
         Archetype::Reaper
     } else if is_harvester_genome(genome, rare_trait) {
@@ -224,6 +227,20 @@ pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> A
         Archetype::Mycelial
     } else if rare_trait == RareTrait::ElderCore || size > 82 {
         Archetype::Leviathan
+    } else if pressure.birth && genome.membrane > 0.68 && genome.fertility > 1.04 {
+        Archetype::Mycelial
+    } else if pressure.birth && genome.orbit > 0.66 && genome.perception > 0.198 {
+        Archetype::Orbiter
+    } else if pressure.birth && genome.bonding > 1.04 {
+        Archetype::Swarmer
+    } else if pressure.overcrowded && genome.volatility > 1.22 && genome.hunger > 0.015 {
+        Archetype::Hunter
+    } else if pressure.overcrowded && genome.orbit > 0.92 {
+        Archetype::Phantom
+    } else if pressure.underpopulated && genome.perception > 0.245 && genome.metabolism < 0.020 {
+        Archetype::Grazer
+    } else if pressure.underpopulated {
+        Archetype::Parasite
     } else if genome.membrane > 0.92 && genome.bonding > 1.12 {
         Archetype::Architect
     } else if genome.orbit > 0.84 && genome.perception > 0.205 {
@@ -240,6 +257,89 @@ pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> A
         Archetype::Phantom
     } else {
         Archetype::Parasite
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SpeciesConwayPressure {
+    active_neighbors: u8,
+    underpopulated: bool,
+    survives: bool,
+    birth: bool,
+    overcrowded: bool,
+}
+
+fn conway_species_pressure(
+    genome: Genome,
+    rare_trait: RareTrait,
+    size: usize,
+) -> SpeciesConwayPressure {
+    let mut active = 0u8;
+
+    if genome.perception > 0.245 {
+        active += 1;
+    }
+
+    if genome.hunger > 0.017 {
+        active += 1;
+    }
+
+    if genome.bonding > 1.08 {
+        active += 1;
+    }
+
+    if genome.volatility > 1.18 {
+        active += 1;
+    }
+
+    if genome.orbit > 0.72 {
+        active += 1;
+    }
+
+    if genome.membrane > 0.66 {
+        active += 1;
+    }
+
+    if genome.metabolism > 0.018 {
+        active += 1;
+    }
+
+    if genome.fertility > 1.10 {
+        active += 1;
+    }
+
+    if rare_trait != RareTrait::None {
+        active = active.saturating_add(1).min(8);
+    }
+
+    if size > 34 {
+        active = active.saturating_add(1).min(8);
+    }
+
+    SpeciesConwayPressure {
+        active_neighbors: active,
+        underpopulated: active < 2,
+        survives: active == 2 || active == 3,
+        birth: active == 3,
+        overcrowded: active > 3,
+    }
+}
+
+fn species_match_threshold(genome: Genome, rare_trait: RareTrait, size: usize) -> f32 {
+    let pressure = conway_species_pressure(genome, rare_trait, size);
+
+    if pressure.active_neighbors == 0 {
+        0.385
+    } else if pressure.birth {
+        0.275
+    } else if pressure.overcrowded {
+        0.295
+    } else if pressure.survives {
+        0.365
+    } else if pressure.underpopulated {
+        0.325
+    } else {
+        0.34
     }
 }
 

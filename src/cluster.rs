@@ -252,6 +252,7 @@ impl ClusterTracker {
             }
 
             let territorial_anchor = cluster_territorial_anchor(&cluster, age);
+            apply_colony_emergence_pressure(&mut cluster, territorial_anchor, age);
 
             for &idx in &group {
                 if let Some(particle) = particles.get_mut(idx) {
@@ -323,6 +324,58 @@ pub struct ClusterEvents {
     pub merges: usize,
     pub splits: usize,
     pub extinctions: usize,
+}
+
+fn apply_colony_emergence_pressure(
+    cluster: &mut Cluster,
+    territorial_anchor: f32,
+    world_age: u64,
+) {
+    if world_age < STRUCTURE_MATURITY_AGE || cluster.age < 96 {
+        return;
+    }
+
+    let age_memory = (cluster.age as f32 / 2_400.0).clamp(0.0, 1.0);
+    let density = (cluster.size as f32 / 54.0).clamp(0.0, 1.0);
+    let stability = (cluster.stability / 100.0).clamp(0.0, 1.0);
+    let membrane = (cluster.membrane / 100.0).clamp(0.0, 1.0);
+    let speed = (cluster.speed() * 220.0).clamp(0.0, 1.0);
+
+    let settled_colony = (stability * 0.36
+        + membrane * 0.22
+        + density * 0.18
+        + age_memory * 0.18
+        + territorial_anchor * 0.20
+        - speed * 0.16)
+        .clamp(0.0, 1.0);
+
+    let migration_front = (speed * 0.34
+        + cluster.avg_genome.orbit * 0.18
+        + cluster.avg_genome.volatility * 0.12
+        + density * 0.10
+        - stability * 0.10)
+        .clamp(0.0, 1.0);
+
+    let builder_pressure = (settled_colony * 0.42
+        + cluster.avg_genome.membrane * 0.22
+        + cluster.avg_genome.bonding * 0.10
+        + age_memory * 0.12)
+        .clamp(0.0, 1.0);
+
+    if settled_colony > 0.42 {
+        cluster.stability = (cluster.stability + settled_colony * 0.42).clamp(0.0, 100.0);
+        cluster.membrane = (cluster.membrane + builder_pressure * 0.34).clamp(0.0, 100.0);
+        cluster.drift_heat = (cluster.drift_heat - settled_colony * 0.28).clamp(0.0, 100.0);
+    }
+
+    if migration_front > 0.46 {
+        cluster.drift_heat = (cluster.drift_heat + migration_front * 0.52).clamp(0.0, 100.0);
+        cluster.stability = (cluster.stability + migration_front * 0.08).clamp(0.0, 100.0);
+    }
+
+    if builder_pressure > 0.55 && cluster.size >= 12 {
+        cluster.membrane = (cluster.membrane + builder_pressure * 0.46).clamp(0.0, 100.0);
+    }
 }
 
 fn cluster_territorial_anchor(cluster: &Cluster, world_age: u64) -> f32 {
