@@ -2,34 +2,30 @@
 
 Persistent artificial life ecosystem written entirely in Rust.
 
-Symbiote is a real-time terminal-rendered biosphere focused on:
-- emergence
-- territorial memory
-- adaptive ecology
-- lineage evolution
-- morphology-aware behavior
-- long-run ecosystem persistence
-- migration topology
-- ecological reinforcement
-- ecosystem readability
-- procedural infrastructure growth
+Symbiote is a real-time terminal-rendered biosphere focused on emergence, territorial memory, adaptive ecology, lineage evolution, Conway-inspired substrate behavior, colony formation, and long-run ecosystem intelligence.
 
-This is not a traditional game.
+This is not a traditional game and not a fixed simulation sandbox.
 
 Symbiote is designed as a living procedural ecosystem where:
+
 - organisms evolve
 - ecological pressure accumulates
 - migration lanes emerge
 - territory stabilizes
 - infrastructure persists
 - species rise and collapse
+- cells form Conway-inspired patterns
+- colonies develop behavioral memory
 - the world develops historical memory over time
+
+
 
 ---
 
 # Current Ecosystem Focus
 
 Symbiote now emphasizes:
+
 - adaptive ecological behavior
 - territorial reinforcement
 - long-run ecosystem persistence
@@ -38,23 +34,24 @@ Symbiote now emphasizes:
 - lineage drift and species turnover
 - ecological memory fields
 - procedural infrastructure growth
+- Conway-inspired cellular emergence
+- colony propagation and behavioral pressure
 - ecosystem storytelling through behavior
-- morphology-aware rendering
-- behavioral readability
-- adaptive substrate density
-- field-responsive motion
 
 The ecosystem intentionally begins sparse and evolves naturally through:
+
 - survival
 - reproduction
 - migration
 - ecological pressure
 - adaptive reinforcement
-- territorial attraction
-- ecological avoidance
-- lineage adaptation
+- local cell birth/survival rules
+- cluster persistence
+- colony memory
 
 Density is earned by the ecosystem itself over time.
+
+
 
 ---
 
@@ -65,6 +62,7 @@ Density is earned by the ecosystem itself over time.
 The PatternField system acts as persistent ecological memory.
 
 It stores and reinforces:
+
 - danger
 - growth
 - cohesion
@@ -73,25 +71,17 @@ It stores and reinforces:
 - migration traces
 - territorial pressure
 - ecosystem history
-- reinforcement corridors
-- ecological affinity pressure
 
-The field actively influences:
-- ecosystem behavior
-- territorial formation
-- migration topology
-- ecological balancing
-- movement pressure
-- long-run world structure
+The field actively influences ecosystem behavior and long-run topology.
 
-The field is evolving toward:
-> an ecosystem nervous system.
+
 
 ---
 
 ## Territorial Reinforcement
 
 The world gradually develops:
+
 - ecological districts
 - migration corridors
 - root highways
@@ -99,32 +89,54 @@ The world gradually develops:
 - persistent settlement regions
 - abandoned ecological zones
 - infrastructure-like reinforcement structures
-- stabilized organism lanes
-- corridor ecosystems
-- ecological bottlenecks
 
 The simulation preserves traces of prior ecological states, allowing the world to develop historical continuity.
 
+
+
 ---
 
-## Morphology-Aware Organisms
+## Conway-Inspired Cellular Ecology
 
-Organisms now visually express:
-- role specialization
-- density state
-- ecological pressure
-- territorial behavior
-- movement identity
-- cluster structure
-- adaptive behavior classes
+The substrate layer now includes simple but fundamental cellular emergence rules:
 
-Rendering is now heavily behavior-first rather than pure particle density.
+- live cells survive with 2 or 3 live neighbors
+- live cells die from underpopulation
+- live cells die from overpopulation
+- dead or empty substrate can birth life with exactly 3 live neighbors
+- spores, nutrients, and dead cells can support near-birth propagation
+- roots remain structural barriers instead of becoming ordinary cells
+
+This gives the cell system room to generate spontaneous local structures, oscillating pockets, propagation fronts, terraces, and dead-cell wakes without hardcoding specific pattern types.
+
+
+
+---
+
+## Colony Propagation Ecology
+
+Clusters now act as a bridge between individual organisms and emergent species behavior.
+
+Colonies can develop pressure based on:
+
+- age
+- stability
+- density
+- membrane strength
+- movement speed
+- territorial anchoring
+- drift heat
+
+This allows old settled colonies to stabilize, moving fronts to become more distinct, and dense clusters to reinforce membrane-like structures without adding hardcoded archetypes.
+
+
 
 ---
 
 ## Artificial Life Simulation
 
 Symbiote combines:
+
 - artificial life systems
 - Conway-inspired emergence pressure
 - ecological balancing
@@ -136,30 +148,32 @@ Symbiote combines:
 
 without becoming deterministic or scripted.
 
+
+
 ---
 
 # Visual Identity
 
 Symbiote intentionally avoids:
+
 - overwhelming particle spam
 - unreadable density
 - excessive visual clutter
-- brute-force rendering
-- meaningless chaos rendering
 
 Instead the ecosystem emphasizes:
+
 - contrast
 - migration readability
 - ecological topology
 - persistent infrastructure
 - territorial behavior
 - ecosystem aging
-- foreground organism clarity
-- long-run readability
-- behavioral visualization
-- sparse-space ecology
+- meaningful negative space
+- readable cellular emergence
 
 The empty space is part of the ecology.
+
+
 
 ---
 
@@ -167,129 +181,228 @@ The empty space is part of the ecology.
 
 ## Long-Run Ecosystem State
 
-Current mature worlds now visibly develop:
+Long-running worlds can develop:
+
 - territorial lanes
 - persistent root infrastructure
 - adaptive migration behavior
 - ecological segmentation
 - long-run species turnover
-- corridor ecosystems
-- stable migration highways
-- ecological districts
-- reinforcement structures
-- colony-like formations
+- Conway-style cellular terraces
+- moving colony fronts
+- dead-cell wake trails
+- rooted ecological barriers
+- propagation seams
 
-(Add updated screenshots from current v0.13+ builds here.)
+(Add updated screenshots here from current builds.)
+
+
 
 ---
 
 # Architecture
 
-## Core Modules
+Core modules:
 
 ```text
 src/
-├── main.rs        # ultra-thin boot entry
-├── app.rs         # ecosystem orchestration/runtime ownership
-├── sim.rs         # core simulation logic
-├── render.rs      # ecosystem rendering + readability systems
-├── field.rs       # PatternField ecosystem memory
-├── pattern.rs     # Conway-inspired pattern classification
-├── cluster.rs     # formations + colony systems
-├── species.rs     # lineage + mutation drift
-├── particle.rs    # organism behavior/state
-├── ecology.rs     # ecological balancing pressure
-├── automata.rs    # substrate/root cellular systems
-├── memory.rs      # ecosystem persistence systems
-├── tree.rs        # trunk/root generation
-└── density.rs     # adaptive density governance
+├── main.rs
+├── app.rs
+├── sim.rs
+├── render.rs
+├── field.rs
+├── pattern.rs
+├── cluster.rs
+├── species.rs
+├── particle.rs
+├── ecology.rs
+├── automata.rs
+├── memory.rs
+├── tree.rs
+└── density.rs
 ```
 
----
+
 
 ## Important System Roles
 
 ### app.rs
 
 Top-level ecosystem orchestration:
+
 - lifecycle management
 - spawning
 - telemetry
 - PatternField ownership
 - reproduction pressure
+- substrate cadence
+- Conway generation timing
 - reset/randomization
-- runtime ecosystem governance
 
----
+
 
 ### sim.rs
 
 Core simulation engine:
+
 - movement
 - ecology interaction
 - reproduction
 - field influence
 - behavioral pressure
 - archetype logic
-- territorial navigation
-- adaptive response behavior
+- particle/cell interaction
+- field polarity response
 
----
+
 
 ### field.rs
 
 Persistent ecological memory layer:
+
 - migration traces
 - stability fields
 - danger pressure
 - growth reinforcement
 - territorial memory
-- corridor persistence
-- ecological reinforcement
+- motion memory
 
----
+
+
+### pattern.rs
+
+Morphology interpretation layer:
+
+- Conway-inspired pattern signatures
+- oscillator/still life/front classification
+- morphology roles
+- structural pressure
+- pattern glyph/readout support
+
+
 
 ### render.rs
 
 Terminal ecosystem visualization:
+
 - organism rendering
 - overlays
 - telemetry
 - cluster visualization
 - field underlays
-- substrate hierarchy
-- morphology-aware readability
-- behavioral foreground emphasis
+- substrate thinning
+- visual hierarchy refinement
 
----
+
+
+### cluster.rs
+
+Colony and group identity layer:
+
+- cluster detection
+- colony age
+- stability
+- membranes
+- drift heat
+- territorial anchoring
+- behavioral colony pressure
+
+
+
+### species.rs
+
+Lineage and taxonomy layer:
+
+- species creation
+- genome blending
+- archetype derivation
+- extinction tracking
+- lineage naming
+- future environmental identity drift
+
+
 
 ### ecology.rs
 
 Environmental pressure systems:
+
 - ecological balancing
 - adaptive ecosystem behavior
 - environmental pressure shaping
-- overcrowding response
-- ecosystem stabilization
+- sparse macro-pressure zones
+
+
+
+### automata.rs
+
+Cellular substrate layer:
+
+- root barriers
+- life cells
+- nutrients
+- dead cells
+- spores
+- mutagens
+- nests
+- Conway-style survival/birth rules
+- near-birth propagation pressure
+
+
+
+### tree.rs
+
+Root infrastructure policy:
+
+- root growth
+- trunk/branch/canopy staging
+- root caps
+- directional growth pressure
+- barriers and surface flow
+
+
+
+### density.rs
+
+Density observation layer:
+
+- cell density
+- root density
+- particle pressure
+- crowding/refill signals
+
+
+
+### memory.rs
+
+Long-run ecosystem memory:
+
+- peak population
+- peak cells
+- peak clusters
+- dominant archetype
+- historical pressure
+- adaptive substrate/corridor signals
+
+
 
 ---
 
 # Requirements
 
 Symbiote requires:
+
 - Rust
 - Cargo
-- a terminal supporting ANSI colors
-- Unicode rendering support
+- A terminal that supports ANSI colors and Unicode rendering
 
 Recommended:
+
 - Linux
 - macOS
 - Windows Terminal
-- Kitty
-- Alacritty
-- WezTerm
-- modern true-color terminal emulators
+- modern terminal emulators with true color support
+
+
 
 ---
 
@@ -316,6 +429,8 @@ rustc --version
 cargo --version
 ```
 
+
+
 ---
 
 ## Windows
@@ -325,53 +440,60 @@ Install Rust using:
 https://rustup.rs/
 
 After installation:
+
 - restart terminal
-- restart VSCode/Windows Terminal if open
+- verify:
 
-Verify:
-
-```powershell
+```bash
 rustc --version
 cargo --version
 ```
+
+
 
 ---
 
 # Cloning Symbiote
 
-## HTTPS
+## HTTPS, recommended for most users
 
 ```bash
 git clone https://github.com/ShamelesAbyss/Symbiote.git
 cd Symbiote
 ```
 
-## SSH
+
+
+## SSH, for contributors and dev environments
 
 ```bash
 git clone git@github.com:ShamelesAbyss/Symbiote.git
 cd Symbiote
 ```
 
+
+
 ---
 
 # Building Symbiote
 
-## Debug Build
+## Debug build
 
 ```bash
 cargo build
 cargo run
 ```
 
----
 
-## Optimized Release Build
+
+## Optimized release build
 
 ```bash
 cargo build --release
 cargo run --release
 ```
+
+
 
 ---
 
@@ -386,11 +508,14 @@ cargo run --release
 | + | Increase simulation speed |
 | - | Decrease simulation speed |
 
+
+
 ---
 
 # Ecosystem Evolution Roadmap
 
 Current active development targets:
+
 - adaptive population pressure
 - territorial intelligence
 - field-guided navigation
@@ -400,85 +525,98 @@ Current active development targets:
 - lineage inheritance
 - emergent sub-archetypes
 - ecosystem nervous system behavior
-- species adaptation pressure
-- field-responsive navigation
-- territorial migration fronts
-- ecology-aware population balancing
+- Conway-style substrate emergence
+- spontaneous pattern propagation
+- colony memory pressure
+- behavioral species drift
+- long-run ecological succession
+
+
 
 ---
 
 # Release History
 
+
+
 ## v0.8.5 — Vertical Growth
 
 Introduced major vertical ecosystem expansion systems.
 
----
+
 
 ## v0.8.6 — Root Growth Stable
 
 Stabilized root infrastructure and substrate reinforcement systems.
 
----
+
 
 ## v0.9.0 — PatternField Emergence
 
 Integrated persistent ecological memory and territorial reinforcement behavior.
 
----
+
 
 ## v0.10.0 — Territorial Intelligence
 
 Introduced ecosystem-aware movement pressure and territorial affinity drift.
 
----
+
 
 ## v0.11.0 — Field Polarity Response
 
-Added field polarity response systems and ecological corridor reinforcement.
+Added archetype-aware PatternField polarity response, improving territorial settlement, danger corridor differentiation, and stable-region inhabitation.
 
----
 
-## v0.11.1 — Visual Hierarchy Refinement
-
-Reduced substrate rendering density and improved long-run ecosystem readability.
-
----
 
 ## v0.12.0 — Morphology-Aware Rendering
 
-Introduced morphology-aware organism rendering and behavioral visual identity systems.
+Improved pattern visibility and ecosystem readability through morphology-driven visual refinement.
 
----
 
-## v0.13.0 — Behavioral Readability
 
-Improved mature ecosystem readability through:
-- organism foreground clarity
-- territorial structure visibility
-- migration topology readability
-- adaptive substrate thinning
-- behavioral visualization refinement
+## v0.13.0 — Observability and Visual Hierarchy
+
+Improved readouts, visual hierarchy, substrate thinning, negative space clarity, and long-run ecosystem observation.
+
+
+
+## v0.14.0 — Emergent Colony Propagation
+
+Added Conway-style cell survival and birth pressure, near-birth propagation support, reduced particle overwrite pressure, and behavioral colony emergence pressure.
+
+
 
 ---
 
 # Philosophy
 
 Symbiote is an experiment in:
+
 - living procedural systems
 - artificial ecology
 - long-run emergence
 - persistent digital environments
 - ecosystem intelligence
 - memory-driven simulation
-- behavior-first visualization
+- Conway-inspired cellular propagation
+- colony behavior emerging from local pressure
 
 The goal is not scripted gameplay.
 
 The goal is believable artificial existence.
 
+The project is guided by one core principle:
+
+```text
+Complex life should emerge from simple interacting pressure systems.
+```
+
+
 ---
 
+
 # License
+
 
 MIT License
