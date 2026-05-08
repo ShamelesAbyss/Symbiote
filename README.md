@@ -10,6 +10,9 @@ Symbiote is a real-time terminal-rendered biosphere focused on:
 - Conway-inspired substrate behavior
 - colony formation
 - long-run ecosystem intelligence
+- trophic pressure
+- live ecological observability
+- exploratory camera navigation
 
 This is not a traditional game and not a fixed simulation sandbox.
 
@@ -23,8 +26,9 @@ Symbiote is designed as a living procedural ecosystem where:
 - cells form Conway-inspired patterns
 - colonies develop behavioral memory
 - the world develops historical memory over time
-
-
+- predators and herbivores create trophic cycling
+- structural organisms emerge from long-run pressure
+- the observer can zoom and pan through the living world
 
 ---
 
@@ -46,6 +50,7 @@ Symbiote now emphasizes:
 - live ecological telemetry
 - archetype observability
 - computational biome readability
+- local ecosystem inspection through camera controls
 
 The ecosystem intentionally begins sparse and evolves naturally through:
 - survival
@@ -56,10 +61,10 @@ The ecosystem intentionally begins sparse and evolves naturally through:
 - local cell birth/survival rules
 - cluster persistence
 - colony memory
+- trophic role pressure
+- long-run territorial development
 
 Density is earned by the ecosystem itself over time.
-
-
 
 ---
 
@@ -81,7 +86,14 @@ It stores and reinforces:
 
 The field actively influences ecosystem behavior and long-run topology while remaining visually restrained to preserve readability.
 
+The field is not meant to dominate the viewport.
 
+It works best as an invisible or subtle ecological pressure layer whose effects are revealed through:
+- organism movement
+- settlement patterns
+- migration flow
+- collapse and recovery
+- territorial clustering
 
 ---
 
@@ -98,13 +110,11 @@ The world gradually develops:
 
 The simulation preserves traces of prior ecological states, allowing the world to develop historical continuity.
 
-
-
 ---
 
 ## Conway-Inspired Cellular Ecology
 
-The substrate layer now includes simple but fundamental cellular emergence rules:
+The substrate layer includes simple but fundamental cellular emergence rules:
 - live cells survive with 2 or 3 live neighbors
 - live cells die from underpopulation
 - live cells die from overpopulation
@@ -122,8 +132,6 @@ This gives the cell system room to generate:
 - ecological chambers
 
 without hardcoding specific pattern types.
-
-
 
 ---
 
@@ -145,10 +153,9 @@ This allows:
 - moving fronts to become more distinct
 - dense clusters to reinforce membrane-like structures
 - structural archetypes to emerge naturally
+- long-run colony behavior to become visible through motion instead of overlays
 
 without adding hardcoded behavior scripting.
-
-
 
 ---
 
@@ -169,13 +176,54 @@ Current trophic archetypes include:
 - Harvesters
 - Hunters
 - Reapers
+- Parasites
 - structural colony organisms
 - drifting ecological specialists
 
 The ecosystem now visibly transitions through:
-substrate growth → population bloom → trophic pressure → collapse → recovery.
 
+```text
+substrate growth
+→ population bloom
+→ harvester cleanup pressure
+→ biological crowding
+→ reaper emergence
+→ collapse
+→ recovery
+→ regrowth
+```
 
+Harvesters now act as gentler ecological cleanup organisms.
+
+Reapers now behave as unstable apex pressure rather than permanent ecosystem deletion.
+
+---
+
+## Structural Archetypes
+
+Symbiote now has improved emergence for structural and rare ecological roles.
+
+Important archetypes include:
+- SWR — Swarmer
+- HNT — Hunter
+- GRZ — Grazer
+- ORB — Orbiter
+- PAR — Parasite
+- ARC — Architect
+- LEV — Leviathan
+- MYC — Mycelial
+- PHM — Phantom
+- HRV — Harvester
+- RPR — Reaper
+
+Recent updates improved visibility and viability for:
+- Mycelial organisms
+- Architects
+- Leviathans
+- Phantoms
+- Swarmers
+
+These roles are now easier to observe through live telemetry and improved glyph identity.
 
 ---
 
@@ -190,10 +238,11 @@ Symbiote combines:
 - species mutation drift
 - substrate growth systems
 - terminal-rendered ecosystem visualization
+- trophic cycling
+- persistent ecological memory
+- exploratory world inspection
 
 without becoming deterministic or scripted.
-
-
 
 ---
 
@@ -212,10 +261,60 @@ Current telemetry includes:
 - corridor pressure analysis
 - root pressure observation
 - long-run ecological memory
+- active particle archetype accounting
+- predator/herbivore/prey balance summaries
 
 This allows the simulation to function like a readable computational ecology console instead of opaque particle noise.
 
+The side panel now acts as an instrument cluster for:
+- population analysis
+- trophic balance
+- ecological role diversity
+- structural archetype emergence
+- collapse and recovery observation
+- long-run tuning
 
+---
+
+# Exploratory Camera System
+
+Symbiote now includes an exploratory camera.
+
+The camera allows the observer to:
+- zoom into local regions
+- pan through the ecosystem
+- inspect Leviathans up close
+- follow Reaper hunting behavior
+- watch Harvesters clean dense cell beds
+- study root highways and corridors
+- inspect colony membranes
+- observe migration fronts
+- examine local trophic interactions
+
+Camera behavior:
+- mouse wheel zooms in and out
+- arrow keys pan the viewport
+- `0` resets the camera
+- zoom range is 1.0x to 6.0x
+- panning scales with zoom for fine control
+- the view clamps inside the world bounds
+
+The camera affects rendering only.
+
+It does not affect:
+- particle movement
+- reproduction
+- species evolution
+- roots
+- Conway substrate
+- field memory
+- telemetry counts
+- trophic behavior
+- ecology logic
+
+Before the camera, the observer watched the biosphere from orbit.
+
+Now the observer can fly through it.
 
 ---
 
@@ -238,31 +337,14 @@ Instead the ecosystem emphasizes:
 - readable cellular emergence
 - structural readability
 - organism motion clarity
+- distinct archetype identity
+- clean telemetry instead of noisy overlays
 
 The empty space is part of the ecology.
 
+The renderer now trusts the simulation.
 
-
----
-
-## Long-Run Ecosystem State
-
-Long-running worlds can develop:
-- territorial lanes
-- persistent root infrastructure
-- adaptive migration behavior
-- ecological segmentation
-- long-run species turnover
-- Conway-style cellular terraces
-- moving colony fronts
-- dead-cell wake trails
-- rooted ecological barriers
-- propagation seams
-- trophic collapse/recovery cycles
-- apex predator waves
-- structural ecological districts
-
-
+The world shows consequences instead of constantly painting the machinery underneath.
 
 ---
 
@@ -285,12 +367,23 @@ src/
 ├── automata.rs
 ├── memory.rs
 ├── tree.rs
-└── density.rs
+├── density.rs
+└── life.rs
 ```
 
-
-
 ## Important System Roles
+
+### main.rs
+
+Ultra-thin boot and input layer:
+- module wiring
+- terminal setup
+- event loop
+- keyboard controls
+- mouse capture
+- zoom input
+- pan input
+- clean shutdown
 
 ### app.rs
 
@@ -305,8 +398,8 @@ Top-level ecosystem orchestration:
 - reset/randomization
 - archetype accounting
 - ecological observation routing
-
-
+- camera state
+- camera zoom/pan helpers
 
 ### sim.rs
 
@@ -322,8 +415,7 @@ Core simulation engine:
 - trophic pressure
 - substrate cleanup behavior
 - apex predator pressure
-
-
+- root collision and surface flow
 
 ### field.rs
 
@@ -335,8 +427,6 @@ Persistent ecological memory layer:
 - territorial memory
 - motion memory
 
-
-
 ### pattern.rs
 
 Morphology interpretation layer:
@@ -346,23 +436,21 @@ Morphology interpretation layer:
 - structural pressure
 - pattern glyph/readout support
 
-
-
 ### render.rs
 
 Terminal ecosystem visualization:
 - organism rendering
-- overlays
+- restrained overlays
 - telemetry
 - cluster visualization
-- field underlays
 - substrate thinning
 - visual hierarchy refinement
 - archetype observability
 - trophic telemetry
+- camera-aware sampling
+- zoomed rendering
+- pan-aware viewport transforms
 - readability-first rendering philosophy
-
-
 
 ### cluster.rs
 
@@ -374,8 +462,6 @@ Colony and group identity layer:
 - drift heat
 - territorial anchoring
 - behavioral colony pressure
-
-
 
 ### species.rs
 
@@ -389,8 +475,6 @@ Lineage and taxonomy layer:
 - structural archetype emergence
 - environmental identity drift
 
-
-
 ### ecology.rs
 
 Environmental pressure systems:
@@ -398,8 +482,6 @@ Environmental pressure systems:
 - adaptive ecosystem behavior
 - environmental pressure shaping
 - sparse macro-pressure zones
-
-
 
 ### automata.rs
 
@@ -414,8 +496,6 @@ Cellular substrate layer:
 - Conway-style survival/birth rules
 - near-birth propagation pressure
 
-
-
 ### tree.rs
 
 Root infrastructure policy:
@@ -425,8 +505,6 @@ Root infrastructure policy:
 - directional growth pressure
 - barriers and surface flow
 
-
-
 ### density.rs
 
 Density observation layer:
@@ -435,8 +513,6 @@ Density observation layer:
 - particle pressure
 - crowding/refill signals
 - ecological occupancy analysis
-
-
 
 ### memory.rs
 
@@ -451,7 +527,14 @@ Long-run ecosystem memory:
 - trophic state tracking
 - long-run ecological statistics
 
+### life.rs
 
+Secondary cellular/axiom layer:
+- Conway-style organism lattice support
+- long-run cellular pattern state
+- quiet pattern analysis
+- invisible emergence pressure
+- behavioral structure support
 
 ---
 
@@ -460,15 +543,14 @@ Long-run ecosystem memory:
 Symbiote requires:
 - Rust
 - Cargo
-- A terminal that supports ANSI colors and Unicode rendering
+- a terminal that supports ANSI colors and Unicode rendering
 
 Recommended:
 - Linux
 - macOS
 - Windows Terminal
 - modern terminal emulators with true color support
-
-
+- desktop terminal for full camera exploration
 
 ---
 
@@ -493,8 +575,6 @@ rustc --version
 cargo --version
 ```
 
-
-
 ---
 
 ## Windows
@@ -510,8 +590,6 @@ After installation:
 rustc --version
 cargo --version
 ```
-
-
 
 ---
 
@@ -549,22 +627,22 @@ cargo build --release
 cargo run --release
 ```
 
-
-
 ---
 
 # Controls
 
-| Key | Action |
-|-----|--------|
-| q | Quit |
+| Key / Input | Action |
+|------------|--------|
+| q | Quit and save |
 | space | Pause simulation |
 | r | Reset ecosystem |
 | n | Generate new world seed |
-| + | Increase simulation speed |
+| + / = | Increase simulation speed |
 | - | Decrease simulation speed |
-
-
+| Mouse wheel up | Zoom in |
+| Mouse wheel down | Zoom out |
+| Arrow keys | Pan camera |
+| 0 | Reset camera |
 
 ---
 
@@ -589,8 +667,8 @@ Current active development targets:
 - biome-scale adaptation
 - ecosystem observability
 - trophic evolution
-
-
+- local camera-guided ecological inspection
+- richer world exploration tools
 
 ---
 
@@ -632,7 +710,10 @@ Rebalanced Harvester and Reaper emergence thresholds, improved archetype stabili
 ## v0.17.0 — Observable Computational Ecology
 Introduced full live archetype accounting, trophic telemetry, structural archetype emergence improvements, renderer readability breakthroughs, and long-run ecological observability.
 
+## v0.18.0 — Exploratory Camera Systems
+Added mouse wheel zoom, arrow-key camera panning, camera-aware rendering, world-bound viewport clamping, and local ecosystem inspection.
 
+This release transforms Symbiote from a fixed terminal viewport into an explorable computational biosphere.
 
 ---
 
@@ -648,6 +729,7 @@ Symbiote is an experiment in:
 - Conway-inspired cellular propagation
 - colony behavior emerging from local pressure
 - observable computational ecosystems
+- exploratory artificial worlds
 
 The goal is not scripted gameplay.
 
@@ -659,6 +741,7 @@ The project is guided by one core principle:
 Complex life should emerge from simple interacting pressure systems.
 ```
 
+Symbiote is now entering a phase where development is less about adding isolated features and more about discovering what the ecosystem naturally wants to become.
 
 ---
 
