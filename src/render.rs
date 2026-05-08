@@ -174,7 +174,6 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
     let mut cells: Vec<Vec<Cell>> = vec![vec![Cell::default(); width]; height];
 
     draw_substrate(&mut cells, app, width, height);
-    let ambient_color = background_color(app);
     draw_signal_trails(&mut cells, app, width, height);
     draw_ecology_zones(&mut cells, app, width, height);
     draw_pattern_field(&mut cells, app, width, height);
@@ -299,10 +298,7 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                 let (glyph, color) = cell.axiom.unwrap();
                 spans.push(Span::styled(glyph.to_string(), Style::default().fg(color)));
             } else if cell.count == 0 {
-                spans.push(Span::styled(
-                    background_glyph(app.environment),
-                    Style::default().fg(ambient_color),
-                ));
+                spans.push(Span::raw(" "));
             } else {
                 let tribe = cell.dominant_tribe();
                 let avg_health = cell.health / cell.count as f32;
@@ -1765,16 +1761,6 @@ fn density_color(label: &str) -> Color {
     }
 }
 
-fn background_color(app: &App) -> Color {
-    let mood = VisualMood::from_app(app);
-
-    if mood.mutation > 0.62 && app.age % 9 < 2 {
-        Color::Gray
-    } else {
-        Color::DarkGray
-    }
-}
-
 fn render_metrics(f: &mut Frame<'_>, area: Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -2040,16 +2026,6 @@ fn env_color(env: Environment) -> Color {
         Environment::Hunger => Color::Red,
         Environment::Storm => Color::Yellow,
         Environment::Drift => Color::Cyan,
-    }
-}
-
-fn background_glyph(env: Environment) -> &'static str {
-    match env {
-        Environment::Calm => "·",
-        Environment::Bloom => ".",
-        Environment::Hunger => " ",
-        Environment::Storm => "∴",
-        Environment::Drift => "˙",
     }
 }
 
