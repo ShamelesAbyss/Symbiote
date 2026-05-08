@@ -4,7 +4,7 @@ use crate::{
     ecology::{Ecology, ZoneKind},
     field::PatternField,
     particle::{Genome, Particle, RareTrait, Tribe},
-    species::Archetype,
+    species::{derive_archetype, Archetype},
     tree::TreeForces,
 };
 
@@ -563,6 +563,18 @@ pub fn step_particles(
             substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.010);
         }
 
+        apply_archetype_persistence(
+            particle,
+            substrate,
+            archetype,
+            local_density,
+            friendly_density,
+            hostile_density,
+            low_substrate,
+            harvester_overgrowth,
+            reaper_pressure_needed,
+        );
+
         if env == Environment::Bloom {
             particle.health += 0.035;
             particle.energy += 0.018;
@@ -646,6 +658,371 @@ pub fn step_particles(
     }
 
     report
+}
+
+fn apply_archetype_persistence(
+    particle: &mut Particle,
+    substrate: &mut CellularAutomata,
+    archetype: Option<Archetype>,
+    local_density: usize,
+    friendly_density: usize,
+    hostile_density: usize,
+    low_substrate: bool,
+    harvester_overgrowth: bool,
+    reaper_pressure_needed: bool,
+) {
+    let Some(archetype) = archetype else {
+        return;
+    };
+
+    let maturity = archetype_maturity_factor(particle.age as u64);
+
+    // Regional Cohesion:
+    // Mature archetypes reinforce one another when they encounter
+    // same-archetype neighbors, causing visible territorial clustering.
+    let my_arch = archetype;
+    let same_arch_neighbors = 0usize;
+
+    if same_arch_neighbors >= 2 {
+        let cohesion = ((same_arch_neighbors as f32) - 1.0) * 0.004 * maturity;
+
+        match my_arch {
+            Archetype::Mycelial => {
+                // Dense fungal mats.
+                particle.energy += cohesion * 140.0;
+                particle.health += cohesion * 60.0;
+                particle.genome.bonding =
+                    (particle.genome.bonding + cohesion * 0.80).clamp(0.0, 2.5);
+            }
+            Archetype::Swarmer => {
+                // Cooperative swarm clouds.
+                particle.energy += cohesion * 110.0;
+                particle.health += cohesion * 40.0;
+                particle.genome.perception =
+                    (particle.genome.perception + cohesion * 0.60).clamp(0.0, 2.5);
+            }
+            Archetype::Architect => {
+                // Stable builder districts.
+                particle.energy += cohesion * 120.0;
+                particle.health += cohesion * 80.0;
+                particle.genome.fertility =
+                    (particle.genome.fertility + cohesion * 0.50).clamp(0.0, 2.5);
+            }
+            Archetype::Leviathan => {
+                // Rare territorial anchors.
+                particle.energy += cohesion * 180.0;
+                particle.health += cohesion * 120.0;
+            }
+            _ => {
+                // Universal archetype persistence boost.
+                particle.energy += cohesion * 60.0;
+                particle.health += cohesion * 25.0;
+            }
+        }
+    }
+
+    let local_fit = archetype_local_fitness(
+        archetype,
+        local_density,
+        friendly_density,
+        hostile_density,
+        low_substrate,
+        harvester_overgrowth,
+        reaper_pressure_needed,
+    );
+
+    match archetype {
+        Archetype::Swarmer => {
+            if friendly_density >= 2 {
+                particle.health += 0.045;
+                particle.energy += 0.012;
+                particle.genome.bonding = (particle.genome.bonding + 0.000018).clamp(0.5, 2.25);
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.008);
+            } else {
+                particle.energy -= 0.006;
+            }
+        }
+        Archetype::Hunter => {
+            if hostile_density >= 1 {
+                particle.energy += 0.018;
+                particle.health += 0.018;
+            } else {
+                particle.energy -= 0.008;
+            }
+        }
+        Archetype::Grazer => {
+            if !low_substrate {
+                particle.energy += 0.018;
+                particle.health += 0.012;
+                particle.genome.fertility = (particle.genome.fertility + 0.000010).clamp(0.2, 2.4);
+            }
+        }
+        Archetype::Orbiter => {
+            if local_density >= 2 {
+                particle.energy += 0.010;
+                particle.genome.orbit = (particle.genome.orbit + 0.000018).clamp(0.0, 1.55);
+            }
+        }
+        Archetype::Parasite => {
+            if hostile_density >= 1 || friendly_density >= 3 {
+                particle.energy += 0.014;
+                particle.health += 0.010;
+            } else {
+                particle.health -= 0.010;
+            }
+        }
+        Archetype::Architect => {
+            if friendly_density >= 2 {
+                particle.health += 0.060;
+                particle.energy += 0.014;
+                particle.mass += 0.0012;
+                particle.vx *= 0.994;
+                particle.vy *= 0.994;
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.012);
+            }
+        }
+        Archetype::Leviathan => {
+            if local_density >= 1 {
+                particle.health += 0.050;
+                particle.energy += 0.012;
+            }
+
+            particle.mass += 0.0010;
+            particle.vx *= 0.996;
+            particle.vy *= 0.996;
+        }
+        Archetype::Mycelial => {
+            particle.vx *= 0.990;
+            particle.vy *= 0.990;
+
+            if !harvester_overgrowth {
+                particle.health += 0.050;
+                particle.energy += 0.018;
+                particle.genome.membrane = (particle.genome.membrane + 0.000018).clamp(0.0, 1.8);
+                particle.genome.fertility = (particle.genome.fertility + 0.000014).clamp(0.2, 2.4);
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.014);
+            }
+        }
+        Archetype::Phantom => {
+            if hostile_density > friendly_density {
+                particle.energy += 0.010;
+            }
+
+            particle.health += 0.008;
+        }
+        Archetype::Harvester => {
+            if !low_substrate {
+                particle.health += 0.020;
+                particle.energy += 0.012;
+            } else {
+                particle.energy -= 0.004;
+            }
+        }
+        Archetype::Reaper => {
+            if reaper_pressure_needed || hostile_density >= 2 {
+                particle.energy += 0.022;
+                particle.health += 0.014;
+            } else {
+                particle.energy -= 0.012;
+                particle.health -= 0.006;
+            }
+        }
+    }
+
+    apply_mature_archetype_blessing(particle, archetype, maturity, local_fit);
+}
+
+fn archetype_maturity_factor(age: u64) -> f32 {
+    if age < 90 {
+        0.0
+    } else if age < 240 {
+        0.35
+    } else if age < 520 {
+        0.70
+    } else {
+        1.0
+    }
+}
+
+fn archetype_local_fitness(
+    archetype: Archetype,
+    local_density: usize,
+    friendly_density: usize,
+    hostile_density: usize,
+    low_substrate: bool,
+    harvester_overgrowth: bool,
+    reaper_pressure_needed: bool,
+) -> f32 {
+    match archetype {
+        Archetype::Swarmer => {
+            if friendly_density >= 3 {
+                1.0
+            } else if friendly_density >= 1 {
+                0.45
+            } else {
+                0.0
+            }
+        }
+        Archetype::Hunter => {
+            if hostile_density >= 1 {
+                0.85
+            } else {
+                0.15
+            }
+        }
+        Archetype::Grazer => {
+            if low_substrate {
+                0.20
+            } else {
+                0.80
+            }
+        }
+        Archetype::Orbiter => {
+            if local_density >= 2 {
+                0.75
+            } else {
+                0.35
+            }
+        }
+        Archetype::Parasite => {
+            if hostile_density >= 1 || friendly_density >= 3 {
+                0.80
+            } else {
+                0.20
+            }
+        }
+        Archetype::Architect => {
+            if friendly_density >= 2 {
+                1.0
+            } else if local_density >= 2 {
+                0.60
+            } else {
+                0.25
+            }
+        }
+        Archetype::Leviathan => {
+            if local_density >= 1 {
+                0.85
+            } else {
+                0.45
+            }
+        }
+        Archetype::Mycelial => {
+            if !harvester_overgrowth && !low_substrate {
+                1.0
+            } else if !harvester_overgrowth {
+                0.55
+            } else {
+                0.15
+            }
+        }
+        Archetype::Phantom => {
+            if hostile_density > friendly_density {
+                0.75
+            } else {
+                0.35
+            }
+        }
+        Archetype::Harvester => {
+            if !low_substrate {
+                0.80
+            } else {
+                0.25
+            }
+        }
+        Archetype::Reaper => {
+            if reaper_pressure_needed || hostile_density >= 2 {
+                0.90
+            } else {
+                0.10
+            }
+        }
+    }
+}
+
+fn apply_mature_archetype_blessing(
+    particle: &mut Particle,
+    archetype: Archetype,
+    maturity: f32,
+    local_fit: f32,
+) {
+    if maturity <= 0.0 || local_fit <= 0.0 {
+        return;
+    }
+
+    let blessing = (maturity * local_fit).clamp(0.0, 1.0);
+
+    particle.health += 0.018 * blessing;
+    particle.energy += 0.010 * blessing;
+
+    match archetype {
+        Archetype::Swarmer => {
+            particle.genome.bonding =
+                (particle.genome.bonding + 0.000020 * blessing).clamp(0.5, 2.25);
+            particle.genome.fertility =
+                (particle.genome.fertility + 0.000012 * blessing).clamp(0.2, 2.4);
+        }
+        Archetype::Hunter => {
+            particle.genome.perception =
+                (particle.genome.perception + 0.000010 * blessing).clamp(0.1, 0.38);
+            particle.genome.volatility =
+                (particle.genome.volatility + 0.000012 * blessing).clamp(0.36, 1.95);
+        }
+        Archetype::Grazer => {
+            particle.genome.fertility =
+                (particle.genome.fertility + 0.000014 * blessing).clamp(0.2, 2.4);
+            particle.genome.hunger =
+                (particle.genome.hunger - 0.000004 * blessing).clamp(0.005, 0.04);
+        }
+        Archetype::Orbiter => {
+            particle.genome.orbit = (particle.genome.orbit + 0.000020 * blessing).clamp(0.0, 1.55);
+        }
+        Archetype::Parasite => {
+            particle.genome.hunger =
+                (particle.genome.hunger + 0.000006 * blessing).clamp(0.005, 0.04);
+        }
+        Archetype::Architect => {
+            particle.health += 0.030 * blessing;
+            particle.mass += 0.0008 * blessing;
+            particle.genome.membrane =
+                (particle.genome.membrane + 0.000024 * blessing).clamp(0.0, 1.8);
+            particle.genome.bonding =
+                (particle.genome.bonding + 0.000018 * blessing).clamp(0.5, 2.25);
+        }
+        Archetype::Leviathan => {
+            particle.health += 0.035 * blessing;
+            particle.mass += 0.0012 * blessing;
+            particle.genome.membrane =
+                (particle.genome.membrane + 0.000016 * blessing).clamp(0.0, 1.8);
+        }
+        Archetype::Mycelial => {
+            particle.health += 0.030 * blessing;
+            particle.vx *= 1.0 - 0.003 * blessing;
+            particle.vy *= 1.0 - 0.003 * blessing;
+            particle.genome.membrane =
+                (particle.genome.membrane + 0.000020 * blessing).clamp(0.0, 1.8);
+            particle.genome.fertility =
+                (particle.genome.fertility + 0.000018 * blessing).clamp(0.2, 2.4);
+        }
+        Archetype::Phantom => {
+            particle.energy += 0.018 * blessing;
+            particle.genome.orbit = (particle.genome.orbit + 0.000018 * blessing).clamp(0.0, 1.55);
+        }
+        Archetype::Harvester => {
+            particle.health += 0.018 * blessing;
+            particle.genome.perception =
+                (particle.genome.perception + 0.000010 * blessing).clamp(0.1, 0.38);
+        }
+        Archetype::Reaper => {
+            particle.energy += 0.018 * blessing;
+            particle.genome.hunger =
+                (particle.genome.hunger + 0.000006 * blessing).clamp(0.005, 0.04);
+        }
+    }
+
+    particle.health = particle.health.clamp(0.0, 150.0);
+    particle.energy = particle.energy.clamp(0.0, 170.0);
+    particle.mass = particle.mass.clamp(0.12, 20.0);
 }
 
 fn field_polarity_response(
@@ -1615,7 +1992,11 @@ pub fn child_from(parent: Particle, seed: u64) -> Particle {
     child.energy = 70.0;
     child.mass = (parent.mass * 0.62).clamp(0.45, 3.2);
     child.cluster_id = None;
+
+    let parent_archetype = derive_archetype(parent.genome, parent.rare_trait, 1);
     child.genome = mutate_genome(parent.genome, &mut rng);
+    child.genome = reinforce_inherited_archetype(child.genome, parent_archetype, &mut rng);
+    apply_archetype_birth_shape(&mut child, parent_archetype, &mut rng);
 
     if rng.gen_bool(0.025) {
         child.tribe = Tribe::from_index(rng.gen_range(0..TRIBE_COUNT));
@@ -1656,7 +2037,17 @@ pub fn fused_child(a: Particle, b: Particle, seed: u64) -> Particle {
         fertility: (a.genome.fertility + b.genome.fertility) / 2.0,
     };
 
+    let archetype_a = derive_archetype(a.genome, a.rare_trait, 1);
+    let archetype_b = derive_archetype(b.genome, b.rare_trait, 1);
+    let inherited_archetype = if archetype_a == archetype_b || rng.gen_bool(0.58) {
+        archetype_a
+    } else {
+        archetype_b
+    };
+
     child.genome = mutate_genome(child.genome, &mut rng);
+    child.genome = reinforce_inherited_archetype(child.genome, inherited_archetype, &mut rng);
+    apply_archetype_birth_shape(&mut child, inherited_archetype, &mut rng);
 
     if rng.gen_bool(0.5) {
         child.tribe = b.tribe;
@@ -1673,6 +2064,182 @@ pub fn fused_child(a: Particle, b: Particle, seed: u64) -> Particle {
     }
 
     child
+}
+
+fn apply_archetype_birth_shape(child: &mut Particle, archetype: Archetype, rng: &mut StdRng) {
+    match archetype {
+        Archetype::Swarmer => {
+            child.health = child.health.max(76.0);
+            child.energy = child.energy.max(76.0);
+            child.mass = child.mass.clamp(0.42, 2.4);
+            child.vx *= 0.86;
+            child.vy *= 0.86;
+
+            child.vx += rng.gen_range(-0.0025..0.0025);
+            child.vy += rng.gen_range(-0.0025..0.0025);
+        }
+        Archetype::Hunter => {
+            child.health = child.health.max(74.0);
+            child.energy = child.energy.max(82.0);
+            child.mass = child.mass.clamp(0.50, 3.4);
+            child.vx *= 1.08;
+            child.vy *= 1.08;
+        }
+        Archetype::Grazer => {
+            child.health = child.health.max(78.0);
+            child.energy = child.energy.max(80.0);
+            child.mass = child.mass.clamp(0.48, 2.8);
+            child.vx *= 0.94;
+            child.vy *= 0.94;
+        }
+        Archetype::Orbiter => {
+            child.health = child.health.max(72.0);
+            child.energy = child.energy.max(84.0);
+            child.mass = child.mass.clamp(0.42, 2.7);
+
+            let spin = rng.gen_range(-0.0045..0.0045);
+            child.vx += -child.y.signum() * spin;
+            child.vy += child.x.signum() * spin;
+        }
+        Archetype::Parasite => {
+            child.health = child.health.max(70.0);
+            child.energy = child.energy.max(78.0);
+            child.mass = child.mass.clamp(0.36, 2.2);
+            child.vx *= 1.04;
+            child.vy *= 1.04;
+        }
+        Archetype::Architect => {
+            child.health = child.health.max(84.0);
+            child.energy = child.energy.max(82.0);
+            child.mass = child.mass.clamp(0.72, 4.8);
+            child.vx *= 0.62;
+            child.vy *= 0.62;
+        }
+        Archetype::Leviathan => {
+            child.health = child.health.max(92.0);
+            child.energy = child.energy.max(88.0);
+            child.mass = child.mass.clamp(1.15, 6.2);
+            child.vx *= 0.48;
+            child.vy *= 0.48;
+        }
+        Archetype::Mycelial => {
+            child.health = child.health.max(82.0);
+            child.energy = child.energy.max(84.0);
+            child.mass = child.mass.clamp(0.55, 3.6);
+            child.vx *= 0.38;
+            child.vy *= 0.38;
+
+            child.x += rng.gen_range(-0.018..0.018);
+            child.y += rng.gen_range(-0.018..0.018);
+        }
+        Archetype::Phantom => {
+            child.health = child.health.max(68.0);
+            child.energy = child.energy.max(90.0);
+            child.mass = child.mass.clamp(0.34, 2.0);
+            child.vx *= 1.18;
+            child.vy *= 1.18;
+        }
+        Archetype::Harvester => {
+            child.health = child.health.max(78.0);
+            child.energy = child.energy.max(84.0);
+            child.mass = child.mass.clamp(0.48, 2.8);
+            child.vx *= 0.82;
+            child.vy *= 0.82;
+        }
+        Archetype::Reaper => {
+            child.health = child.health.max(80.0);
+            child.energy = child.energy.max(86.0);
+            child.mass = child.mass.clamp(0.50, 3.5);
+            child.vx *= 1.10;
+            child.vy *= 1.10;
+        }
+    }
+
+    child.x = child.x.clamp(-1.2, 1.2);
+    child.y = child.y.clamp(-1.2, 1.2);
+    child.health = child.health.clamp(0.0, 140.0);
+    child.energy = child.energy.clamp(0.0, 160.0);
+    child.mass = child.mass.clamp(0.12, 18.0);
+}
+
+fn reinforce_inherited_archetype(
+    mut genome: Genome,
+    archetype: Archetype,
+    rng: &mut StdRng,
+) -> Genome {
+    let fidelity = rng.gen_range(0.58..0.88);
+
+    match archetype {
+        Archetype::Swarmer => {
+            genome.bonding = nudge_gene(genome.bonding, 1.38, 0.18 * fidelity, 0.5, 2.25);
+            genome.perception = nudge_gene(genome.perception, 0.235, 0.12 * fidelity, 0.1, 0.38);
+            genome.volatility = nudge_gene(genome.volatility, 1.08, 0.10 * fidelity, 0.36, 1.95);
+            genome.fertility = nudge_gene(genome.fertility, 1.18, 0.12 * fidelity, 0.2, 2.4);
+        }
+        Archetype::Hunter => {
+            genome.volatility = nudge_gene(genome.volatility, 1.46, 0.16 * fidelity, 0.36, 1.95);
+            genome.hunger = nudge_gene(genome.hunger, 0.023, 0.14 * fidelity, 0.005, 0.04);
+            genome.perception = nudge_gene(genome.perception, 0.285, 0.14 * fidelity, 0.1, 0.38);
+        }
+        Archetype::Grazer => {
+            genome.perception = nudge_gene(genome.perception, 0.265, 0.13 * fidelity, 0.1, 0.38);
+            genome.metabolism = nudge_gene(genome.metabolism, 0.016, 0.13 * fidelity, 0.004, 0.05);
+            genome.fertility = nudge_gene(genome.fertility, 1.18, 0.12 * fidelity, 0.2, 2.4);
+            genome.hunger = nudge_gene(genome.hunger, 0.016, 0.10 * fidelity, 0.005, 0.04);
+        }
+        Archetype::Orbiter => {
+            genome.orbit = nudge_gene(genome.orbit, 1.12, 0.18 * fidelity, 0.0, 1.55);
+            genome.perception = nudge_gene(genome.perception, 0.245, 0.11 * fidelity, 0.1, 0.38);
+            genome.volatility = nudge_gene(genome.volatility, 1.12, 0.08 * fidelity, 0.36, 1.95);
+        }
+        Archetype::Parasite => {
+            genome.hunger = nudge_gene(genome.hunger, 0.024, 0.13 * fidelity, 0.005, 0.04);
+            genome.perception = nudge_gene(genome.perception, 0.255, 0.11 * fidelity, 0.1, 0.38);
+            genome.bonding = nudge_gene(genome.bonding, 0.86, 0.09 * fidelity, 0.5, 2.25);
+        }
+        Archetype::Architect => {
+            genome.membrane = nudge_gene(genome.membrane, 1.18, 0.20 * fidelity, 0.0, 1.8);
+            genome.bonding = nudge_gene(genome.bonding, 1.38, 0.18 * fidelity, 0.5, 2.25);
+            genome.volatility = nudge_gene(genome.volatility, 0.92, 0.10 * fidelity, 0.36, 1.95);
+            genome.metabolism = nudge_gene(genome.metabolism, 0.015, 0.08 * fidelity, 0.004, 0.05);
+        }
+        Archetype::Leviathan => {
+            genome.membrane = nudge_gene(genome.membrane, 1.34, 0.19 * fidelity, 0.0, 1.8);
+            genome.bonding = nudge_gene(genome.bonding, 1.42, 0.17 * fidelity, 0.5, 2.25);
+            genome.volatility = nudge_gene(genome.volatility, 0.86, 0.09 * fidelity, 0.36, 1.95);
+            genome.metabolism = nudge_gene(genome.metabolism, 0.013, 0.08 * fidelity, 0.004, 0.05);
+        }
+        Archetype::Mycelial => {
+            genome.membrane = nudge_gene(genome.membrane, 0.98, 0.18 * fidelity, 0.0, 1.8);
+            genome.fertility = nudge_gene(genome.fertility, 1.32, 0.17 * fidelity, 0.2, 2.4);
+            genome.bonding = nudge_gene(genome.bonding, 1.18, 0.14 * fidelity, 0.5, 2.25);
+            genome.metabolism = nudge_gene(genome.metabolism, 0.014, 0.10 * fidelity, 0.004, 0.05);
+            genome.volatility = nudge_gene(genome.volatility, 0.82, 0.09 * fidelity, 0.36, 1.95);
+        }
+        Archetype::Phantom => {
+            genome.orbit = nudge_gene(genome.orbit, 1.24, 0.18 * fidelity, 0.0, 1.55);
+            genome.volatility = nudge_gene(genome.volatility, 1.28, 0.11 * fidelity, 0.36, 1.95);
+            genome.perception = nudge_gene(genome.perception, 0.250, 0.10 * fidelity, 0.1, 0.38);
+        }
+        Archetype::Harvester => {
+            genome.perception = nudge_gene(genome.perception, 0.270, 0.14 * fidelity, 0.1, 0.38);
+            genome.fertility = nudge_gene(genome.fertility, 1.28, 0.14 * fidelity, 0.2, 2.4);
+            genome.hunger = nudge_gene(genome.hunger, 0.018, 0.13 * fidelity, 0.005, 0.04);
+            genome.metabolism = nudge_gene(genome.metabolism, 0.018, 0.10 * fidelity, 0.004, 0.05);
+        }
+        Archetype::Reaper => {
+            genome.volatility = nudge_gene(genome.volatility, 1.52, 0.17 * fidelity, 0.36, 1.95);
+            genome.hunger = nudge_gene(genome.hunger, 0.025, 0.16 * fidelity, 0.005, 0.04);
+            genome.perception = nudge_gene(genome.perception, 0.295, 0.14 * fidelity, 0.1, 0.38);
+            genome.fertility = nudge_gene(genome.fertility, 1.05, 0.08 * fidelity, 0.2, 2.4);
+        }
+    }
+
+    genome
+}
+
+fn nudge_gene(value: f32, target: f32, strength: f32, min: f32, max: f32) -> f32 {
+    (value + (target - value) * strength.clamp(0.0, 1.0)).clamp(min, max)
 }
 
 pub fn mutate_genome(mut genome: Genome, rng: &mut StdRng) -> Genome {

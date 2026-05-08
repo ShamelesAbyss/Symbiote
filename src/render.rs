@@ -1545,6 +1545,18 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
     ));
 
     lines.push(trophic_count_line(app));
+    lines.push(Line::from(vec![
+        Span::styled(
+            "Evolution ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            app.memory.evolution_status_line(),
+            Style::default().fg(Color::Cyan),
+        ),
+    ]));
 
     lines.push(Line::from(vec![
         Span::styled("Field: ", Style::default().fg(Color::Yellow)),

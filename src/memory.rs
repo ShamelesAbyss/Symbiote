@@ -109,6 +109,12 @@ pub struct MemoryBank {
     pub archetype_population_samples: u64,
     #[serde(default)]
     pub trophic_balance_label: String,
+    pub primitive_population: usize,
+    pub evolved_population: usize,
+    pub mature_population: usize,
+    pub mature_evolved_population: usize,
+    pub evolved_ratio: f32,
+    pub mature_evolved_ratio: f32,
 
     pub notes: Vec<String>,
 }
@@ -183,6 +189,12 @@ impl MemoryBank {
             archetype_seen_counts: [0; 11],
             archetype_population_samples: 0,
             trophic_balance_label: "unknown".to_string(),
+            primitive_population: 0,
+            evolved_population: 0,
+            mature_population: 0,
+            mature_evolved_population: 0,
+            evolved_ratio: 0.0,
+            mature_evolved_ratio: 0.0,
 
             notes: Vec::new(),
         }
@@ -305,6 +317,45 @@ impl MemoryBank {
             apex_count(&self.archetype_live_counts),
             self.archetype_peak_counts[9],
             self.archetype_peak_counts[10]
+        )
+    }
+
+    pub fn observe_evolution_stage(
+        &mut self,
+        primitive_population: usize,
+        evolved_population: usize,
+        mature_population: usize,
+        mature_evolved_population: usize,
+    ) {
+        let total_population = primitive_population + evolved_population;
+
+        self.primitive_population = primitive_population;
+        self.evolved_population = evolved_population;
+        self.mature_population = mature_population;
+        self.mature_evolved_population = mature_evolved_population;
+
+        self.evolved_ratio = if total_population > 0 {
+            evolved_population as f32 / total_population as f32
+        } else {
+            0.0
+        };
+
+        self.mature_evolved_ratio = if mature_population > 0 {
+            mature_evolved_population as f32 / mature_population as f32
+        } else {
+            0.0
+        };
+    }
+
+    pub fn evolution_status_line(&self) -> String {
+        format!(
+            "evo primitive:{} evolved:{} mature:{} lineage:{} evo:{:.0}% mature:{:.0}%",
+            self.primitive_population,
+            self.evolved_population,
+            self.mature_population,
+            self.mature_evolved_population,
+            self.evolved_ratio * 100.0,
+            self.mature_evolved_ratio * 100.0
         )
     }
 

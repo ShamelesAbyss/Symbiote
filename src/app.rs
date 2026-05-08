@@ -1402,6 +1402,36 @@ impl App {
         let particle_archetype_counts = self.active_particle_archetype_counts();
         self.memory.observe_archetypes(particle_archetype_counts);
 
+        let mut primitive_population = 0usize;
+        let mut evolved_population = 0usize;
+        let mut mature_population = 0usize;
+        let mut mature_evolved_population = 0usize;
+
+        for particle in &self.particles {
+            let evolved = particle.species_id.is_some();
+
+            if evolved {
+                evolved_population += 1;
+            } else {
+                primitive_population += 1;
+            }
+
+            if particle.age >= 90 {
+                mature_population += 1;
+
+                if evolved {
+                    mature_evolved_population += 1;
+                }
+            }
+        }
+
+        self.memory.observe_evolution_stage(
+            primitive_population,
+            evolved_population,
+            mature_population,
+            mature_evolved_population,
+        );
+
         self.memory.observe_substrate(
             self.substrate.living_cells(),
             self.substrate.total_cells(),
@@ -1505,7 +1535,9 @@ impl App {
 }
 
 fn random_particle(rng: &mut StdRng) -> Particle {
-    Particle {
+    // Primitive seed organisms only.
+    // Advanced archetypes must emerge through evolution.
+    let mut p = Particle {
         x: rng.gen_range(-1.17..1.17),
         y: rng.gen_range(-1.17..1.17),
         vx: rng.gen_range(-0.020..0.020),
@@ -1528,7 +1560,22 @@ fn random_particle(rng: &mut StdRng) -> Particle {
             metabolism: rng.gen_range(0.008..0.024),
             fertility: rng.gen_range(0.55..1.18),
         },
-    }
+    };
+
+    // Clamp primitive genome into a biologically generic range so edge
+    // refill does not directly create advanced archetypes like MYC/SWR/LEV.
+    p.genome.membrane = p.genome.membrane.clamp(0.0, 0.42);
+    p.genome.bonding = p.genome.bonding.clamp(0.55, 1.08);
+    p.genome.fertility = p.genome.fertility.clamp(0.72, 1.22);
+    p.genome.perception = p.genome.perception.clamp(0.14, 0.29);
+    p.genome.orbit = p.genome.orbit.clamp(0.0, 0.42);
+    p.genome.volatility = p.genome.volatility.clamp(0.72, 1.38);
+    p.genome.hunger = p.genome.hunger.clamp(0.010, 0.024);
+    p.genome.metabolism = p.genome.metabolism.clamp(0.010, 0.024);
+
+    p.rare_trait = RareTrait::None;
+
+    p
 }
 
 fn dist(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
