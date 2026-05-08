@@ -1,6 +1,7 @@
 use crate::{
     app::{App, Environment},
     automata::{CellKind, SignalKind},
+    life::AxiomPatternState,
     particle::Tribe,
     pattern::{
         pattern_glyph, pattern_strength_bar, MorphologyRole, PatternKind, PatternMotion,
@@ -176,6 +177,7 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
     draw_signal_trails(&mut cells, app, width, height);
     draw_ecology_zones(&mut cells, app, width, height);
     draw_pattern_field(&mut cells, app, width, height);
+    draw_axiom_lattice(&mut cells, app, width, height);
     // force root layer to overwrite everything (no flicker)
     for y in 0..height {
         for x in 0..width {
@@ -291,6 +293,9 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                 spans.push(Span::styled(glyph.to_string(), Style::default().fg(color)));
             } else if cell.count == 0 && cell.signal.is_some() {
                 let (glyph, color) = cell.signal.unwrap();
+                spans.push(Span::styled(glyph.to_string(), Style::default().fg(color)));
+            } else if cell.count == 0 && cell.axiom.is_some() {
+                let (glyph, color) = cell.axiom.unwrap();
                 spans.push(Span::styled(glyph.to_string(), Style::default().fg(color)));
             } else if cell.count == 0 {
                 spans.push(Span::styled(
@@ -417,6 +422,122 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
             .wrap(Wrap { trim: false }),
         area,
     );
+}
+
+fn draw_axiom_lattice(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
+    if width == 0 || height == 0 {
+        return;
+    }
+
+    let stats = app.axiom_lattice.stats();
+
+    if stats.alive == 0 || stats.generation == 0 {
+        return;
+    }
+
+    for y in 0..height {
+        for x in 0..width {
+            let screen_cell = &mut cells[y][x];
+
+            if screen_cell.count > 0
+                || screen_cell.trail
+                || screen_cell.membrane
+                || screen_cell.zone.is_some()
+                || screen_cell.substrate.is_some()
+                || screen_cell.signal.is_some()
+            {
+                continue;
+            }
+
+            if !app
+                .axiom_lattice
+                .sample_screen(x, y, width, height)
+                .is_alive()
+            {
+                continue;
+            }
+
+            if !should_render_axiom_cell(app.age, x, y, stats.state) {
+                continue;
+            }
+
+            screen_cell.axiom = Some(axiom_visual(app.age, x, y, stats.state));
+        }
+    }
+}
+
+fn should_render_axiom_cell(age: u64, x: usize, y: usize, state: AxiomPatternState) -> bool {
+    let spacing = match state {
+        AxiomPatternState::Dormant => 19,
+        AxiomPatternState::Static => 11,
+        AxiomPatternState::Oscillating => 3,
+        AxiomPatternState::Translating => 2,
+        AxiomPatternState::Expanding => 4,
+        AxiomPatternState::Collapsing => 7,
+        AxiomPatternState::Chaotic => 9,
+    };
+
+    visual_hash(age / 3 + axiom_state_offset(state), x, y) % spacing == 0
+}
+
+fn axiom_visual(age: u64, x: usize, y: usize, state: AxiomPatternState) -> (char, Color) {
+    let phase = visual_hash(age / 2 + axiom_state_offset(state), x, y) % 6;
+
+    match state {
+        AxiomPatternState::Dormant => ('·', Color::DarkGray),
+        AxiomPatternState::Static => {
+            if phase % 2 == 0 {
+                ('∙', Color::DarkGray)
+            } else {
+                ('·', Color::DarkGray)
+            }
+        }
+        AxiomPatternState::Oscillating => {
+            if phase % 2 == 0 {
+                ('◦', Color::Cyan)
+            } else {
+                ('∘', Color::Blue)
+            }
+        }
+        AxiomPatternState::Translating => match phase {
+            0 | 3 => ('⊚', Color::Magenta),
+            1 | 4 => ('◌', Color::Cyan),
+            _ => ('°', Color::Blue),
+        },
+        AxiomPatternState::Expanding => {
+            if phase <= 2 {
+                ('✦', Color::White)
+            } else {
+                ('°', Color::Cyan)
+            }
+        }
+        AxiomPatternState::Collapsing => {
+            if phase <= 2 {
+                ('·', Color::Gray)
+            } else {
+                ('∙', Color::DarkGray)
+            }
+        }
+        AxiomPatternState::Chaotic => {
+            if phase == 0 {
+                ('░', Color::DarkGray)
+            } else {
+                ('·', Color::DarkGray)
+            }
+        }
+    }
+}
+
+fn axiom_state_offset(state: AxiomPatternState) -> u64 {
+    match state {
+        AxiomPatternState::Dormant => 1,
+        AxiomPatternState::Static => 2,
+        AxiomPatternState::Oscillating => 3,
+        AxiomPatternState::Translating => 4,
+        AxiomPatternState::Expanding => 5,
+        AxiomPatternState::Collapsing => 6,
+        AxiomPatternState::Chaotic => 7,
+    }
 }
 
 fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
@@ -1570,6 +1691,7 @@ struct Cell {
     zone: Option<(char, Color)>,
     substrate: Option<(char, Color)>,
     signal: Option<(char, Color)>,
+    axiom: Option<(char, Color)>,
 }
 
 impl Default for Cell {
@@ -1590,6 +1712,7 @@ impl Default for Cell {
             zone: None,
             substrate: None,
             signal: None,
+            axiom: None,
         }
     }
 }
