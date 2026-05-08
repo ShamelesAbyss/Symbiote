@@ -469,13 +469,13 @@ fn draw_axiom_lattice(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
 
 fn should_render_axiom_cell(generation: u64, x: usize, y: usize, state: AxiomPatternState) -> bool {
     let spacing = match state {
-        AxiomPatternState::Dormant => 29,
-        AxiomPatternState::Static => 13,
-        AxiomPatternState::Oscillating => 2,
-        AxiomPatternState::Translating => 2,
-        AxiomPatternState::Expanding => 3,
-        AxiomPatternState::Collapsing => 11,
-        AxiomPatternState::Chaotic => 17,
+        AxiomPatternState::Dormant => 89,
+        AxiomPatternState::Static => 47,
+        AxiomPatternState::Oscillating => 19,
+        AxiomPatternState::Translating => 23,
+        AxiomPatternState::Expanding => 29,
+        AxiomPatternState::Collapsing => 53,
+        AxiomPatternState::Chaotic => 61,
     };
 
     let stable_epoch = generation / 6 + axiom_state_offset(state);
@@ -486,7 +486,7 @@ fn should_render_axiom_cell(generation: u64, x: usize, y: usize, state: AxiomPat
         }
         AxiomPatternState::Expanding => {
             visual_hash(stable_epoch, x, y) % spacing == 0
-                || visual_hash(stable_epoch + 17, x / 2, y / 2) % 23 == 0
+                || visual_hash(stable_epoch + 17, x / 2, y / 2) % 67 == 0
         }
         _ => visual_hash(stable_epoch, x, y) % spacing == 0,
     }
@@ -652,29 +652,29 @@ fn should_render_field_haze(
     mood: VisualMood,
 ) -> bool {
     let pressure = danger.max(intensity);
-    let quiet_floor = 0.28 + mood.quieting() * 0.20 - mood.volatility() * 0.08;
+    let quiet_floor = 0.58 + mood.quieting() * 0.30 - mood.volatility() * 0.05;
 
-    if pressure < quiet_floor {
+    if danger < 0.70 && pressure < quiet_floor {
         return false;
     }
 
-    let spacing: usize = if danger > 0.76 || intensity > 0.92 {
-        3
-    } else if danger > 0.58 || intensity > 0.78 {
-        5
-    } else if intensity > 0.56 {
-        9
+    let spacing: usize = if danger > 0.82 {
+        11
+    } else if danger > 0.64 || intensity > 0.92 {
+        19
+    } else if intensity > 0.78 {
+        37
     } else {
-        15
+        71
     };
 
-    let quiet_extra = (mood.quieting() * 9.0).round() as usize;
-    let volatile_relief = (mood.volatility() * 4.0).round() as usize;
+    let quiet_extra = (mood.quieting() * 18.0).round() as usize;
+    let volatile_relief = (mood.volatility() * 3.0).round() as usize;
     let corridor_relief = if matches!(
         kind,
         PatternKind::Chain | PatternKind::Glider | PatternKind::Swarmfront
     ) {
-        (mood.corridor_bias() * 4.0).round() as usize
+        (mood.corridor_bias() * 2.0).round() as usize
     } else {
         0
     };
@@ -745,7 +745,7 @@ fn field_haze_visual(
         ));
     }
 
-    if intensity > 0.64 {
+    if intensity > 0.78 && mood.corridor > 0.58 {
         return Some((
             match kind {
                 PatternKind::Swarmfront | PatternKind::Glider | PatternKind::Chain => ',',
@@ -753,11 +753,7 @@ fn field_haze_visual(
                 PatternKind::Halo | PatternKind::Oscillator => '.',
                 PatternKind::Lattice | PatternKind::StillLife | PatternKind::Dormant => '∙',
             },
-            if mood.throttle > 0.55 {
-                Color::DarkGray
-            } else {
-                Color::Gray
-            },
+            Color::DarkGray,
         ));
     }
 
