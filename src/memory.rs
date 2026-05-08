@@ -98,6 +98,18 @@ pub struct MemoryBank {
     pub density_peak_occupied_ratio: f32,
     #[serde(default)]
     pub density_samples: u64,
+
+    #[serde(default)]
+    pub archetype_live_counts: [usize; 11],
+    #[serde(default)]
+    pub archetype_peak_counts: [usize; 11],
+    #[serde(default)]
+    pub archetype_seen_counts: [u64; 11],
+    #[serde(default)]
+    pub archetype_population_samples: u64,
+    #[serde(default)]
+    pub trophic_balance_label: String,
+
     pub notes: Vec<String>,
 }
 
@@ -165,6 +177,13 @@ impl MemoryBank {
             density_occupied_ratio: 0.0,
             density_peak_occupied_ratio: 0.0,
             density_samples: 0,
+
+            archetype_live_counts: [0; 11],
+            archetype_peak_counts: [0; 11],
+            archetype_seen_counts: [0; 11],
+            archetype_population_samples: 0,
+            trophic_balance_label: "unknown".to_string(),
+
             notes: Vec::new(),
         }
     }
@@ -258,6 +277,34 @@ impl MemoryBank {
             self.density_particle_spawn_pressure,
             self.density_root_growth_pressure,
             self.density_crowding_pressure
+        )
+    }
+
+    pub fn observe_archetypes(&mut self, live_counts: [usize; 11]) {
+        self.archetype_live_counts = live_counts;
+        self.archetype_population_samples = self.archetype_population_samples.saturating_add(1);
+
+        for idx in 0..11 {
+            self.archetype_peak_counts[idx] = self.archetype_peak_counts[idx].max(live_counts[idx]);
+
+            if live_counts[idx] > 0 {
+                self.archetype_seen_counts[idx] =
+                    self.archetype_seen_counts[idx].saturating_add(live_counts[idx] as u64);
+            }
+        }
+
+        self.trophic_balance_label = trophic_balance_label(&live_counts).to_string();
+    }
+
+    pub fn trophic_status_line(&self) -> String {
+        format!(
+            "{} prey:{} herb:{} apex:{} peak_hrv:{} peak_rpr:{}",
+            self.trophic_balance_label,
+            prey_count(&self.archetype_live_counts),
+            herbivore_count(&self.archetype_live_counts),
+            apex_count(&self.archetype_live_counts),
+            self.archetype_peak_counts[9],
+            self.archetype_peak_counts[10]
         )
     }
 
@@ -393,6 +440,40 @@ impl MemoryBank {
             (root_density * 3.5 + corridors + choke * 0.5).clamp(0.0, 1.0);
         self.adaptive_substrate_throttle =
             (overgrown + root_density * 1.8 - starved * 0.35).clamp(0.0, 1.0);
+    }
+}
+
+fn prey_count(counts: &[usize; 11]) -> usize {
+    counts[0] + counts[2] + counts[3] + counts[5] + counts[6] + counts[7] + counts[8]
+}
+
+fn herbivore_count(counts: &[usize; 11]) -> usize {
+    counts[2] + counts[7] + counts[9]
+}
+
+fn apex_count(counts: &[usize; 11]) -> usize {
+    counts[1] + counts[4] + counts[10]
+}
+
+fn trophic_balance_label(counts: &[usize; 11]) -> &'static str {
+    let herb = herbivore_count(counts);
+    let apex = apex_count(counts);
+    let prey = prey_count(counts);
+    let harvesters = counts[9];
+    let reapers = counts[10];
+
+    if reapers > 0 && harvesters > 0 {
+        "cycling"
+    } else if harvesters >= 8 && reapers == 0 {
+        "grazing"
+    } else if reapers > 0 && apex > herb.saturating_add(6) {
+        "predatory"
+    } else if prey >= herb.saturating_add(apex).saturating_mul(3).max(1) {
+        "prey bloom"
+    } else if herb == 0 && apex == 0 {
+        "basal"
+    } else {
+        "balanced"
     }
 }
 

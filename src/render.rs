@@ -1198,6 +1198,28 @@ fn archetype_count_line(
     Line::from(spans)
 }
 
+fn trophic_count_line(app: &App) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(
+            "Trophic ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            app.memory.trophic_status_line(),
+            Style::default().fg(match app.memory.trophic_balance_label.as_str() {
+                "cycling" => Color::Magenta,
+                "grazing" => Color::Green,
+                "predatory" => Color::Red,
+                "prey bloom" => Color::Cyan,
+                "basal" => Color::DarkGray,
+                _ => Color::Yellow,
+            }),
+        ),
+    ])
+}
+
 fn ecosystem_phase_label(
     app: &App,
     active_species: usize,
@@ -1384,21 +1406,23 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
 
     lines.push(archetype_count_line(
         "Roles A ",
-        &archetype_counts,
+        &app.memory.archetype_live_counts,
         &[0, 1, 2, 3],
     ));
 
     lines.push(archetype_count_line(
         "Roles B ",
-        &archetype_counts,
+        &app.memory.archetype_live_counts,
         &[4, 5, 6, 7],
     ));
 
     lines.push(archetype_count_line(
         "Roles C ",
-        &archetype_counts,
+        &app.memory.archetype_live_counts,
         &[8, 9, 10],
     ));
+
+    lines.push(trophic_count_line(app));
 
     lines.push(Line::from(vec![
         Span::styled("Field: ", Style::default().fg(Color::Yellow)),

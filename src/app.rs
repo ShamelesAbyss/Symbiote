@@ -9,7 +9,7 @@ use crate::{
     particle::{Genome, Particle, RareTrait, Tribe},
     pattern::{PatternKind, PatternMotion, PatternSignature},
     sim::{build_rule_matrix, child_from, fused_child, mutate_rules, step_particles, RuleMatrix},
-    species::{Archetype, SpeciesBank},
+    species::{derive_archetype, Archetype, SpeciesBank},
     tree::TreeProfile,
 };
 
@@ -1297,6 +1297,33 @@ impl App {
         self.matrix_pressure = ((tension / max) * 100.0).clamp(0.0, 100.0);
     }
 
+    fn active_particle_archetype_counts(&self) -> [usize; 11] {
+        let lookup = self.build_archetype_lookup();
+        let mut counts = [0usize; 11];
+
+        for particle in &self.particles {
+            let archetype = particle
+                .cluster_id
+                .and_then(|cluster_id| {
+                    self.clusters
+                        .clusters
+                        .iter()
+                        .find(|cluster| cluster.id == cluster_id)
+                        .and_then(|cluster| cluster.effective_archetype())
+                })
+                .or_else(|| {
+                    particle
+                        .species_id
+                        .and_then(|id| lookup.get(id as usize).copied().flatten())
+                })
+                .unwrap_or_else(|| derive_archetype(particle.genome, particle.rare_trait, 1));
+
+            counts[archetype.index()] += 1;
+        }
+
+        counts
+    }
+
     fn update_memory(&mut self) {
         self.memory.seed = self.seed;
 
@@ -1312,6 +1339,9 @@ impl App {
             .memory
             .peak_living_cells
             .max(self.substrate.living_cells());
+
+        let particle_archetype_counts = self.active_particle_archetype_counts();
+        self.memory.observe_archetypes(particle_archetype_counts);
 
         self.memory.observe_substrate(
             self.substrate.living_cells(),
