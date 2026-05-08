@@ -579,17 +579,9 @@ fn field_polarity_response(
         0.0024 * strength
     };
 
-    let mut calm = if dangerous {
-        0.0
-    } else {
-        0.0014 * strength
-    };
+    let mut calm = if dangerous { 0.0 } else { 0.0014 * strength };
 
-    let mut hunger = if dangerous {
-        0.0042 * strength
-    } else {
-        0.0
-    };
+    let mut hunger = if dangerous { 0.0042 * strength } else { 0.0 };
 
     match archetype {
         Some(Archetype::Harvester) => {
@@ -1345,7 +1337,14 @@ fn apply_pattern_micro_rules(particle: &mut Particle) {
         crate::pattern::PatternKind::Dormant => {}
     }
 
-    apply_morphology_role_pressure(particle, role, morphology_pressure, intensity, cohesion, drift);
+    apply_morphology_role_pressure(
+        particle,
+        role,
+        morphology_pressure,
+        intensity,
+        cohesion,
+        drift,
+    );
 
     particle.health = particle.health.clamp(0.0, 140.0);
     particle.energy = particle.energy.clamp(0.0, 160.0);
@@ -1360,8 +1359,7 @@ fn apply_morphology_role_pressure(
     drift: f32,
 ) {
     let pressure = pressure.clamp(0.0, 1.0);
-    let role_phase =
-        (particle.x * 11.0 + particle.y * 17.0 + particle.genome.orbit * 3.0).sin();
+    let role_phase = (particle.x * 11.0 + particle.y * 17.0 + particle.genome.orbit * 3.0).sin();
 
     match role {
         crate::pattern::MorphologyRole::Dormant => {}
@@ -1380,8 +1378,7 @@ fn apply_morphology_role_pressure(
             particle.vx += pulse;
             particle.vy -= pulse * 0.72;
             particle.energy += 0.0025 * intensity;
-            particle.genome.orbit =
-                (particle.genome.orbit + 0.000018 * pressure).clamp(0.0, 1.55);
+            particle.genome.orbit = (particle.genome.orbit + 0.000018 * pressure).clamp(0.0, 1.55);
         }
 
         crate::pattern::MorphologyRole::Migrator => {

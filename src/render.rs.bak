@@ -1087,9 +1087,7 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
         Span::styled(" | Dom ", Style::default().fg(Color::DarkGray)),
         Span::styled(
             archetype_short_from_index(dominant_archetype),
-            Style::default()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
         ),
         Span::styled(" ", Style::default().fg(Color::DarkGray)),
         Span::styled(
@@ -1116,9 +1114,7 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
         Span::styled(" ", Style::default().fg(Color::DarkGray)),
         Span::styled(
             app.pattern_field.strongest_kind().short(),
-            Style::default()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
         ),
         Span::styled(" | corridor ", Style::default().fg(Color::DarkGray)),
         Span::styled(

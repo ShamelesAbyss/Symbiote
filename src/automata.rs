@@ -311,7 +311,10 @@ impl CellularAutomata {
                             let age_thin = if cell.age > 180 { 0.34 } else { 0.0 };
                             let crowd_thin = if density > 0.24 { 0.28 } else { 0.0 };
 
-                            next.energy = (cell.energy + nutrient_neighbors as f32 * 0.48 - 1.22 - age_thin - crowd_thin)
+                            next.energy = (cell.energy + nutrient_neighbors as f32 * 0.48
+                                - 1.22
+                                - age_thin
+                                - crowd_thin)
                                 .clamp(0.0, 85.0);
 
                             if next.energy <= 0.0 {
@@ -399,18 +402,18 @@ impl CellularAutomata {
                             next.energy = (cell.energy - decay).max(0.0);
 
                             if root_neighbors > 0 && recovery_mode {
-                            next.kind = CellKind::Nutrient;
-                            next.energy = 30.0;
-                            next.signal.growth = (next.signal.growth + 0.12).clamp(0.0, 1.0);
-                        } else if nutrient_neighbors >= 2 && neighbors >= 2 {
-                            next.kind = CellKind::Nutrient;
-                            next.energy = 32.0;
-                            next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
-                        } else if recovery_mode && dead_neighbors >= 2 && density < 0.06 {
-                            next.kind = CellKind::Nutrient;
-                            next.energy = 24.0;
-                            next.signal.growth = (next.signal.growth + 0.06).clamp(0.0, 1.0);
-                        } else if next.energy <= 0.0 || dead_neighbors > 5 {
+                                next.kind = CellKind::Nutrient;
+                                next.energy = 30.0;
+                                next.signal.growth = (next.signal.growth + 0.12).clamp(0.0, 1.0);
+                            } else if nutrient_neighbors >= 2 && neighbors >= 2 {
+                                next.kind = CellKind::Nutrient;
+                                next.energy = 32.0;
+                                next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
+                            } else if recovery_mode && dead_neighbors >= 2 && density < 0.06 {
+                                next.kind = CellKind::Nutrient;
+                                next.energy = 24.0;
+                                next.signal.growth = (next.signal.growth + 0.06).clamp(0.0, 1.0);
+                            } else if next.energy <= 0.0 || dead_neighbors > 5 {
                                 next.kind = CellKind::Empty;
                                 next.age = 0;
                             }

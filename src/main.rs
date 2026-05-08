@@ -4,6 +4,7 @@ mod cluster;
 mod density;
 mod ecology;
 mod field;
+mod life;
 mod memory;
 mod particle;
 mod pattern;

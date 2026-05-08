@@ -293,7 +293,7 @@ impl PatternSignature {
             + role.stability_bias().max(0.0)
             + role.migration_bias().max(0.0)
             + role.fertility_bias().max(0.0))
-            .clamp(0.0, 1.0)
+        .clamp(0.0, 1.0)
     }
 }
 

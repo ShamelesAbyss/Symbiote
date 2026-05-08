@@ -282,12 +282,13 @@ impl ClusterTracker {
                         particle.vx = particle.vx * settle + orbit_x;
                         particle.vy = particle.vy * settle + orbit_y;
 
-                        particle.genome.membrane =
-                            (particle.genome.membrane + territorial_anchor * 0.00018).clamp(0.0, 1.8);
-                        particle.genome.bonding =
-                            (particle.genome.bonding + territorial_anchor * 0.00010).clamp(0.5, 2.25);
+                        particle.genome.membrane = (particle.genome.membrane
+                            + territorial_anchor * 0.00018)
+                            .clamp(0.0, 1.8);
+                        particle.genome.bonding = (particle.genome.bonding
+                            + territorial_anchor * 0.00010)
+                            .clamp(0.5, 2.25);
                     }
-
 
                     if cluster.archetype_override.is_some() && age >= STRUCTURE_MATURITY_AGE {
                         particle.genome.perception =
@@ -326,11 +327,7 @@ pub struct ClusterEvents {
     pub extinctions: usize,
 }
 
-fn apply_colony_emergence_pressure(
-    cluster: &mut Cluster,
-    territorial_anchor: f32,
-    world_age: u64,
-) {
+fn apply_colony_emergence_pressure(cluster: &mut Cluster, territorial_anchor: f32, world_age: u64) {
     if world_age < STRUCTURE_MATURITY_AGE || cluster.age < 96 {
         return;
     }
@@ -392,16 +389,11 @@ fn cluster_territorial_anchor(cluster: &Cluster, world_age: u64) -> f32 {
     let density = (cluster.size as f32 / 46.0).clamp(0.0, 1.0);
     let mobility = root_mobility_score(cluster.avg_genome);
 
-    (stability * 0.34
-        + membrane * 0.22
-        + density * 0.18
-        + age_memory * 0.18
-        + maturity * 0.16
+    (stability * 0.34 + membrane * 0.22 + density * 0.18 + age_memory * 0.18 + maturity * 0.16
         - drift * 0.20
         - mobility * 0.08)
         .clamp(0.0, 0.42)
 }
-
 
 fn apply_cluster_drift(
     cluster: &mut Cluster,
