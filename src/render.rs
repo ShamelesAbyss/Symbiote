@@ -1135,6 +1135,69 @@ fn archetype_short_from_index(index: usize) -> &'static str {
     }
 }
 
+fn archetype_glyph_from_index(index: usize) -> &'static str {
+    match index {
+        0 => "›",
+        1 => "▲",
+        2 => "+",
+        3 => "◌",
+        4 => "×",
+        5 => "▣",
+        6 => "◉",
+        7 => "░",
+        8 => "◇",
+        9 => "♻",
+        10 => "Ω",
+        _ => "?",
+    }
+}
+
+fn archetype_color_from_index(index: usize) -> Color {
+    match index {
+        0 => Color::Cyan,
+        1 => Color::Red,
+        2 => Color::Green,
+        3 => Color::Blue,
+        4 => Color::Magenta,
+        5 => Color::Yellow,
+        6 => Color::LightYellow,
+        7 => Color::Green,
+        8 => Color::DarkGray,
+        9 => Color::Green,
+        10 => Color::Red,
+        _ => Color::DarkGray,
+    }
+}
+
+fn archetype_count_line(
+    label: &'static str,
+    counts: &[usize; 11],
+    indexes: &[usize],
+) -> Line<'static> {
+    let mut spans = vec![Span::styled(
+        label,
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    )];
+
+    for index in indexes {
+        spans.push(Span::styled(
+            format!(
+                "{}{}:{} ",
+                archetype_glyph_from_index(*index),
+                archetype_short_from_index(*index),
+                counts[*index]
+            ),
+            Style::default()
+                .fg(archetype_color_from_index(*index))
+                .add_modifier(Modifier::BOLD),
+        ));
+    }
+
+    Line::from(spans)
+}
+
 fn ecosystem_phase_label(
     app: &App,
     active_species: usize,
@@ -1318,6 +1381,24 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
         Span::styled(" RPR ", Style::default().fg(Color::DarkGray)),
         Span::styled(format!("{}", reapers), Style::default().fg(Color::Red)),
     ]));
+
+    lines.push(archetype_count_line(
+        "Roles A ",
+        &archetype_counts,
+        &[0, 1, 2, 3],
+    ));
+
+    lines.push(archetype_count_line(
+        "Roles B ",
+        &archetype_counts,
+        &[4, 5, 6, 7],
+    ));
+
+    lines.push(archetype_count_line(
+        "Roles C ",
+        &archetype_counts,
+        &[8, 9, 10],
+    ));
 
     lines.push(Line::from(vec![
         Span::styled("Field: ", Style::default().fg(Color::Yellow)),

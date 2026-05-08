@@ -177,9 +177,8 @@ pub fn step_particles(
                     continue;
                 }
 
-                let other_is_harvester =
-                    matches!(other_archetype, Some(Archetype::Harvester))
-                        || other.rare_trait == RareTrait::Devourer;
+                let other_is_harvester = matches!(other_archetype, Some(Archetype::Harvester))
+                    || other.rare_trait == RareTrait::Devourer;
 
                 let dx = other.x - particle.x;
                 let dy = other.y - particle.y;
@@ -192,7 +191,11 @@ pub fn step_particles(
                 let d = d2.sqrt();
 
                 let prey_value = if other_is_harvester {
-                    if d < 0.86 { 5.0 } else { 0.0 }
+                    if d < 0.86 {
+                        5.0
+                    } else {
+                        0.0
+                    }
                 } else if reaper_pressure_needed && other.health < 42.0 && d < 0.34 {
                     1.35
                 } else if reaper_pressure_needed && other.cluster_id.is_some() && d < 0.30 {
@@ -219,7 +222,11 @@ pub fn step_particles(
                 let d = (dx * dx + dy * dy).sqrt().max(0.001);
                 let hunt_radius = if target_is_harvester { 0.86 } else { 0.34 };
                 let urgency = if target_is_harvester {
-                    if reaper_pressure_needed { 1.45 } else { 1.10 }
+                    if reaper_pressure_needed {
+                        1.45
+                    } else {
+                        1.10
+                    }
                 } else {
                     0.42
                 };
