@@ -1,3 +1,4 @@
+use crate::life::AxiomImprint;
 use crate::{
     app::{Environment, TRIBE_COUNT},
     automata::{CellKind, CellularAutomata, SignalKind},
@@ -2234,6 +2235,59 @@ fn reinforce_inherited_archetype(
             genome.fertility = nudge_gene(genome.fertility, 1.05, 0.08 * fidelity, 0.2, 2.4);
         }
     }
+
+    genome
+}
+
+#[allow(dead_code)]
+pub fn lineage_axiom_imprint_strength(age: u32, evolved: bool) -> f32 {
+    if !evolved {
+        0.06
+    } else if age < 90 {
+        0.18
+    } else if age < 240 {
+        0.45
+    } else if age < 520 {
+        0.72
+    } else {
+        1.0
+    }
+}
+
+#[allow(dead_code)]
+pub fn scale_axiom_imprint(mut imprint: AxiomImprint, strength: f32) -> AxiomImprint {
+    let strength = strength.clamp(0.0, 1.0);
+
+    imprint.stability *= strength;
+    imprint.oscillation *= strength;
+    imprint.translation *= strength;
+    imprint.expansion *= strength;
+    imprint.collapse *= strength;
+    imprint.chaos *= strength;
+
+    imprint
+}
+
+#[allow(dead_code)]
+pub fn apply_axiom_imprint(mut genome: Genome, imprint: AxiomImprint) -> Genome {
+    genome.membrane = (genome.membrane + imprint.stability * 0.08).clamp(0.0, 1.8);
+    genome.bonding = (genome.bonding + imprint.stability * 0.06).clamp(0.5, 2.25);
+
+    genome.orbit = (genome.orbit + imprint.oscillation * 0.10).clamp(0.0, 1.55);
+    genome.volatility = (genome.volatility + imprint.oscillation * 0.03).clamp(0.36, 1.95);
+
+    genome.perception = (genome.perception + imprint.translation * 0.04).clamp(0.1, 0.38);
+
+    genome.fertility = (genome.fertility + imprint.expansion * 0.10).clamp(0.2, 2.4);
+
+    genome.hunger = (genome.hunger + imprint.collapse * 0.003).clamp(0.005, 0.04);
+    genome.volatility = (genome.volatility + imprint.collapse * 0.05).clamp(0.36, 1.95);
+
+    let chaos = imprint.chaos;
+    genome.perception = (genome.perception + chaos * 0.01).clamp(0.1, 0.38);
+    genome.orbit = (genome.orbit + chaos * 0.02).clamp(0.0, 1.55);
+    genome.membrane = (genome.membrane + chaos * 0.02).clamp(0.0, 1.8);
+    genome.fertility = (genome.fertility + chaos * 0.03).clamp(0.2, 2.4);
 
     genome
 }
