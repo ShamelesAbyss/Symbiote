@@ -169,8 +169,8 @@ impl CellularAutomata {
         let total = snapshot.len().max(1);
         let density = living as f32 / total as f32;
 
-        let recovery_mode = living < 150;
-        let bloom_mode = living < 55;
+        let recovery_mode = living < 2_800;
+        let bloom_mode = living < 1_600;
 
         let root_count = snapshot
             .iter()
@@ -266,13 +266,13 @@ impl CellularAutomata {
                             next.energy = 27.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
-                        } else if bloom_mode && seed_roll < 24 {
+                        } else if bloom_mode && seed_roll < 320 {
                             next.kind = CellKind::Nutrient;
                             next.energy = 38.0;
                             next.age = 0;
                             next.tribe_hint = seed_roll % 6;
                             next.signal.growth = (next.signal.growth + 0.06).clamp(0.0, 1.0);
-                        } else if recovery_mode && seed_roll < 10 {
+                        } else if recovery_mode && seed_roll < 140 {
                             next.kind = CellKind::Spore;
                             next.energy = 30.0;
                             next.age = 0;
@@ -310,8 +310,8 @@ impl CellularAutomata {
                             next.energy = (cell.energy + 3.0).min(85.0);
                             next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else {
-                            let age_thin = if cell.age > 240 { 0.18 } else { 0.0 };
-                            let crowd_thin = if density > 0.34 { 0.18 } else { 0.0 };
+                            let age_thin = if cell.age > 900 { 0.03 } else { 0.0 };
+                            let crowd_thin = if density > 0.82 { 0.03 } else { 0.0 };
 
                             next.energy = (cell.energy + nutrient_neighbors as f32 * 1.20
                                 - 1.22
@@ -345,8 +345,8 @@ impl CellularAutomata {
                             next.energy = 14.0;
                             next.signal.danger = (next.signal.danger + 0.14).clamp(0.0, 1.0);
                         } else {
-                            let age_thin = if cell.age > 220 { 0.18 } else { 0.0 };
-                            let crowd_thin = if density > 0.34 { 0.20 } else { 0.0 };
+                            let age_thin = if cell.age > 860 { 0.03 } else { 0.0 };
+                            let crowd_thin = if density > 0.82 { 0.04 } else { 0.0 };
 
                             next.energy = (cell.energy - 1.02 - age_thin - crowd_thin).max(0.0);
 
@@ -383,7 +383,7 @@ impl CellularAutomata {
                             next.kind = CellKind::Spore;
                             next.energy = 35.0;
                         } else {
-                            let decay = if recovery_mode { 0.02 } else { 0.08 };
+                            let decay = if recovery_mode { 0.004 } else { 0.018 };
                             next.energy = (cell.energy - decay).max(0.0);
 
                             if next.energy <= 0.0 {
