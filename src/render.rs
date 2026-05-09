@@ -945,7 +945,7 @@ fn substrate_visual(
             let shimmer = visual_hash(app.age / 2, x, y) as u64 % spacing;
 
             if shimmer == 0 {
-                None
+                Some(('⁙', Color::DarkGray))
             } else {
                 None
             }
@@ -1607,7 +1607,7 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
         Span::styled("∙ life ", Style::default().fg(Color::DarkGray)),
         Span::styled("+ food/nutrient ", Style::default().fg(Color::Green)),
         Span::styled("× dead ", Style::default().fg(Color::DarkGray)),
-        Span::styled("░ spore ", Style::default().fg(Color::DarkGray)),
+        Span::styled("⁙ spore ", Style::default().fg(Color::DarkGray)),
         Span::styled("*✶ mutagen ", Style::default().fg(Color::Magenta)),
         Span::styled("◎ nest", Style::default().fg(Color::Cyan)),
     ]));
