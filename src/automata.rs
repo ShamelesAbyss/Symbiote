@@ -169,8 +169,8 @@ impl CellularAutomata {
         let total = snapshot.len().max(1);
         let density = living as f32 / total as f32;
 
-        let recovery_mode = living < 2_800;
-        let bloom_mode = living < 1_600;
+        let recovery_mode = living < 1_400;
+        let bloom_mode = living < 800;
 
         let root_count = snapshot
             .iter()
@@ -266,13 +266,13 @@ impl CellularAutomata {
                             next.energy = 27.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
-                        } else if bloom_mode && seed_roll < 320 {
+                        } else if bloom_mode && seed_roll < 160 {
                             next.kind = CellKind::Nutrient;
                             next.energy = 38.0;
                             next.age = 0;
                             next.tribe_hint = seed_roll % 6;
                             next.signal.growth = (next.signal.growth + 0.06).clamp(0.0, 1.0);
-                        } else if recovery_mode && seed_roll < 140 {
+                        } else if recovery_mode && seed_roll < 70 {
                             next.kind = CellKind::Spore;
                             next.energy = 30.0;
                             next.age = 0;
@@ -310,8 +310,8 @@ impl CellularAutomata {
                             next.energy = (cell.energy + 3.0).min(85.0);
                             next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else {
-                            let age_thin = if cell.age > 900 { 0.03 } else { 0.0 };
-                            let crowd_thin = if density > 0.82 { 0.03 } else { 0.0 };
+                            let age_thin = if cell.age > 900 { 0.06 } else { 0.0 };
+                            let crowd_thin = if density > 0.82 { 0.06 } else { 0.0 };
 
                             next.energy = (cell.energy + nutrient_neighbors as f32 * 1.20
                                 - 1.22
