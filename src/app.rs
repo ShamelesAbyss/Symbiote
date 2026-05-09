@@ -1573,14 +1573,15 @@ fn random_particle(rng: &mut StdRng) -> Particle {
 
     // Clamp primitive genome into a biologically generic range so edge
     // refill does not directly create advanced archetypes like MYC/SWR/LEV.
-    p.genome.membrane = p.genome.membrane.clamp(0.0, 0.42);
-    p.genome.bonding = p.genome.bonding.clamp(0.55, 1.08);
-    p.genome.fertility = p.genome.fertility.clamp(0.72, 1.22);
-    p.genome.perception = p.genome.perception.clamp(0.14, 0.29);
-    p.genome.orbit = p.genome.orbit.clamp(0.0, 0.42);
-    p.genome.volatility = p.genome.volatility.clamp(0.72, 1.38);
+    // Expanded primitive ranges so advanced archetypes can emerge naturally.
+    p.genome.membrane = p.genome.membrane.clamp(0.0, 1.25);
+    p.genome.bonding = p.genome.bonding.clamp(0.55, 1.35);
+    p.genome.fertility = p.genome.fertility.clamp(0.72, 1.35);
+    p.genome.perception = p.genome.perception.clamp(0.14, 0.32);
+    p.genome.orbit = p.genome.orbit.clamp(0.0, 1.25);
+    p.genome.volatility = p.genome.volatility.clamp(0.72, 1.55);
     p.genome.hunger = p.genome.hunger.clamp(0.010, 0.024);
-    p.genome.metabolism = p.genome.metabolism.clamp(0.010, 0.024);
+    p.genome.metabolism = p.genome.metabolism.clamp(0.008, 0.024);
 
     p.rare_trait = RareTrait::None;
 
