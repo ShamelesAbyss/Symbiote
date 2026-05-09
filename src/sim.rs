@@ -777,8 +777,8 @@ fn apply_archetype_persistence(
                 particle.health += 0.060;
                 particle.energy += 0.014;
                 particle.mass += 0.0012;
-                particle.vx *= 0.994;
-                particle.vy *= 0.994;
+                particle.vx *= 0.998;
+                particle.vy *= 0.998;
                 substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.012);
             }
         }
@@ -789,12 +789,12 @@ fn apply_archetype_persistence(
             }
 
             particle.mass += 0.0010;
-            particle.vx *= 0.996;
-            particle.vy *= 0.996;
+            particle.vx *= 0.999;
+            particle.vy *= 0.999;
         }
         Archetype::Mycelial => {
-            particle.vx *= 0.990;
-            particle.vy *= 0.990;
+            particle.vx *= 0.997;
+            particle.vy *= 0.997;
 
             if !harvester_overgrowth {
                 particle.health += 0.050;

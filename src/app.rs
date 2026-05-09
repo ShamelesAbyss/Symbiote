@@ -572,19 +572,19 @@ impl App {
                     child.y += (child.y / len) * outward_bias;
                 }
 
-                let orbital_bias = 0.015 + pathfinder_bias * 0.018 + corridor_pressure * 0.022;
+                let orbital_bias = 0.010 + pathfinder_bias * 0.012 + corridor_pressure * 0.014;
 
                 child.vx += (-child.y) * orbital_bias;
                 child.vy += child.x * orbital_bias;
 
-                child.x += rng.gen_range(-0.12..0.12);
-                child.y += rng.gen_range(-0.12..0.12);
+                child.x += rng.gen_range(-0.06..0.06);
+                child.y += rng.gen_range(-0.06..0.06);
 
                 child.x = child.x.clamp(-1.16, 1.16);
                 child.y = child.y.clamp(-1.16, 1.16);
 
-                child.vx += rng.gen_range(-0.008..0.008);
-                child.vy += rng.gen_range(-0.008..0.008);
+                child.vx += rng.gen_range(-0.004..0.004);
+                child.vy += rng.gen_range(-0.004..0.004);
             }
 
             if child.genome.perception > 0.295
