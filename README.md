@@ -1,11 +1,9 @@
-]0;echo "# Symbiote"# Symbiote
-]0;echo
-]0;echo '<p align="center">'<p align="center">
-]0;echo '  <img src="assets/images/symbiote-cover.png" alt="Symbiote Cover Art" width="900">'  <img src="assets/images/symbiote-cover.png" alt="Symbiote Cover Art" width="900">
-]0;echo '</p>'</p>
-]0;echo
-]0;tail -n +4 README.md<p align="center"> <img src="assets/images/symbiote-cover.png" alt="Symbiote Cover Art" 
-  width="900">
+# Symbiote
+
+<p align="center">
+  <img src="assets/images/symbiote-cover.png" alt="Symbiote Cover Art" width="900">
+</p>
+
 </p>Rust Powered Terminal Artificial Life SIM
 
 
