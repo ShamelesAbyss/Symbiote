@@ -2028,7 +2028,7 @@ fn archetype_visual(index: usize) -> Option<(char, Color)> {
         4 => Some(('⁘', Color::Magenta)),      // Parasite
         5 => Some(('▣', Color::Yellow)),       // Architect
         6 => Some(('◈', Color::White)),        // Leviathan
-        7 => Some(('♆', Color::LightMagenta)), // Mycelial
+        7 => Some(('☘', Color::LightMagenta)), // Mycelial
         8 => Some(('⟡', Color::Gray)),         // Phantom
         9 => Some(('♻', Color::LightGreen)),   // Harvester
         10 => Some(('Ω', Color::Red)),         // Reaper
