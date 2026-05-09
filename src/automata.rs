@@ -251,7 +251,7 @@ impl CellularAutomata {
                             next.signal.growth = (next.signal.growth + 0.18).clamp(0.0, 1.0);
                         } else if conway_neighbors == 3 {
                             next.kind = CellKind::Life;
-                            next.energy = 36.0 + nutrient_neighbors as f32 * 3.0;
+                            next.energy = 52.0 + nutrient_neighbors as f32 * 5.5;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
                         } else if recovery_mode && root_neighbors > 0 && nutrient_neighbors > 0 {
@@ -286,11 +286,11 @@ impl CellularAutomata {
                             next.signal.danger = (next.signal.danger + 0.16).clamp(0.0, 1.0);
                         } else if conway_neighbors > 3 {
                             next.kind = CellKind::Dead;
-                            next.energy = 18.0;
+                            next.energy = 24.0;
                             next.signal.danger = (next.signal.danger + 0.22).clamp(0.0, 1.0);
                         } else if root_neighbors > 1 {
                             next.kind = CellKind::Dead;
-                            next.energy = 18.0;
+                            next.energy = 24.0;
                             next.signal.danger = (next.signal.danger + 0.18).clamp(0.0, 1.0);
                         } else if root_neighbors > 0
                             && recovery_mode
@@ -301,15 +301,15 @@ impl CellularAutomata {
                             next.signal.growth = (next.signal.growth + 0.03).clamp(0.0, 1.0);
                         } else if neighbors < 2 || neighbors > 3 {
                             next.kind = CellKind::Dead;
-                            next.energy = 18.0;
+                            next.energy = 24.0;
                             next.signal.danger = (next.signal.danger + 0.22).clamp(0.0, 1.0);
                         } else if neighbors == 3 && nutrient_neighbors > 2 {
                             next.kind = CellKind::Spore;
                             next.energy = (cell.energy + 3.0).min(85.0);
                             next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else {
-                            let age_thin = if cell.age > 180 { 0.34 } else { 0.0 };
-                            let crowd_thin = if density > 0.24 { 0.28 } else { 0.0 };
+                            let age_thin = if cell.age > 240 { 0.18 } else { 0.0 };
+                            let crowd_thin = if density > 0.34 { 0.18 } else { 0.0 };
 
                             next.energy = (cell.energy + nutrient_neighbors as f32 * 0.48
                                 - 1.22
@@ -330,21 +330,21 @@ impl CellularAutomata {
 
                         if conway_neighbors == 3 && root_neighbors == 0 {
                             next.kind = CellKind::Life;
-                            next.energy = 34.0;
+                            next.energy = 48.0;
                             next.age = 0;
                         } else if root_neighbors > 1 {
                             next.kind = CellKind::Nutrient;
                             next.energy = 28.0;
                         } else if root_neighbors > 0 && recovery_mode && nutrient_neighbors > 0 {
                             next.kind = CellKind::Life;
-                            next.energy = 36.0;
+                            next.energy = 52.0;
                         } else if neighbors < 2 || neighbors > 4 {
                             next.kind = CellKind::Dead;
                             next.energy = 14.0;
                             next.signal.danger = (next.signal.danger + 0.14).clamp(0.0, 1.0);
                         } else {
-                            let age_thin = if cell.age > 140 { 0.28 } else { 0.0 };
-                            let crowd_thin = if density > 0.24 { 0.32 } else { 0.0 };
+                            let age_thin = if cell.age > 220 { 0.18 } else { 0.0 };
+                            let crowd_thin = if density > 0.34 { 0.20 } else { 0.0 };
 
                             next.energy = (cell.energy - 1.02 - age_thin - crowd_thin).max(0.0);
 
@@ -361,7 +361,7 @@ impl CellularAutomata {
 
                         if conway_neighbors == 3 && root_neighbors == 0 {
                             next.kind = CellKind::Life;
-                            next.energy = 38.0;
+                            next.energy = 54.0;
                             next.age = 0;
                         } else if root_neighbors > 1 && density > 0.14 {
                             next.kind = CellKind::Empty;
@@ -369,16 +369,16 @@ impl CellularAutomata {
                             next.age = 0;
                         } else if root_neighbors > 0 && recovery_mode && neighbors >= 1 {
                             next.kind = CellKind::Spore;
-                            next.energy = 38.0;
-                        } else if neighbors == 3 && cell.energy > 28.0 {
+                            next.energy = 52.0;
+                        } else if (neighbors == 3 || conway_neighbors == 3) && cell.energy > 18.0 {
                             next.kind = CellKind::Life;
-                            next.energy = 42.0;
+                            next.energy = 58.0;
                             next.age = 0;
                         } else if recovery_mode && neighbors >= 2 {
                             next.kind = CellKind::Spore;
                             next.energy = 35.0;
                         } else {
-                            let decay = if recovery_mode { 0.04 } else { 0.14 };
+                            let decay = if recovery_mode { 0.02 } else { 0.08 };
                             next.energy = (cell.energy - decay).max(0.0);
 
                             if next.energy <= 0.0 {
@@ -393,12 +393,12 @@ impl CellularAutomata {
 
                         if conway_neighbors == 3 {
                             next.kind = CellKind::Life;
-                            next.energy = 34.0;
+                            next.energy = 48.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
                             next.signal.growth = (next.signal.growth + 0.10).clamp(0.0, 1.0);
                         } else {
-                            let decay = if recovery_mode { 0.10 } else { 0.30 };
+                            let decay = if recovery_mode { 0.05 } else { 0.16 };
                             next.energy = (cell.energy - decay).max(0.0);
 
                             if root_neighbors > 0 && recovery_mode {
@@ -423,11 +423,11 @@ impl CellularAutomata {
                     CellKind::Mutagen => {
                         if root_neighbors > 0 && recovery_mode {
                             next.kind = CellKind::Spore;
-                            next.energy = 38.0;
+                            next.energy = 52.0;
                             next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else if neighbors == 3 {
                             next.kind = CellKind::Spore;
-                            next.energy = 42.0;
+                            next.energy = 58.0;
                             next.signal.growth = (next.signal.growth + 0.08).clamp(0.0, 1.0);
                         } else {
                             next.energy = (cell.energy - 0.18).max(0.0);
