@@ -1070,7 +1070,7 @@ fn root_screen_visual(app: &App, x: usize, y: usize, width: usize, height: usize
         }
         (true, false, false, false) => {
             if height_ratio < 0.38 {
-                '✿'
+                '╵'
             } else {
                 '╵'
             }
@@ -1093,9 +1093,9 @@ fn root_screen_visual(app: &App, x: usize, y: usize, width: usize, height: usize
         _ => {
             if height_ratio < 0.38 {
                 if phase % 2 == 0 {
-                    '✿'
+                    '╵'
                 } else {
-                    '✿'
+                    '╵'
                 }
             } else if phase % 2 == 0 {
                 '│'
