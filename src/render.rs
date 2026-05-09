@@ -1586,7 +1586,7 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
 
     lines.push(Line::from(vec![
         Span::styled(
-            "Trunks ╂ base | vertical ║ bends ╫ tips",
+            "Trunks ┼ base | vertical │ bends ┐ tips ╵",
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
