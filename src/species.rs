@@ -230,11 +230,11 @@ pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> A
         || (genome.membrane > 1.24 && genome.bonding > 1.18 && genome.fertility > 0.88)
     {
         Archetype::Leviathan
-    } else if genome.membrane > 0.82 && genome.bonding > 0.92 && size > 6 {
+    } else if genome.membrane > 0.58 && genome.bonding > 0.58 && size > 4 {
         Archetype::Architect
-    } else if genome.membrane > 0.52 && genome.fertility > 0.78 && genome.metabolism < 0.040 {
+    } else if genome.membrane > 0.34 && genome.fertility > 0.62 && genome.metabolism < 0.055 {
         Archetype::Mycelial
-    } else if pressure.birth && genome.membrane > 0.48 && genome.fertility > 0.76 {
+    } else if pressure.birth && genome.membrane > 0.30 && genome.fertility > 0.60 {
         Archetype::Mycelial
     } else if pressure.birth && genome.orbit > 0.58 && genome.perception > 0.182 {
         Archetype::Orbiter
@@ -244,13 +244,13 @@ pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> A
         Archetype::Swarmer
     } else if pressure.overcrowded && genome.volatility > 1.22 && genome.hunger > 0.015 {
         Archetype::Hunter
-    } else if pressure.overcrowded && genome.orbit > 0.80 {
+    } else if pressure.overcrowded && genome.orbit > 0.52 {
         Archetype::Phantom
     } else if pressure.underpopulated && genome.perception > 0.245 && genome.metabolism < 0.020 {
         Archetype::Grazer
     } else if pressure.underpopulated {
         Archetype::Parasite
-    } else if genome.membrane > 0.56 && genome.bonding > 0.62 {
+    } else if genome.membrane > 0.44 && genome.bonding > 0.48 {
         Archetype::Architect
     } else if genome.orbit > 0.58 && genome.perception > 0.12 {
         Archetype::Orbiter
@@ -260,9 +260,9 @@ pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> A
         Archetype::Swarmer
     } else if genome.perception > 0.238 && genome.metabolism < 0.021 {
         Archetype::Grazer
-    } else if genome.membrane > 0.46 && genome.fertility > 0.74 {
+    } else if genome.membrane > 0.30 && genome.fertility > 0.58 {
         Archetype::Mycelial
-    } else if genome.orbit > 0.98 || rare_trait == RareTrait::Radiant {
+    } else if genome.orbit > 0.68 || rare_trait == RareTrait::Radiant {
         Archetype::Phantom
     } else {
         Archetype::Parasite
