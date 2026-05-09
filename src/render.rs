@@ -1605,7 +1605,7 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled("∙ life ", Style::default().fg(Color::DarkGray)),
-        Span::styled("+ food ", Style::default().fg(Color::Green)),
+        Span::styled("+ food/nutrient ", Style::default().fg(Color::Green)),
         Span::styled("× dead ", Style::default().fg(Color::DarkGray)),
         Span::styled("░ spore ", Style::default().fg(Color::DarkGray)),
         Span::styled("*✶ mutagen ", Style::default().fg(Color::Magenta)),
@@ -1647,7 +1647,7 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
         Span::styled("✦✧ rare ", Style::default().fg(Color::White)),
         Span::styled("♻ harvester ", Style::default().fg(Color::Green)),
         Span::styled("Ωϟ reaper ", Style::default().fg(Color::Red)),
-        Span::styled("◆◇ drift ", Style::default().fg(Color::Magenta)),
+        Span::styled("◆ drift ", Style::default().fg(Color::Magenta)),
         Span::styled("○ membrane", Style::default().fg(Color::Gray)),
     ]));
 
