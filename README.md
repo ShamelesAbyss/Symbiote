@@ -1,7 +1,11 @@
 ```Markdown
 # Symbiote
 
-Rust Powered Terminal Artificial Life SIM
+<p align="center"> <img src="assets/images/symbiote-cover.png" alt="Symbiote Cover Art" 
+  width="900">
+</p>Rust Powered Terminal Artificial Life SIM
+
+
 
 Symbiote is a persistent artificial life ecosystem written entirely in Rust.
 
