@@ -1718,7 +1718,7 @@ fn render_clusters(f: &mut Frame<'_>, area: Rect, app: &App) {
             if cluster.drift_heat > 80.0 {
                 "✦"
             } else if cluster.drift_heat > 60.0 {
-                "⚡"
+                "≋"
             } else {
                 "~"
             }
