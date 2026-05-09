@@ -330,7 +330,8 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
                     .max_by_key(|(_, count)| *count)
                     .and_then(|(idx, count)| if *count > 0 { Some(idx) } else { None });
 
-                let archetype_render_ready = cell.clustered > 0
+                let archetype_render_ready = dominant_archetype.is_some()
+                    || cell.clustered > 0
                     || cell.count >= 3
                     || cell.harvester
                     || cell.reaper
