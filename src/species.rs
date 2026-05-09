@@ -250,9 +250,9 @@ pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> A
         Archetype::Grazer
     } else if pressure.underpopulated {
         Archetype::Parasite
-    } else if genome.membrane > 0.72 && genome.bonding > 0.88 {
+    } else if genome.membrane > 0.56 && genome.bonding > 0.62 {
         Archetype::Architect
-    } else if genome.orbit > 0.84 && genome.perception > 0.205 {
+    } else if genome.orbit > 0.58 && genome.perception > 0.12 {
         Archetype::Orbiter
     } else if genome.volatility > 1.34 && genome.metabolism > 0.018 {
         Archetype::Hunter
