@@ -225,6 +225,8 @@ pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> A
         Archetype::Phantom
     } else if rare_trait == RareTrait::SporeKing {
         Archetype::Mycelial
+    } else if genome.membrane > 0.48 && genome.bonding > 0.54 && size > 3 {
+        Archetype::Architect
     } else if rare_trait == RareTrait::ElderCore
         || size > 58
         || (genome.membrane > 1.24 && genome.bonding > 1.18 && genome.fertility > 0.88)
@@ -248,10 +250,10 @@ pub fn derive_archetype(genome: Genome, rare_trait: RareTrait, size: usize) -> A
         Archetype::Phantom
     } else if pressure.underpopulated && genome.perception > 0.245 && genome.metabolism < 0.020 {
         Archetype::Grazer
-    } else if pressure.underpopulated {
-        Archetype::Parasite
     } else if genome.membrane > 0.44 && genome.bonding > 0.48 {
         Archetype::Architect
+    } else if pressure.underpopulated {
+        Archetype::Parasite
     } else if genome.orbit > 0.58 && genome.perception > 0.12 {
         Archetype::Orbiter
     } else if genome.volatility > 1.34 && genome.metabolism > 0.018 {
