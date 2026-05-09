@@ -249,9 +249,11 @@ impl CellularAutomata {
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
                             next.signal.growth = (next.signal.growth + 0.18).clamp(0.0, 1.0);
-                        } else if conway_neighbors == 3 {
+                        } else if conway_neighbors == 3
+                            || (neighbors == 3 && nutrient_neighbors >= 1)
+                        {
                             next.kind = CellKind::Life;
-                            next.energy = 52.0 + nutrient_neighbors as f32 * 5.5;
+                            next.energy = 64.0 + nutrient_neighbors as f32 * 7.5;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
                         } else if recovery_mode && root_neighbors > 0 && nutrient_neighbors > 0 {
@@ -311,7 +313,7 @@ impl CellularAutomata {
                             let age_thin = if cell.age > 240 { 0.18 } else { 0.0 };
                             let crowd_thin = if density > 0.34 { 0.18 } else { 0.0 };
 
-                            next.energy = (cell.energy + nutrient_neighbors as f32 * 0.48
+                            next.energy = (cell.energy + nutrient_neighbors as f32 * 1.20
                                 - 1.22
                                 - age_thin
                                 - crowd_thin)
@@ -370,7 +372,10 @@ impl CellularAutomata {
                         } else if root_neighbors > 0 && recovery_mode && neighbors >= 1 {
                             next.kind = CellKind::Spore;
                             next.energy = 52.0;
-                        } else if (neighbors == 3 || conway_neighbors == 3) && cell.energy > 18.0 {
+                        } else if ((neighbors == 3 || conway_neighbors == 3)
+                            || (dead_neighbors >= 2 && nutrient_neighbors >= 2))
+                            && cell.energy > 12.0
+                        {
                             next.kind = CellKind::Life;
                             next.energy = 58.0;
                             next.age = 0;
@@ -391,14 +396,15 @@ impl CellularAutomata {
                     CellKind::Dead => {
                         next.signal.danger = (next.signal.danger + 0.006).clamp(0.0, 1.0);
 
-                        if conway_neighbors == 3 {
+                        if conway_neighbors == 3 || (dead_neighbors >= 2 && nutrient_neighbors >= 2)
+                        {
                             next.kind = CellKind::Life;
                             next.energy = 48.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
                             next.signal.growth = (next.signal.growth + 0.10).clamp(0.0, 1.0);
                         } else {
-                            let decay = if recovery_mode { 0.05 } else { 0.16 };
+                            let decay = if recovery_mode { 0.02 } else { 0.08 };
                             next.energy = (cell.energy - decay).max(0.0);
 
                             if root_neighbors > 0 && recovery_mode {
