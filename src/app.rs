@@ -22,13 +22,13 @@ const ECOSYSTEM_SCHEMA_PATH: &str = "memory/ecosystem_schema.txt";
 const ECOSYSTEM_SCHEMA_VERSION: &str = "trunk-root-v1";
 
 pub const TRIBE_COUNT: usize = 8;
-pub const PARTICLE_COUNT: usize = 780;
-pub const MAX_PARTICLES: usize = 1250;
-pub const MIN_PARTICLES: usize = 560;
+pub const PARTICLE_COUNT: usize = 1400;
+pub const MAX_PARTICLES: usize = 3200;
+pub const MIN_PARTICLES: usize = 900;
 
-const DISPERSAL_WARMUP_TICKS: u64 = 220;
-const REPRODUCTION_WARMUP_TICKS: u64 = 360;
-const STRUCTURE_WARMUP_TICKS: u64 = 760;
+const DISPERSAL_WARMUP_TICKS: u64 = 200;
+const REPRODUCTION_WARMUP_TICKS: u64 = 400;
+const STRUCTURE_WARMUP_TICKS: u64 = 660;
 
 #[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Environment {
