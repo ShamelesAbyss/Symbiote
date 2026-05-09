@@ -2021,17 +2021,17 @@ fn memory_phase_color(mood: VisualMood) -> Color {
 
 fn archetype_visual(index: usize) -> Option<(char, Color)> {
     match index {
-        0 => Some(('≋', Color::Cyan)),       // Swarmer
-        1 => Some(('⌁', Color::Red)),        // Hunter
-        2 => Some(('˖', Color::Green)),      // Grazer
-        3 => Some(('⊙', Color::Blue)),       // Orbiter
-        4 => Some(('⁘', Color::Magenta)),    // Parasite
-        5 => Some(('▣', Color::Yellow)),     // Architect
-        6 => Some(('◈', Color::White)),      // Leviathan
-        7 => Some(('✣', Color::Green)),      // Mycelial
-        8 => Some(('⟡', Color::Gray)),       // Phantom
-        9 => Some(('♻', Color::LightGreen)), // Harvester
-        10 => Some(('Ω', Color::Red)),       // Reaper
+        0 => Some(('≋', Color::Cyan)),         // Swarmer
+        1 => Some(('⌁', Color::Red)),          // Hunter
+        2 => Some(('˖', Color::Green)),        // Grazer
+        3 => Some(('⊙', Color::Blue)),         // Orbiter
+        4 => Some(('⁘', Color::Magenta)),      // Parasite
+        5 => Some(('▣', Color::Yellow)),       // Architect
+        6 => Some(('◈', Color::White)),        // Leviathan
+        7 => Some(('♆', Color::LightMagenta)), // Mycelial
+        8 => Some(('⟡', Color::Gray)),         // Phantom
+        9 => Some(('♻', Color::LightGreen)),   // Harvester
+        10 => Some(('Ω', Color::Red)),         // Reaper
         _ => None,
     }
 }
