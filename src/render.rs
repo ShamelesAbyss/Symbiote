@@ -1264,7 +1264,7 @@ fn archetype_glyph_from_index(index: usize) -> &'static str {
         1 => "▲",
         2 => "+",
         3 => "◌",
-        4 => "×",
+        4 => "※",
         5 => "▣",
         6 => "◉",
         7 => "§",
