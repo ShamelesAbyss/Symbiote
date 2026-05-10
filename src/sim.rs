@@ -994,7 +994,11 @@ fn apply_mature_archetype_blessing(
                 (particle.genome.perception + 0.000018 * blessing).clamp(0.1, 0.38);
         }
         Archetype::Orbiter => {
-            particle.genome.orbit = (particle.genome.orbit + 0.000020 * blessing).clamp(0.0, 1.55);
+            particle.energy += 0.012 * blessing;
+            particle.health += 0.006 * blessing;
+            particle.genome.orbit = (particle.genome.orbit + 0.000040 * blessing).clamp(0.0, 1.55);
+            particle.genome.perception =
+                (particle.genome.perception + 0.000012 * blessing).clamp(0.1, 0.38);
         }
         Archetype::Parasite => {
             particle.genome.hunger =
