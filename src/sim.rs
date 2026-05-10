@@ -2153,11 +2153,13 @@ fn apply_archetype_birth_shape(child: &mut Particle, archetype: Archetype, rng: 
             child.vy = child.vy * 1.08 + child.x.signum() * spin;
         }
         Archetype::Parasite => {
-            child.health = child.health.max(70.0);
-            child.energy = child.energy.max(78.0);
-            child.mass = child.mass.clamp(0.36, 2.2);
-            child.vx *= 1.04;
-            child.vy *= 1.04;
+            child.health = child.health.max(76.0);
+            child.energy = child.energy.max(88.0);
+            child.mass = child.mass.clamp(0.28, 1.95);
+            child.vx *= 1.18;
+            child.vy *= 1.18;
+            child.vx += rng.gen_range(-0.0038..0.0038);
+            child.vy += rng.gen_range(-0.0038..0.0038);
         }
         Archetype::Architect => {
             child.health = child.health.max(84.0);
