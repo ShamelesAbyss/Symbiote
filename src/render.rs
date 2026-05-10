@@ -1262,7 +1262,7 @@ fn archetype_glyph_from_index(index: usize) -> &'static str {
     match index {
         0 => "›",
         1 => "▲",
-        2 => "+",
+        2 => "Ө",
         3 => "◌",
         4 => "※",
         5 => "▣",
