@@ -2281,10 +2281,11 @@ fn reinforce_inherited_archetype(
             genome.volatility = nudge_gene(genome.volatility, 1.34, 0.12 * fidelity, 0.36, 1.95);
         }
         Archetype::Architect => {
-            genome.membrane = nudge_gene(genome.membrane, 1.18, 0.20 * fidelity, 0.0, 1.8);
-            genome.bonding = nudge_gene(genome.bonding, 1.62, 0.26 * fidelity, 0.5, 2.25);
-            genome.volatility = nudge_gene(genome.volatility, 0.92, 0.10 * fidelity, 0.36, 1.95);
-            genome.metabolism = nudge_gene(genome.metabolism, 0.015, 0.08 * fidelity, 0.004, 0.05);
+            genome.membrane = nudge_gene(genome.membrane, 1.42, 0.26 * fidelity, 0.0, 1.8);
+            genome.bonding = nudge_gene(genome.bonding, 1.82, 0.30 * fidelity, 0.5, 2.25);
+            genome.volatility = nudge_gene(genome.volatility, 0.78, 0.14 * fidelity, 0.36, 1.95);
+            genome.metabolism = nudge_gene(genome.metabolism, 0.012, 0.10 * fidelity, 0.004, 0.05);
+            genome.fertility = nudge_gene(genome.fertility, 1.22, 0.10 * fidelity, 0.2, 2.4);
         }
         Archetype::Leviathan => {
             genome.membrane = nudge_gene(genome.membrane, 1.34, 0.19 * fidelity, 0.0, 1.8);
