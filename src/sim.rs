@@ -843,10 +843,19 @@ fn apply_archetype_persistence(
         }
         Archetype::Phantom => {
             if hostile_density > friendly_density {
-                particle.energy += 0.010;
+                particle.energy += 0.022;
+                particle.health += 0.014;
+                particle.genome.orbit = (particle.genome.orbit + 0.000018).clamp(0.0, 1.55);
+                particle.genome.volatility =
+                    (particle.genome.volatility + 0.000012).clamp(0.36, 1.95);
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Fear, 0.012);
+            } else if local_density == 0 {
+                particle.energy += 0.008;
+                particle.vx *= 1.006;
+                particle.vy *= 1.006;
+            } else {
+                particle.health += 0.006;
             }
-
-            particle.health += 0.008;
         }
         Archetype::Harvester => {
             if !low_substrate {
