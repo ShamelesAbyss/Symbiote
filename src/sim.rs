@@ -2372,9 +2372,10 @@ fn reinforce_inherited_archetype(
             genome.volatility = nudge_gene(genome.volatility, 0.68, 0.12 * fidelity, 0.36, 1.95);
         }
         Archetype::Phantom => {
-            genome.orbit = nudge_gene(genome.orbit, 1.24, 0.18 * fidelity, 0.0, 1.55);
-            genome.volatility = nudge_gene(genome.volatility, 1.28, 0.11 * fidelity, 0.36, 1.95);
-            genome.perception = nudge_gene(genome.perception, 0.250, 0.10 * fidelity, 0.1, 0.38);
+            genome.orbit = nudge_gene(genome.orbit, 1.46, 0.24 * fidelity, 0.0, 1.55);
+            genome.volatility = nudge_gene(genome.volatility, 1.58, 0.16 * fidelity, 0.36, 1.95);
+            genome.perception = nudge_gene(genome.perception, 0.315, 0.14 * fidelity, 0.1, 0.38);
+            genome.metabolism = nudge_gene(genome.metabolism, 0.011, 0.10 * fidelity, 0.004, 0.05);
         }
         Archetype::Harvester => {
             genome.perception = nudge_gene(genome.perception, 0.270, 0.14 * fidelity, 0.1, 0.38);
