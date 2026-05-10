@@ -1527,52 +1527,6 @@ impl App {
     }
 }
 
-#[allow(dead_code)]
-fn random_particle(rng: &mut StdRng) -> Particle {
-    // Primitive seed organisms only.
-    // Advanced archetypes must emerge through evolution.
-    let mut p = Particle {
-        x: rng.gen_range(-1.17..1.17),
-        y: rng.gen_range(-1.17..1.17),
-        vx: rng.gen_range(-0.020..0.020),
-        vy: rng.gen_range(-0.020..0.020),
-        tribe: Tribe::from_index(rng.gen_range(0..TRIBE_COUNT)),
-        age: 0,
-        health: rng.gen_range(60.0..100.0),
-        energy: rng.gen_range(60.0..110.0),
-        mass: rng.gen_range(0.58..1.32),
-        cluster_id: None,
-        species_id: None,
-        rare_trait: RareTrait::None,
-        genome: Genome {
-            perception: rng.gen_range(0.145..0.285),
-            hunger: rng.gen_range(0.009..0.023),
-            bonding: rng.gen_range(0.58..1.42),
-            volatility: rng.gen_range(0.82..1.55),
-            orbit: rng.gen_range(0.10..1.02),
-            membrane: rng.gen_range(0.0..0.92),
-            metabolism: rng.gen_range(0.008..0.024),
-            fertility: rng.gen_range(0.55..1.18),
-        },
-    };
-
-    // Clamp primitive genome into a biologically generic range so edge
-    // refill does not directly create advanced archetypes like MYC/SWR/LEV.
-    // Expanded primitive ranges so advanced archetypes can emerge naturally.
-    p.genome.membrane = p.genome.membrane.clamp(0.0, 1.25);
-    p.genome.bonding = p.genome.bonding.clamp(0.55, 1.35);
-    p.genome.fertility = p.genome.fertility.clamp(0.72, 1.35);
-    p.genome.perception = p.genome.perception.clamp(0.14, 0.32);
-    p.genome.orbit = p.genome.orbit.clamp(0.0, 1.25);
-    p.genome.volatility = p.genome.volatility.clamp(0.72, 1.55);
-    p.genome.hunger = p.genome.hunger.clamp(0.010, 0.024);
-    p.genome.metabolism = p.genome.metabolism.clamp(0.008, 0.024);
-
-    p.rare_trait = RareTrait::None;
-
-    p
-}
-
 fn dist(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
     let dx = ax - bx;
     let dy = ay - by;
