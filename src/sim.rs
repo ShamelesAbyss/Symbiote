@@ -1147,9 +1147,9 @@ fn field_polarity_response(
             hunger *= 0.46;
         }
         Some(Archetype::Mycelial) => {
-            pull *= if dangerous { 0.92 } else { 1.46 };
-            calm *= 1.62;
-            hunger *= 0.72;
+            pull *= if dangerous { 0.82 } else { 1.62 };
+            calm *= 1.92;
+            hunger *= 0.50;
         }
         Some(Archetype::Orbiter) => {
             pull *= if dangerous { 0.38 } else { 1.22 };
@@ -1335,11 +1335,18 @@ fn apply_signal_field(
             avoid += signal.growth * 0.12;
             avoid += signal.danger * 0.16;
         }
-        Some(Archetype::Grazer | Archetype::Mycelial) => {
+        Some(Archetype::Grazer) => {
             seek += signal.growth * 0.86;
 
             avoid += signal.danger * 0.82;
             avoid += signal.fear * 0.42;
+        }
+        Some(Archetype::Mycelial) => {
+            seek += signal.growth * 1.18;
+            seek += signal.hunger * 0.16;
+
+            avoid += signal.danger * 0.70;
+            avoid += signal.fear * 0.28;
         }
         Some(Archetype::Hunter) => {
             seek += signal.danger * 0.72;
