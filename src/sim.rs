@@ -962,12 +962,14 @@ fn archetype_local_fitness(
             }
         }
         Archetype::Mycelial => {
-            if !harvester_overgrowth && !low_substrate {
-                1.0
+            if !harvester_overgrowth && !low_substrate && local_density >= 3 {
+                1.28
+            } else if !harvester_overgrowth && !low_substrate {
+                1.06
             } else if !harvester_overgrowth {
-                0.55
+                0.62
             } else {
-                0.15
+                0.12
             }
         }
         Archetype::Phantom => {
