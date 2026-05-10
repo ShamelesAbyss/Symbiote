@@ -45,7 +45,7 @@ pub fn build_rule_matrix(seed: u64) -> RuleMatrix {
 
     for row in matrix.iter_mut() {
         for value in row.iter_mut() {
-            *value = rng.gen_range(-1.0..1.0);
+            *value = rng.gen_range(-1.25..1.0);
         }
     }
 
@@ -424,7 +424,7 @@ pub fn step_particles(
                 && d < BOND_RADIUS
                 && other.mass > particle.mass
             {
-                particle.energy += 0.012;
+                particle.energy += 0.022;
                 substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.025);
             }
         }
@@ -597,7 +597,7 @@ pub fn step_particles(
                 substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.08);
                 substrate.deposit_signal(particle.x, particle.y, SignalKind::Danger, 0.025);
             } else {
-                particle.energy -= 0.006;
+                particle.energy -= 0.014;
                 particle.health += 0.002;
                 substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.035);
             }
@@ -616,7 +616,7 @@ pub fn step_particles(
 
             particle.energy -= 0.017 * starvation_relief;
             particle.health -= 0.005 * starvation_relief;
-            particle.mass = (particle.mass + 0.002).clamp(0.45, 7.0);
+            particle.mass = (particle.mass + 0.002).clamp(0.62, 7.0);
 
             substrate.deposit_signal(particle.x, particle.y, SignalKind::Fear, 0.052);
         }
@@ -697,10 +697,10 @@ fn apply_archetype_persistence(
             }
             Archetype::Swarmer => {
                 // Cooperative swarm clouds.
-                particle.energy += cohesion * 110.0;
-                particle.health += cohesion * 40.0;
+                particle.energy += cohesion * 175.0;
+                particle.health += cohesion * 72.0;
                 particle.genome.perception =
-                    (particle.genome.perception + cohesion * 0.60).clamp(0.0, 2.5);
+                    (particle.genome.perception + cohesion * 1.05).clamp(0.0, 2.5);
             }
             Archetype::Architect => {
                 // Stable builder districts.
@@ -734,13 +734,13 @@ fn apply_archetype_persistence(
 
     match archetype {
         Archetype::Swarmer => {
-            if friendly_density >= 2 {
-                particle.health += 0.045;
-                particle.energy += 0.012;
-                particle.genome.bonding = (particle.genome.bonding + 0.000018).clamp(0.5, 2.25);
-                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.008);
+            if friendly_density >= 4 {
+                particle.health += 0.072;
+                particle.energy += 0.022;
+                particle.genome.bonding = (particle.genome.bonding + 0.000038).clamp(0.5, 2.25);
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.014);
             } else {
-                particle.energy -= 0.006;
+                particle.energy -= 0.014;
             }
         }
         Archetype::Hunter => {
@@ -773,7 +773,7 @@ fn apply_archetype_persistence(
             }
         }
         Archetype::Architect => {
-            if friendly_density >= 2 {
+            if friendly_density >= 3 {
                 particle.health += 0.250;
                 particle.energy += 0.014;
                 particle.mass += 0.0012;
@@ -785,7 +785,7 @@ fn apply_archetype_persistence(
         Archetype::Leviathan => {
             if local_density >= 1 {
                 particle.health += 0.050;
-                particle.energy += 0.012;
+                particle.energy += 0.022;
             }
 
             particle.mass += 0.0010;
@@ -814,7 +814,7 @@ fn apply_archetype_persistence(
         Archetype::Harvester => {
             if !low_substrate {
                 particle.health += 0.020;
-                particle.energy += 0.012;
+                particle.energy += 0.022;
             } else {
                 particle.energy -= 0.004;
             }
@@ -893,7 +893,7 @@ fn archetype_local_fitness(
             }
         }
         Archetype::Architect => {
-            if friendly_density >= 2 {
+            if friendly_density >= 3 {
                 1.0
             } else if local_density >= 2 {
                 0.60
@@ -959,9 +959,9 @@ fn apply_mature_archetype_blessing(
     match archetype {
         Archetype::Swarmer => {
             particle.genome.bonding =
-                (particle.genome.bonding + 0.000020 * blessing).clamp(0.5, 2.25);
+                (particle.genome.bonding + 0.000055 * blessing).clamp(0.5, 2.25);
             particle.genome.fertility =
-                (particle.genome.fertility + 0.000012 * blessing).clamp(0.2, 2.4);
+                (particle.genome.fertility + 0.000026 * blessing).clamp(0.2, 2.4);
         }
         Archetype::Hunter => {
             particle.genome.perception =
@@ -988,7 +988,7 @@ fn apply_mature_archetype_blessing(
             particle.genome.membrane =
                 (particle.genome.membrane + 0.000024 * blessing).clamp(0.0, 1.8);
             particle.genome.bonding =
-                (particle.genome.bonding + 0.000018 * blessing).clamp(0.5, 2.25);
+                (particle.genome.bonding + 0.000038 * blessing).clamp(0.5, 2.25);
         }
         Archetype::Leviathan => {
             particle.health += 0.035 * blessing;
@@ -1834,7 +1834,7 @@ fn apply_morphology_role_pressure(
             particle.vy *= settle;
             particle.health += 0.004 * pressure;
             particle.genome.bonding =
-                (particle.genome.bonding + 0.000018 * cohesion).clamp(0.5, 2.25);
+                (particle.genome.bonding + 0.000038 * cohesion).clamp(0.5, 2.25);
         }
 
         crate::pattern::MorphologyRole::Oscillator => {
@@ -2070,14 +2070,14 @@ pub fn fused_child(a: Particle, b: Particle, seed: u64) -> Particle {
 fn apply_archetype_birth_shape(child: &mut Particle, archetype: Archetype, rng: &mut StdRng) {
     match archetype {
         Archetype::Swarmer => {
-            child.health = child.health.max(76.0);
-            child.energy = child.energy.max(76.0);
-            child.mass = child.mass.clamp(0.42, 2.4);
-            child.vx *= 0.86;
-            child.vy *= 0.86;
+            child.health = child.health.max(84.0);
+            child.energy = child.energy.max(88.0);
+            child.mass = child.mass.clamp(0.30, 1.85);
+            child.vx *= 1.18;
+            child.vy *= 1.18;
 
-            child.vx += rng.gen_range(-0.0025..0.0025);
-            child.vy += rng.gen_range(-0.0025..0.0025);
+            child.vx += rng.gen_range(-0.0048..0.0048);
+            child.vy += rng.gen_range(-0.0048..0.0048);
         }
         Archetype::Hunter => {
             child.health = child.health.max(74.0);
@@ -2172,10 +2172,10 @@ fn reinforce_inherited_archetype(
 
     match archetype {
         Archetype::Swarmer => {
-            genome.bonding = nudge_gene(genome.bonding, 1.38, 0.18 * fidelity, 0.5, 2.25);
-            genome.perception = nudge_gene(genome.perception, 0.235, 0.12 * fidelity, 0.1, 0.38);
-            genome.volatility = nudge_gene(genome.volatility, 1.08, 0.10 * fidelity, 0.36, 1.95);
-            genome.fertility = nudge_gene(genome.fertility, 1.18, 0.12 * fidelity, 0.2, 2.4);
+            genome.bonding = nudge_gene(genome.bonding, 1.62, 0.26 * fidelity, 0.5, 2.25);
+            genome.perception = nudge_gene(genome.perception, 0.285, 0.18 * fidelity, 0.1, 0.38);
+            genome.volatility = nudge_gene(genome.volatility, 1.18, 0.14 * fidelity, 0.36, 1.95);
+            genome.fertility = nudge_gene(genome.fertility, 1.30, 0.16 * fidelity, 0.2, 2.4);
         }
         Archetype::Hunter => {
             genome.volatility = nudge_gene(genome.volatility, 1.46, 0.16 * fidelity, 0.36, 1.95);
@@ -2185,7 +2185,7 @@ fn reinforce_inherited_archetype(
         Archetype::Grazer => {
             genome.perception = nudge_gene(genome.perception, 0.265, 0.13 * fidelity, 0.1, 0.38);
             genome.metabolism = nudge_gene(genome.metabolism, 0.016, 0.13 * fidelity, 0.004, 0.05);
-            genome.fertility = nudge_gene(genome.fertility, 1.18, 0.12 * fidelity, 0.2, 2.4);
+            genome.fertility = nudge_gene(genome.fertility, 1.30, 0.16 * fidelity, 0.2, 2.4);
             genome.hunger = nudge_gene(genome.hunger, 0.016, 0.10 * fidelity, 0.005, 0.04);
         }
         Archetype::Orbiter => {
@@ -2200,7 +2200,7 @@ fn reinforce_inherited_archetype(
         }
         Archetype::Architect => {
             genome.membrane = nudge_gene(genome.membrane, 1.18, 0.20 * fidelity, 0.0, 1.8);
-            genome.bonding = nudge_gene(genome.bonding, 1.38, 0.18 * fidelity, 0.5, 2.25);
+            genome.bonding = nudge_gene(genome.bonding, 1.62, 0.26 * fidelity, 0.5, 2.25);
             genome.volatility = nudge_gene(genome.volatility, 0.92, 0.10 * fidelity, 0.36, 1.95);
             genome.metabolism = nudge_gene(genome.metabolism, 0.015, 0.08 * fidelity, 0.004, 0.05);
         }
