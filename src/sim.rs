@@ -1290,11 +1290,19 @@ fn apply_signal_field(
             avoid += signal.danger * 0.82;
             avoid += signal.fear * 0.42;
         }
-        Some(Archetype::Hunter | Archetype::Parasite) => {
+        Some(Archetype::Hunter) => {
             seek += signal.danger * 0.72;
             seek += signal.hunger * 0.44;
 
             avoid += signal.fear * 0.10;
+        }
+        Some(Archetype::Parasite) => {
+            seek += signal.fear * 1.24;
+            seek += signal.danger * 1.08;
+            seek += signal.hunger * 0.58;
+
+            avoid += signal.growth * 0.22;
+            avoid += signal.fear * 0.04;
         }
         Some(Archetype::Architect | Archetype::Leviathan) => {
             seek += signal.growth * 0.54;
