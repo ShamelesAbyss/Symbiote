@@ -823,15 +823,22 @@ fn apply_archetype_persistence(
             particle.vy *= 0.996;
         }
         Archetype::Mycelial => {
-            particle.vx *= 0.997;
-            particle.vy *= 0.997;
+            particle.vx *= 0.994;
+            particle.vy *= 0.994;
 
-            if !harvester_overgrowth {
-                particle.health += 0.050;
-                particle.energy += 0.018;
-                particle.genome.membrane = (particle.genome.membrane + 0.000018).clamp(0.0, 1.8);
-                particle.genome.fertility = (particle.genome.fertility + 0.000014).clamp(0.2, 2.4);
-                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.014);
+            if !harvester_overgrowth && !low_substrate {
+                particle.health += 0.070;
+                particle.energy += 0.024;
+                particle.genome.membrane = (particle.genome.membrane + 0.000024).clamp(0.0, 1.8);
+                particle.genome.fertility = (particle.genome.fertility + 0.000020).clamp(0.2, 2.4);
+                particle.genome.bonding = (particle.genome.bonding + 0.000018).clamp(0.5, 2.25);
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.022);
+            } else if !harvester_overgrowth {
+                particle.health += 0.032;
+                particle.energy += 0.012;
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.010);
+            } else {
+                particle.energy -= 0.004;
             }
         }
         Archetype::Phantom => {
