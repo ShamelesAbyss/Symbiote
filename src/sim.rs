@@ -927,12 +927,14 @@ fn archetype_local_fitness(
             }
         }
         Archetype::Architect => {
-            if friendly_density >= 3 {
-                1.0
+            if friendly_density >= 5 {
+                1.30
+            } else if friendly_density >= 3 {
+                1.08
             } else if local_density >= 2 {
-                0.60
+                0.68
             } else {
-                0.25
+                0.18
             }
         }
         Archetype::Leviathan => {
