@@ -745,10 +745,10 @@ fn apply_archetype_persistence(
         }
         Archetype::Hunter => {
             if hostile_density >= 1 {
-                particle.energy += 0.018;
-                particle.health += 0.018;
+                particle.energy += 0.040;
+                particle.health += 0.032;
             } else {
-                particle.energy -= 0.008;
+                particle.energy -= 0.018;
             }
         }
         Archetype::Grazer => {
@@ -866,9 +866,9 @@ fn archetype_local_fitness(
         }
         Archetype::Hunter => {
             if hostile_density >= 1 {
-                0.85
+                1.15
             } else {
-                0.15
+                0.04
             }
         }
         Archetype::Grazer => {
@@ -1249,10 +1249,10 @@ fn apply_signal_field(
             avoid += signal.fear * 0.42;
         }
         Some(Archetype::Hunter | Archetype::Parasite) => {
-            seek += signal.danger * 0.34;
-            seek += signal.hunger * 0.26;
+            seek += signal.danger * 0.72;
+            seek += signal.hunger * 0.44;
 
-            avoid += signal.fear * 0.22;
+            avoid += signal.fear * 0.10;
         }
         Some(Archetype::Architect | Archetype::Leviathan) => {
             seek += signal.growth * 0.54;
@@ -2080,11 +2080,11 @@ fn apply_archetype_birth_shape(child: &mut Particle, archetype: Archetype, rng: 
             child.vy += rng.gen_range(-0.0048..0.0048);
         }
         Archetype::Hunter => {
-            child.health = child.health.max(74.0);
-            child.energy = child.energy.max(82.0);
-            child.mass = child.mass.clamp(0.50, 3.4);
-            child.vx *= 1.08;
-            child.vy *= 1.08;
+            child.health = child.health.max(82.0);
+            child.energy = child.energy.max(94.0);
+            child.mass = child.mass.clamp(0.42, 3.1);
+            child.vx *= 1.24;
+            child.vy *= 1.24;
         }
         Archetype::Grazer => {
             child.health = child.health.max(78.0);
@@ -2178,9 +2178,9 @@ fn reinforce_inherited_archetype(
             genome.fertility = nudge_gene(genome.fertility, 1.30, 0.16 * fidelity, 0.2, 2.4);
         }
         Archetype::Hunter => {
-            genome.volatility = nudge_gene(genome.volatility, 1.46, 0.16 * fidelity, 0.36, 1.95);
-            genome.hunger = nudge_gene(genome.hunger, 0.023, 0.14 * fidelity, 0.005, 0.04);
-            genome.perception = nudge_gene(genome.perception, 0.285, 0.14 * fidelity, 0.1, 0.38);
+            genome.volatility = nudge_gene(genome.volatility, 1.62, 0.23 * fidelity, 0.36, 1.95);
+            genome.hunger = nudge_gene(genome.hunger, 0.028, 0.20 * fidelity, 0.005, 0.04);
+            genome.perception = nudge_gene(genome.perception, 0.330, 0.20 * fidelity, 0.1, 0.38);
         }
         Archetype::Grazer => {
             genome.perception = nudge_gene(genome.perception, 0.265, 0.13 * fidelity, 0.1, 0.38);
