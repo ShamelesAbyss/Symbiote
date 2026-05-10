@@ -2247,9 +2247,10 @@ fn reinforce_inherited_archetype(
             genome.bonding = nudge_gene(genome.bonding, 1.18, 0.10 * fidelity, 0.5, 2.25);
         }
         Archetype::Parasite => {
-            genome.hunger = nudge_gene(genome.hunger, 0.024, 0.13 * fidelity, 0.005, 0.04);
-            genome.perception = nudge_gene(genome.perception, 0.255, 0.11 * fidelity, 0.1, 0.38);
-            genome.bonding = nudge_gene(genome.bonding, 0.86, 0.09 * fidelity, 0.5, 2.25);
+            genome.hunger = nudge_gene(genome.hunger, 0.031, 0.22 * fidelity, 0.005, 0.04);
+            genome.perception = nudge_gene(genome.perception, 0.305, 0.18 * fidelity, 0.1, 0.38);
+            genome.bonding = nudge_gene(genome.bonding, 0.66, 0.14 * fidelity, 0.5, 2.25);
+            genome.volatility = nudge_gene(genome.volatility, 1.34, 0.12 * fidelity, 0.36, 1.95);
         }
         Archetype::Architect => {
             genome.membrane = nudge_gene(genome.membrane, 1.18, 0.20 * fidelity, 0.0, 1.8);
