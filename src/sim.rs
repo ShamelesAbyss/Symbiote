@@ -1084,7 +1084,12 @@ fn field_polarity_response(
             calm *= 1.62;
             hunger *= 0.72;
         }
-        Some(Archetype::Orbiter | Archetype::Phantom) => {
+        Some(Archetype::Orbiter) => {
+            pull *= if dangerous { 0.38 } else { 1.22 };
+            calm *= 1.12;
+            hunger *= 0.48;
+        }
+        Some(Archetype::Phantom) => {
             pull *= if dangerous { 0.72 } else { 1.08 };
             calm *= 0.58;
             hunger *= 0.62;
