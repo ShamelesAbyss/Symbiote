@@ -8,7 +8,11 @@ use crate::{
     memory::MemoryBank,
     particle::{Genome, Particle, RareTrait, Tribe},
     pattern::{PatternKind, PatternMotion, PatternSignature},
-    sim::{build_rule_matrix, child_from, fused_child, mutate_rules, step_particles, RuleMatrix},
+    sim::{
+        apply_axiom_imprint, build_rule_matrix, child_from, fused_child,
+        lineage_axiom_imprint_strength, mutate_rules, scale_axiom_imprint, step_particles,
+        RuleMatrix,
+    },
     species::{derive_archetype, Archetype, SpeciesBank},
     tree::TreeProfile,
 };
@@ -627,6 +631,17 @@ impl App {
                     (child.genome.orbit + rng.gen_range(-0.06..0.12)).clamp(0.0, 1.55);
                 child.genome.membrane =
                     (child.genome.membrane + rng.gen_range(0.02..0.14)).clamp(0.0, 1.8);
+                child.species_id = None;
+            }
+
+            let evolved = child.species_id.is_some();
+            let imprint_strength = lineage_axiom_imprint_strength(child.age, evolved);
+
+            if imprint_strength > 0.0 {
+                let imprint =
+                    scale_axiom_imprint(self.axiom_lattice.current_imprint(), imprint_strength);
+
+                child.genome = apply_axiom_imprint(child.genome, imprint);
                 child.species_id = None;
             }
 
