@@ -982,10 +982,14 @@ fn archetype_local_fitness(
             }
         }
         Archetype::Phantom => {
-            if hostile_density > friendly_density {
-                0.75
+            if hostile_density > friendly_density && local_density <= 3 {
+                1.18
+            } else if hostile_density > friendly_density {
+                0.92
+            } else if local_density == 0 {
+                0.74
             } else {
-                0.35
+                0.28
             }
         }
         Archetype::Harvester => {
