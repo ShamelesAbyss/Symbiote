@@ -2215,9 +2215,10 @@ fn reinforce_inherited_archetype(
             genome.hunger = nudge_gene(genome.hunger, 0.016, 0.10 * fidelity, 0.005, 0.04);
         }
         Archetype::Orbiter => {
-            genome.orbit = nudge_gene(genome.orbit, 1.12, 0.18 * fidelity, 0.0, 1.55);
-            genome.perception = nudge_gene(genome.perception, 0.245, 0.11 * fidelity, 0.1, 0.38);
-            genome.volatility = nudge_gene(genome.volatility, 1.12, 0.08 * fidelity, 0.36, 1.95);
+            genome.orbit = nudge_gene(genome.orbit, 1.38, 0.24 * fidelity, 0.0, 1.55);
+            genome.perception = nudge_gene(genome.perception, 0.275, 0.14 * fidelity, 0.1, 0.38);
+            genome.volatility = nudge_gene(genome.volatility, 1.04, 0.08 * fidelity, 0.36, 1.95);
+            genome.bonding = nudge_gene(genome.bonding, 1.18, 0.10 * fidelity, 0.5, 2.25);
         }
         Archetype::Parasite => {
             genome.hunger = nudge_gene(genome.hunger, 0.024, 0.13 * fidelity, 0.005, 0.04);
