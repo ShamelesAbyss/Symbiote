@@ -22,10 +22,9 @@ const ECOSYSTEM_SCHEMA_PATH: &str = "memory/ecosystem_schema.txt";
 const ECOSYSTEM_SCHEMA_VERSION: &str = "trunk-root-v1";
 
 pub const TRIBE_COUNT: usize = 8;
-pub const PARTICLE_COUNT: usize = 1050;
-pub const MAX_PARTICLES: usize = 2400;
-pub const MIN_PARTICLES: usize = 675;
-
+pub const PARTICLE_COUNT: usize = 950;
+pub const MAX_PARTICLES: usize = 4200;
+pub const MIN_PARTICLES: usize = 525;
 const DISPERSAL_WARMUP_TICKS: u64 = 200;
 const REPRODUCTION_WARMUP_TICKS: u64 = 400;
 const STRUCTURE_WARMUP_TICKS: u64 = 660;
@@ -693,26 +692,11 @@ impl App {
             particle.energy > 0.0 && particle.health > 0.0 && rng.gen_bool(survival as f64)
         });
 
-        let density_particle_floor = if self.memory.density_crowding_pressure >= 850 {
-            MIN_PARTICLES.saturating_mul(48) / 100
-        } else if self.memory.density_crowding_pressure >= 650 {
-            MIN_PARTICLES.saturating_mul(62) / 100
-        } else if self.memory.density_crowding_pressure >= 425 {
-            MIN_PARTICLES.saturating_mul(78) / 100
-        } else if self.memory.density_refill_pressure >= 700 {
-            MIN_PARTICLES.saturating_mul(118) / 100
-        } else {
-            MIN_PARTICLES
-        }
-        .clamp(
-            MIN_PARTICLES.saturating_mul(45) / 100,
-            MIN_PARTICLES.saturating_mul(120) / 100,
-        );
+        let density_particle_floor = 0usize;
 
-        while self.particles.len() < density_particle_floor {
-            self.particles.push(random_particle(rng));
+        if self.particles.len() < density_particle_floor {
+            self.push_event("genesis lockdown: particle refill suppressed");
         }
-
         let after = self.particles.len();
 
         if after < before {
@@ -1543,6 +1527,7 @@ impl App {
     }
 }
 
+#[allow(dead_code)]
 fn random_particle(rng: &mut StdRng) -> Particle {
     // Primitive seed organisms only.
     // Advanced archetypes must emerge through evolution.
