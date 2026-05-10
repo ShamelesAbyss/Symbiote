@@ -2188,11 +2188,13 @@ fn apply_archetype_birth_shape(child: &mut Particle, archetype: Archetype, rng: 
             child.vy += rng.gen_range(-0.0038..0.0038);
         }
         Archetype::Architect => {
-            child.health = child.health.max(84.0);
-            child.energy = child.energy.max(82.0);
-            child.mass = child.mass.clamp(0.72, 4.8);
-            child.vx *= 0.62;
-            child.vy *= 0.62;
+            child.health = child.health.max(92.0);
+            child.energy = child.energy.max(90.0);
+            child.mass = child.mass.clamp(0.95, 5.4);
+            child.vx *= 0.54;
+            child.vy *= 0.54;
+            child.genome.membrane = (child.genome.membrane + 0.040).clamp(0.0, 1.8);
+            child.genome.bonding = (child.genome.bonding + 0.050).clamp(0.5, 2.25);
         }
         Archetype::Leviathan => {
             child.health = child.health.max(92.0);
