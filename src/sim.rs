@@ -807,14 +807,20 @@ fn apply_archetype_persistence(
             }
         }
         Archetype::Leviathan => {
-            if local_density >= 1 {
-                particle.health += 0.050;
+            if local_density >= 2 {
+                particle.health += 0.080;
+                particle.energy += 0.030;
+                particle.mass += 0.0018;
+            } else if local_density >= 1 {
+                particle.health += 0.052;
                 particle.energy += 0.022;
+                particle.mass += 0.0012;
+            } else {
+                particle.energy -= 0.003;
             }
 
-            particle.mass += 0.0010;
-            particle.vx *= 0.999;
-            particle.vy *= 0.999;
+            particle.vx *= 0.996;
+            particle.vy *= 0.996;
         }
         Archetype::Mycelial => {
             particle.vx *= 0.997;
