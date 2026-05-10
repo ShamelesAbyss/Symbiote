@@ -2248,14 +2248,17 @@ fn apply_archetype_birth_shape(child: &mut Particle, archetype: Archetype, rng: 
             child.genome.volatility = (child.genome.volatility - 0.035).clamp(0.36, 1.95);
         }
         Archetype::Mycelial => {
-            child.health = child.health.max(82.0);
-            child.energy = child.energy.max(84.0);
-            child.mass = child.mass.clamp(0.55, 3.6);
-            child.vx *= 0.38;
-            child.vy *= 0.38;
+            child.health = child.health.max(88.0);
+            child.energy = child.energy.max(90.0);
+            child.mass = child.mass.clamp(0.62, 4.0);
+            child.vx *= 0.32;
+            child.vy *= 0.32;
+            child.genome.membrane = (child.genome.membrane + 0.032).clamp(0.0, 1.8);
+            child.genome.bonding = (child.genome.bonding + 0.036).clamp(0.5, 2.25);
+            child.genome.fertility = (child.genome.fertility + 0.040).clamp(0.2, 2.4);
 
-            child.x += rng.gen_range(-0.018..0.018);
-            child.y += rng.gen_range(-0.018..0.018);
+            child.x += rng.gen_range(-0.026..0.026);
+            child.y += rng.gen_range(-0.026..0.026);
         }
         Archetype::Phantom => {
             child.health = child.health.max(68.0);
