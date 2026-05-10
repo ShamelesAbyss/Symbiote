@@ -905,10 +905,16 @@ fn archetype_local_fitness(
             }
         }
         Archetype::Parasite => {
-            if hostile_density >= 1 || friendly_density >= 3 {
-                0.80
+            if hostile_density >= 2 {
+                1.22
+            } else if hostile_density >= 1 {
+                0.96
+            } else if friendly_density >= 4 {
+                0.84
+            } else if friendly_density >= 2 {
+                0.46
             } else {
-                0.20
+                0.08
             }
         }
         Archetype::Architect => {
