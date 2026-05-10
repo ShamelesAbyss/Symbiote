@@ -704,6 +704,77 @@ Current active development targets:
 -----------------------------------------------------------------------------------------------------------------------------
 
 ## Release History
+## Release History Additions
+
+
+
+### v0.20.0 — Full Archetype Evolution Overhaul
+
+Major milestone release completing the full archetype identity pass across the Symbiote ecosystem.
+
+This release transforms the simulation into a deeply differentiated artificial ecology where every major organism class now has unique behavior across:
+
+- persistence behavior
+- local fitness scoring
+- mature archetype blessings
+- field polarity response
+- signal steering
+- offspring phenotype
+- genetic inheritance bias
+
+Completed archetype overhauls:
+
+- Swarmer
+- Hunter
+- Grazer
+- Orbiter
+- Parasite
+- Architect
+- Leviathan
+- Mycelial
+- Phantom
+
+Harvester and Reaper remain integrated as the ecosystem's core resource-extraction and population-control pressure pair.
+
+### Ecological Roles
+
+#### Grazer
+Substrate-feeding herbivore that seeks growth-rich zones and reinforces fertility.
+
+#### Orbiter
+Halo-forming species that stabilizes around populated regions.
+
+#### Parasite
+Fear-seeking infiltrator that exploits dense host populations.
+
+#### Architect
+Structural builder that reinforces membrane strength and cooperative bonding.
+
+#### Leviathan
+Rare titan organism with immense durability and slow ecosystem-scale pressure.
+
+#### Mycelial
+Fungal network organism that forms nutrient webs and cooperative growth corridors.
+
+#### Phantom
+Volatile anomaly that seeks fear and danger while roaming unpredictably.
+
+### Expected Emergence
+
+- predator/prey oscillations
+- fungal nutrient webs
+- parasite outbreaks
+- titan dominance events
+- phantom disruption pockets
+- architect-supported stable regions
+- richer long-run evolutionary divergence
+
+### Why v0.20.0 Matters
+
+Every archetype now functions as a distinct ecological strategy rather than a lightly flavored particle type.
+
+The ecosystem has become dramatically more specialized, readable, and capable of producing surprising long-term emergent behavior.
+
 
 ### v0.19.0 — Axiom Divergence
 
