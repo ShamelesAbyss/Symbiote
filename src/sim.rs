@@ -1071,13 +1071,18 @@ fn apply_mature_archetype_blessing(
                 (particle.genome.volatility - 0.000014 * blessing).clamp(0.36, 1.95);
         }
         Archetype::Mycelial => {
-            particle.health += 0.030 * blessing;
-            particle.vx *= 1.0 - 0.003 * blessing;
-            particle.vy *= 1.0 - 0.003 * blessing;
+            particle.health += 0.044 * blessing;
+            particle.energy += 0.010 * blessing;
+            particle.vx *= 1.0 - 0.0045 * blessing;
+            particle.vy *= 1.0 - 0.0045 * blessing;
             particle.genome.membrane =
-                (particle.genome.membrane + 0.000020 * blessing).clamp(0.0, 1.8);
+                (particle.genome.membrane + 0.000034 * blessing).clamp(0.0, 1.8);
             particle.genome.fertility =
-                (particle.genome.fertility + 0.000018 * blessing).clamp(0.2, 2.4);
+                (particle.genome.fertility + 0.000028 * blessing).clamp(0.2, 2.4);
+            particle.genome.bonding =
+                (particle.genome.bonding + 0.000024 * blessing).clamp(0.5, 2.25);
+            particle.genome.volatility =
+                (particle.genome.volatility - 0.000010 * blessing).clamp(0.36, 1.95);
         }
         Archetype::Phantom => {
             particle.energy += 0.018 * blessing;
