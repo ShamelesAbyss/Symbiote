@@ -162,7 +162,7 @@ impl App {
             age: 0,
             generation: 0,
             paused: false,
-            tick_ms: 90,
+            tick_ms: 120,
             energy: 0.0,
             cohesion: 0.0,
             chaos: 0.0,
@@ -194,7 +194,7 @@ impl App {
     pub fn step(&mut self) {
         self.pattern_field.step();
 
-        if self.age % 4 == 0 {
+        if self.age % 16 == 0 {
             self.axiom_lattice.tick_b3s23();
             self.reinforce_pattern_field_from_clusters();
         }
@@ -216,7 +216,6 @@ impl App {
             ));
         }
 
-        self.reinforce_pattern_field_from_clusters();
         if self.age % 240 == 0 {
             self.push_event(&format!(
                 "pattern field tick {} | active {} | avg {:.2} | strongest {}",
@@ -284,27 +283,27 @@ impl App {
 
         self.ecology.tick(self.seed, self.age, self.environment);
 
-        if self.age % 24 == 0 {
+        if self.age % 72 == 0 {
             self.deposit_to_substrate();
         }
 
-        if self.age % 8 == 0 {
+        if self.age % 16 == 0 {
             self.substrate.tick();
         }
 
-        if self.memory.substrate_recovery_bias() > 0.52 && self.age % 48 == 0 {
+        if self.memory.substrate_recovery_bias() > 0.52 && self.age % 96 == 0 {
             self.substrate.tick();
         }
 
-        if self.memory.substrate_throttle_pressure() > 0.62 && self.age % 36 == 0 {
+        if self.memory.substrate_throttle_pressure() > 0.62 && self.age % 72 == 0 {
             self.thin_overgrown_substrate_pressure();
         }
 
-        if self.age >= REPRODUCTION_WARMUP_TICKS && self.age % 32 == 0 {
+        if self.age >= REPRODUCTION_WARMUP_TICKS && self.age % 64 == 0 {
             self.native_reproduction();
         }
 
-        if self.age % 24 == 0 {
+        if self.age % 72 == 0 {
             let before_species = self.species_bank.species.len();
 
             let cluster_events =
@@ -325,13 +324,13 @@ impl App {
             self.process_cluster_events(cluster_events);
         }
 
-        if self.age % 60 == 0 && self.age < STRUCTURE_WARMUP_TICKS {
+        if self.age % 120 == 0 && self.age < STRUCTURE_WARMUP_TICKS {
             self.apply_migration_pressure();
-        } else if self.age % 90 == 0 {
+        } else if self.age % 180 == 0 {
             self.apply_migration_pressure();
         }
 
-        if self.age >= STRUCTURE_WARMUP_TICKS && self.age % 120 == 0 {
+        if self.age >= STRUCTURE_WARMUP_TICKS && self.age % 240 == 0 {
             self.reinforce_matrix_from_clusters();
         }
 
@@ -339,7 +338,7 @@ impl App {
             self.shift_environment();
         }
 
-        if self.age % 280 == 0 {
+        if self.age % 560 == 0 {
             let base_intensity = match self.environment {
                 Environment::Calm => 0.018,
                 Environment::Bloom => 0.014,
@@ -371,7 +370,7 @@ impl App {
         self.measure_matrix();
         self.update_memory();
 
-        if self.age % 600 == 0 {
+        if self.age % 1800 == 0 {
             self.save_all();
         }
     }
