@@ -2218,11 +2218,13 @@ fn apply_archetype_birth_shape(child: &mut Particle, archetype: Archetype, rng: 
             child.genome.bonding = (child.genome.bonding + 0.050).clamp(0.5, 2.25);
         }
         Archetype::Leviathan => {
-            child.health = child.health.max(92.0);
-            child.energy = child.energy.max(88.0);
-            child.mass = child.mass.clamp(1.15, 6.2);
-            child.vx *= 0.48;
-            child.vy *= 0.48;
+            child.health = child.health.max(104.0);
+            child.energy = child.energy.max(96.0);
+            child.mass = child.mass.clamp(1.55, 7.4);
+            child.vx *= 0.40;
+            child.vy *= 0.40;
+            child.genome.membrane = (child.genome.membrane + 0.055).clamp(0.0, 1.8);
+            child.genome.volatility = (child.genome.volatility - 0.035).clamp(0.36, 1.95);
         }
         Archetype::Mycelial => {
             child.health = child.health.max(82.0);
