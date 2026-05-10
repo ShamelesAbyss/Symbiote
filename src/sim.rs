@@ -1012,8 +1012,13 @@ fn apply_mature_archetype_blessing(
                 (particle.genome.perception + 0.000012 * blessing).clamp(0.1, 0.38);
         }
         Archetype::Parasite => {
+            particle.energy += 0.010 * blessing;
             particle.genome.hunger =
-                (particle.genome.hunger + 0.000006 * blessing).clamp(0.005, 0.04);
+                (particle.genome.hunger + 0.000014 * blessing).clamp(0.005, 0.04);
+            particle.genome.perception =
+                (particle.genome.perception + 0.000018 * blessing).clamp(0.1, 0.38);
+            particle.genome.bonding =
+                (particle.genome.bonding - 0.000010 * blessing).clamp(0.5, 2.25);
         }
         Archetype::Architect => {
             particle.health += 0.030 * blessing;
