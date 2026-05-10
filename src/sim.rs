@@ -789,12 +789,21 @@ fn apply_archetype_persistence(
         }
         Archetype::Architect => {
             if friendly_density >= 3 {
-                particle.health += 0.250;
-                particle.energy += 0.014;
-                particle.mass += 0.0012;
-                particle.vx *= 0.998;
-                particle.vy *= 0.998;
-                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.012);
+                particle.health += 0.090;
+                particle.energy += 0.024;
+                particle.mass += 0.0016;
+                particle.genome.membrane = (particle.genome.membrane + 0.000018).clamp(0.0, 1.8);
+                particle.genome.bonding = (particle.genome.bonding + 0.000024).clamp(0.5, 2.25);
+                particle.vx *= 0.994;
+                particle.vy *= 0.994;
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.020);
+            } else if local_density >= 2 {
+                particle.health += 0.026;
+                particle.energy += 0.010;
+                particle.vx *= 0.996;
+                particle.vy *= 0.996;
+            } else {
+                particle.energy -= 0.004;
             }
         }
         Archetype::Leviathan => {
