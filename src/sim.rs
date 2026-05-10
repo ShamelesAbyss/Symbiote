@@ -2120,13 +2120,13 @@ fn apply_archetype_birth_shape(child: &mut Particle, archetype: Archetype, rng: 
             child.vy *= 0.94;
         }
         Archetype::Orbiter => {
-            child.health = child.health.max(72.0);
-            child.energy = child.energy.max(84.0);
-            child.mass = child.mass.clamp(0.42, 2.7);
+            child.health = child.health.max(76.0);
+            child.energy = child.energy.max(92.0);
+            child.mass = child.mass.clamp(0.36, 2.35);
 
-            let spin = rng.gen_range(-0.0045..0.0045);
-            child.vx += -child.y.signum() * spin;
-            child.vy += child.x.signum() * spin;
+            let spin = rng.gen_range(-0.0075..0.0075);
+            child.vx = child.vx * 1.08 + -child.y.signum() * spin;
+            child.vy = child.vy * 1.08 + child.x.signum() * spin;
         }
         Archetype::Parasite => {
             child.health = child.health.max(70.0);
