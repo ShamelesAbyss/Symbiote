@@ -965,9 +965,9 @@ fn apply_mature_archetype_blessing(
         }
         Archetype::Hunter => {
             particle.genome.perception =
-                (particle.genome.perception + 0.000010 * blessing).clamp(0.1, 0.38);
+                (particle.genome.perception + 0.000022 * blessing).clamp(0.1, 0.38);
             particle.genome.volatility =
-                (particle.genome.volatility + 0.000012 * blessing).clamp(0.36, 1.95);
+                (particle.genome.volatility + 0.000028 * blessing).clamp(0.36, 1.95);
         }
         Archetype::Grazer => {
             particle.genome.fertility =
