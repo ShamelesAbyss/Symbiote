@@ -57,7 +57,7 @@ pub fn mutate_rules(rules: &mut RuleMatrix, seed: u64, intensity: f32) {
 
     for row in rules.iter_mut() {
         for value in row.iter_mut() {
-            if rng.gen_bool(0.18) {
+            if rng.gen_bool(0.55) {
                 *value = (*value + rng.gen_range(-intensity..intensity)).clamp(-1.0, 1.0);
             }
         }
@@ -295,7 +295,7 @@ pub fn step_particles(
                     Some(Archetype::Swarmer) => 1.20,
                     Some(Archetype::Architect) => 1.34,
                     Some(Archetype::Leviathan) => 1.48,
-                    Some(Archetype::Harvester) => 0.72,
+                    Some(Archetype::Harvester) => 1.45,
                     Some(Archetype::Reaper) => 0.46,
                     Some(Archetype::Parasite) => 0.78,
                     _ => 0.92,
@@ -413,7 +413,7 @@ pub fn step_particles(
 
             if matches!(archetype, Some(Archetype::Hunter))
                 && predator_pressure > 1.1
-                && d < perception * 0.45
+                && d < perception * 0.95
             {
                 particle.energy += 0.018;
                 particle.health += 0.012;
@@ -607,7 +607,7 @@ pub fn step_particles(
                 particle.health -= 0.014;
                 particle.genome.hunger = (particle.genome.hunger + 0.00007).clamp(0.005, 0.04);
 
-                substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.06);
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.25);
             }
         }
 
@@ -636,7 +636,7 @@ pub fn step_particles(
             particle.energy -= if low_substrate { 0.030 } else { 0.010 };
             particle.health += if low_substrate { 0.0 } else { 0.004 };
 
-            substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.06);
+            substrate.deposit_signal(particle.x, particle.y, SignalKind::Hunger, 0.25);
         }
 
         particle.energy -= particle.genome.metabolism * env.hunger_mult();
@@ -774,7 +774,7 @@ fn apply_archetype_persistence(
         }
         Archetype::Architect => {
             if friendly_density >= 2 {
-                particle.health += 0.060;
+                particle.health += 0.250;
                 particle.energy += 0.014;
                 particle.mass += 0.0012;
                 particle.vx *= 0.998;
@@ -2242,7 +2242,7 @@ fn reinforce_inherited_archetype(
 #[allow(dead_code)]
 pub fn lineage_axiom_imprint_strength(age: u32, evolved: bool) -> f32 {
     if !evolved {
-        0.06
+        0.25
     } else if age < 90 {
         0.18
     } else if age < 240 {
@@ -2270,24 +2270,24 @@ pub fn scale_axiom_imprint(mut imprint: AxiomImprint, strength: f32) -> AxiomImp
 
 #[allow(dead_code)]
 pub fn apply_axiom_imprint(mut genome: Genome, imprint: AxiomImprint) -> Genome {
-    genome.membrane = (genome.membrane + imprint.stability * 0.08).clamp(0.0, 1.8);
-    genome.bonding = (genome.bonding + imprint.stability * 0.06).clamp(0.5, 2.25);
+    genome.membrane = (genome.membrane + imprint.stability * 0.42).clamp(0.0, 1.8);
+    genome.bonding = (genome.bonding + imprint.stability * 0.28).clamp(0.5, 2.25);
 
-    genome.orbit = (genome.orbit + imprint.oscillation * 0.10).clamp(0.0, 1.55);
-    genome.volatility = (genome.volatility + imprint.oscillation * 0.03).clamp(0.36, 1.95);
+    genome.orbit = (genome.orbit + imprint.oscillation * 0.55).clamp(0.0, 1.55);
+    genome.volatility = (genome.volatility + imprint.oscillation * 0.22).clamp(0.36, 1.95);
 
-    genome.perception = (genome.perception + imprint.translation * 0.04).clamp(0.1, 0.38);
+    genome.perception = (genome.perception + imprint.translation * 0.32).clamp(0.1, 0.38);
 
-    genome.fertility = (genome.fertility + imprint.expansion * 0.10).clamp(0.2, 2.4);
+    genome.fertility = (genome.fertility + imprint.expansion * 0.85).clamp(0.2, 2.4);
 
-    genome.hunger = (genome.hunger + imprint.collapse * 0.003).clamp(0.005, 0.04);
-    genome.volatility = (genome.volatility + imprint.collapse * 0.05).clamp(0.36, 1.95);
+    genome.hunger = (genome.hunger + imprint.collapse * 0.030).clamp(0.005, 0.04);
+    genome.volatility = (genome.volatility + imprint.collapse * 0.30).clamp(0.36, 1.95);
 
     let chaos = imprint.chaos;
-    genome.perception = (genome.perception + chaos * 0.01).clamp(0.1, 0.38);
-    genome.orbit = (genome.orbit + chaos * 0.02).clamp(0.0, 1.55);
-    genome.membrane = (genome.membrane + chaos * 0.02).clamp(0.0, 1.8);
-    genome.fertility = (genome.fertility + chaos * 0.03).clamp(0.2, 2.4);
+    genome.perception = (genome.perception + chaos * 0.12).clamp(0.1, 0.38);
+    genome.orbit = (genome.orbit + chaos * 0.16).clamp(0.0, 1.55);
+    genome.membrane = (genome.membrane + chaos * 0.16).clamp(0.0, 1.8);
+    genome.fertility = (genome.fertility + chaos * 0.24).clamp(0.2, 2.4);
 
     genome
 }
