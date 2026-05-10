@@ -1109,7 +1109,12 @@ fn field_polarity_response(
             calm *= 0.42;
             hunger *= 0.55;
         }
-        Some(Archetype::Architect | Archetype::Leviathan | Archetype::Mycelial) => {
+        Some(Archetype::Architect) => {
+            pull *= if dangerous { 0.64 } else { 1.64 };
+            calm *= 1.88;
+            hunger *= 0.58;
+        }
+        Some(Archetype::Leviathan | Archetype::Mycelial) => {
             pull *= if dangerous { 0.92 } else { 1.46 };
             calm *= 1.62;
             hunger *= 0.72;
@@ -1318,7 +1323,14 @@ fn apply_signal_field(
             avoid += signal.growth * 0.22;
             avoid += signal.fear * 0.04;
         }
-        Some(Archetype::Architect | Archetype::Leviathan) => {
+        Some(Archetype::Architect) => {
+            seek += signal.growth * 0.86;
+            seek += signal.hunger * 0.12;
+
+            avoid += signal.danger * 0.62;
+            avoid += signal.fear * 0.22;
+        }
+        Some(Archetype::Leviathan) => {
             seek += signal.growth * 0.54;
             avoid += signal.danger * 0.38;
         }
