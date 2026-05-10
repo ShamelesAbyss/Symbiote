@@ -1032,12 +1032,15 @@ fn apply_mature_archetype_blessing(
                 (particle.genome.bonding - 0.000010 * blessing).clamp(0.5, 2.25);
         }
         Archetype::Architect => {
-            particle.health += 0.030 * blessing;
-            particle.mass += 0.0008 * blessing;
+            particle.health += 0.045 * blessing;
+            particle.energy += 0.012 * blessing;
+            particle.mass += 0.0010 * blessing;
             particle.genome.membrane =
-                (particle.genome.membrane + 0.000024 * blessing).clamp(0.0, 1.8);
+                (particle.genome.membrane + 0.000040 * blessing).clamp(0.0, 1.8);
             particle.genome.bonding =
-                (particle.genome.bonding + 0.000038 * blessing).clamp(0.5, 2.25);
+                (particle.genome.bonding + 0.000055 * blessing).clamp(0.5, 2.25);
+            particle.genome.fertility =
+                (particle.genome.fertility + 0.000010 * blessing).clamp(0.2, 2.4);
         }
         Archetype::Leviathan => {
             particle.health += 0.035 * blessing;
