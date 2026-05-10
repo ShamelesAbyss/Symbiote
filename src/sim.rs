@@ -753,9 +753,13 @@ fn apply_archetype_persistence(
         }
         Archetype::Grazer => {
             if !low_substrate {
-                particle.energy += 0.018;
-                particle.health += 0.012;
-                particle.genome.fertility = (particle.genome.fertility + 0.000010).clamp(0.2, 2.4);
+                particle.energy += 0.028;
+                particle.health += 0.022;
+                particle.genome.fertility = (particle.genome.fertility + 0.000028).clamp(0.2, 2.4);
+                particle.genome.hunger = (particle.genome.hunger - 0.0000015).clamp(0.005, 0.04);
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.012);
+            } else {
+                particle.energy -= 0.004;
             }
         }
         Archetype::Orbiter => {
@@ -873,9 +877,11 @@ fn archetype_local_fitness(
         }
         Archetype::Grazer => {
             if low_substrate {
-                0.20
+                0.10
+            } else if local_density >= 2 {
+                1.35
             } else {
-                0.80
+                0.72
             }
         }
         Archetype::Orbiter => {
@@ -971,9 +977,11 @@ fn apply_mature_archetype_blessing(
         }
         Archetype::Grazer => {
             particle.genome.fertility =
-                (particle.genome.fertility + 0.000014 * blessing).clamp(0.2, 2.4);
+                (particle.genome.fertility + 0.000026 * blessing).clamp(0.2, 2.4);
             particle.genome.hunger =
-                (particle.genome.hunger - 0.000004 * blessing).clamp(0.005, 0.04);
+                (particle.genome.hunger - 0.000010 * blessing).clamp(0.005, 0.04);
+            particle.genome.perception =
+                (particle.genome.perception + 0.000018 * blessing).clamp(0.1, 0.38);
         }
         Archetype::Orbiter => {
             particle.genome.orbit = (particle.genome.orbit + 0.000020 * blessing).clamp(0.0, 1.55);
@@ -1025,7 +1033,6 @@ fn apply_mature_archetype_blessing(
     particle.energy = particle.energy.clamp(0.0, 170.0);
     particle.mass = particle.mass.clamp(0.12, 20.0);
 }
-
 fn field_polarity_response(
     archetype: Option<Archetype>,
     rare_trait: RareTrait,
