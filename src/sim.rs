@@ -764,8 +764,14 @@ fn apply_archetype_persistence(
         }
         Archetype::Orbiter => {
             if local_density >= 2 {
-                particle.energy += 0.010;
-                particle.genome.orbit = (particle.genome.orbit + 0.000018).clamp(0.0, 1.55);
+                particle.energy += 0.018;
+                particle.health += 0.008;
+                particle.genome.orbit = (particle.genome.orbit + 0.000034).clamp(0.0, 1.55);
+                particle.vx += (-particle.y.signum()) * 0.0008;
+                particle.vy += particle.x.signum() * 0.0008;
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Growth, 0.010);
+            } else {
+                particle.energy -= 0.006;
             }
         }
         Archetype::Parasite => {
@@ -839,11 +845,11 @@ fn apply_archetype_persistence(
 
 fn archetype_maturity_factor(age: u64) -> f32 {
     if age < 90 {
-        0.0
+        0.18
     } else if age < 240 {
-        0.35
+        0.45
     } else if age < 520 {
-        0.70
+        0.72
     } else {
         1.0
     }
@@ -885,10 +891,12 @@ fn archetype_local_fitness(
             }
         }
         Archetype::Orbiter => {
-            if local_density >= 2 {
-                0.75
+            if local_density >= 3 {
+                1.28
+            } else if local_density >= 1 {
+                0.92
             } else {
-                0.35
+                0.24
             }
         }
         Archetype::Parasite => {
@@ -931,17 +939,19 @@ fn archetype_local_fitness(
             }
         }
         Archetype::Harvester => {
-            if !low_substrate {
-                0.80
+            if low_substrate || harvester_overgrowth {
+                0.18
             } else {
-                0.25
+                0.78
             }
         }
         Archetype::Reaper => {
-            if reaper_pressure_needed || hostile_density >= 2 {
-                0.90
+            if reaper_pressure_needed {
+                1.0
+            } else if hostile_density >= 1 {
+                0.55
             } else {
-                0.10
+                0.20
             }
         }
     }
