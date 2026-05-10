@@ -26,9 +26,9 @@ pub struct DensityConfig {
 impl Default for DensityConfig {
     fn default() -> Self {
         Self {
-            min_cell_ratio: 0.023,
-            target_cell_ratio: 0.068,
-            max_cell_ratio: 0.120,
+            min_cell_ratio: 0.012,
+            target_cell_ratio: 0.038,
+            max_cell_ratio: 0.070,
 
             min_particle_ratio: 0.045,
             target_particle_ratio: 0.145,

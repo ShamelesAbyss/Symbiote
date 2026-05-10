@@ -26,9 +26,9 @@ const ECOSYSTEM_SCHEMA_PATH: &str = "memory/ecosystem_schema.txt";
 const ECOSYSTEM_SCHEMA_VERSION: &str = "trunk-root-v1";
 
 pub const TRIBE_COUNT: usize = 8;
-pub const PARTICLE_COUNT: usize = 875;
-pub const MAX_PARTICLES: usize = 3600;
-pub const MIN_PARTICLES: usize = 450;
+pub const PARTICLE_COUNT: usize = 900;
+pub const MAX_PARTICLES: usize = 2750;
+pub const MIN_PARTICLES: usize = 400;
 const DISPERSAL_WARMUP_TICKS: u64 = 200;
 const REPRODUCTION_WARMUP_TICKS: u64 = 400;
 const STRUCTURE_WARMUP_TICKS: u64 = 660;
