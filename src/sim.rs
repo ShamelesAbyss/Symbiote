@@ -2281,11 +2281,14 @@ fn apply_archetype_birth_shape(child: &mut Particle, archetype: Archetype, rng: 
             child.y += rng.gen_range(-0.026..0.026);
         }
         Archetype::Phantom => {
-            child.health = child.health.max(68.0);
-            child.energy = child.energy.max(90.0);
-            child.mass = child.mass.clamp(0.34, 2.0);
-            child.vx *= 1.18;
-            child.vy *= 1.18;
+            child.health = child.health.max(66.0);
+            child.energy = child.energy.max(98.0);
+            child.mass = child.mass.clamp(0.26, 1.75);
+            child.vx *= 1.32;
+            child.vy *= 1.32;
+            child.genome.orbit = (child.genome.orbit + 0.050).clamp(0.0, 1.55);
+            child.genome.volatility = (child.genome.volatility + 0.045).clamp(0.36, 1.95);
+            child.genome.perception = (child.genome.perception + 0.018).clamp(0.1, 0.38);
         }
         Archetype::Harvester => {
             child.health = child.health.max(78.0);
