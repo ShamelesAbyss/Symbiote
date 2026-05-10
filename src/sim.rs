@@ -776,10 +776,15 @@ fn apply_archetype_persistence(
         }
         Archetype::Parasite => {
             if hostile_density >= 1 || friendly_density >= 3 {
-                particle.energy += 0.014;
-                particle.health += 0.010;
+                particle.energy += 0.026;
+                particle.health += 0.018;
+                particle.genome.hunger = (particle.genome.hunger + 0.000010).clamp(0.005, 0.04);
+                particle.genome.perception =
+                    (particle.genome.perception + 0.000012).clamp(0.1, 0.38);
+                substrate.deposit_signal(particle.x, particle.y, SignalKind::Fear, 0.010);
             } else {
-                particle.health -= 0.010;
+                particle.health -= 0.018;
+                particle.energy -= 0.008;
             }
         }
         Archetype::Architect => {
