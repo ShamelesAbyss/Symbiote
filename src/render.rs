@@ -2023,7 +2023,7 @@ fn archetype_visual(index: usize) -> Option<(char, Color)> {
     match index {
         0 => Some(('≋', Color::Cyan)),         // Swarmer
         1 => Some(('⌁', Color::Red)),          // Hunter
-        2 => Some(('˖', Color::Green)),        // Grazer
+        2 => Some(('Ө', Color::Green)),        // Grazer
         3 => Some(('⊙', Color::Blue)),         // Orbiter
         4 => Some(('⁘', Color::Magenta)),      // Parasite
         5 => Some(('▣', Color::Yellow)),       // Architect
