@@ -426,9 +426,8 @@ impl App {
 
         let mut rng = StdRng::seed_from_u64(self.seed ^ self.age ^ self.generation);
         let snapshot = self.particles.clone();
-        let archetype_lookup = self.build_archetype_lookup();
 
-        let mut children = Vec::new();
+        let mut children: Vec<Particle> = Vec::new();
 
         let substrate_density = if self.substrate.total_cells() == 0 {
             0.0
@@ -442,25 +441,12 @@ impl App {
             self.substrate.protected_cells() as f32 / self.substrate.total_cells() as f32
         };
 
-        let active_harvester_particles = snapshot
-            .iter()
-            .filter(|particle| {
-                particle.rare_trait == RareTrait::Devourer
-                    || particle
-                        .species_id
-                        .and_then(|id| archetype_lookup.get(id as usize).copied().flatten())
-                        == Some(Archetype::Harvester)
-            })
-            .count();
-
-        let harvester_body_ratio = active_harvester_particles as f32 / snapshot.len().max(1) as f32;
         let harvester_resistance = self.memory.harvester_resistance();
-        let reaper_urgency = self.memory.reaper_urgency();
-        let recovery_bias = self.memory.substrate_recovery_bias();
         let mutation_pressure = self.memory.mutation_pressure();
         let pathfinder_bias = self.memory.pathfinder_bias();
         let corridor_pressure = self.memory.corridor_pressure();
         let population_pressure = self.population_pressure();
+
         let fertility_pressure = self.fertility_pressure_multiplier(
             population_pressure,
             substrate_density,
@@ -481,11 +467,13 @@ impl App {
             } else {
                 0.0
             };
+
             let rare_bonus = if parent.rare_trait != RareTrait::None {
                 0.12
             } else {
                 0.0
             };
+
             let adaptive_fertility_drag = harvester_resistance * 4.5 + population_pressure * 18.0;
 
             let threshold = 118.0 - parent.genome.fertility * 11.5 - clustered_bonus * 14.0
@@ -558,33 +546,27 @@ impl App {
 
             if corridor_pressure > 0.38 && rng.gen_bool((corridor_pressure * 0.08) as f64) {
                 let radial = (child.x * child.x + child.y * child.y).sqrt();
-
                 let mature_world = if self.age > STRUCTURE_WARMUP_TICKS {
                     1.0
                 } else {
                     0.0
                 };
-
                 let outward_bias = 0.08 + corridor_pressure * 0.16 + mature_world * 0.08;
 
                 if radial < 0.52 {
                     let len = radial.max(0.001);
-
                     child.x += (child.x / len) * outward_bias;
                     child.y += (child.y / len) * outward_bias;
                 }
 
                 let orbital_bias = 0.010 + pathfinder_bias * 0.012 + corridor_pressure * 0.014;
-
-                child.vx += (-child.y) * orbital_bias;
+                child.vx += -child.y * orbital_bias;
                 child.vy += child.x * orbital_bias;
 
                 child.x += rng.gen_range(-0.06..0.06);
                 child.y += rng.gen_range(-0.06..0.06);
-
                 child.x = child.x.clamp(-1.16, 1.16);
                 child.y = child.y.clamp(-1.16, 1.16);
-
                 child.vx += rng.gen_range(-0.004..0.004);
                 child.vy += rng.gen_range(-0.004..0.004);
             }
@@ -599,27 +581,6 @@ impl App {
                     (child.genome.fertility - rng.gen_range(0.018..0.05)).clamp(0.2, 2.4);
                 child.genome.metabolism =
                     (child.genome.metabolism + rng.gen_range(0.0003..0.0012)).clamp(0.004, 0.05);
-                child.species_id = None;
-            }
-
-            let reaper_trigger = active_harvester_particles >= 15
-                || harvester_body_ratio > 0.11
-                || (active_harvester_particles >= 10 && reaper_urgency > 0.55);
-
-            let reaper_chance =
-                (0.15 + reaper_urgency * 0.18 + recovery_bias * 0.06).clamp(0.08, 0.38);
-
-            if reaper_trigger
-                && substrate_density < (0.08 + recovery_bias * 0.025)
-                && rng.gen_bool(reaper_chance as f64)
-            {
-                child.genome.volatility = rng.gen_range(1.70..1.92);
-                child.genome.perception = rng.gen_range(0.305..0.38);
-                child.genome.hunger = rng.gen_range(0.021..0.036);
-                child.genome.fertility = rng.gen_range(0.50..1.18);
-                child.genome.bonding = rng.gen_range(0.55..1.15);
-                child.mass = (child.mass + rng.gen_range(0.35..1.2)).clamp(0.45, 7.0);
-                child.rare_trait = RareTrait::None;
                 child.species_id = None;
             }
 
@@ -665,7 +626,6 @@ impl App {
         self.apply_selection_pressure(&mut rng);
         self.reseed_extinction_remnant();
     }
-
     fn apply_selection_pressure(&mut self, rng: &mut StdRng) {
         let before = self.particles.len();
         let adaptive_stability = 1.0 - self.memory.mutation_pressure() * 0.08;
