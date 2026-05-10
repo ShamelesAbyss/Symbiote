@@ -663,6 +663,7 @@ impl App {
         }
 
         self.apply_selection_pressure(&mut rng);
+        self.reseed_extinction_remnant();
     }
 
     fn apply_selection_pressure(&mut self, rng: &mut StdRng) {
@@ -1041,6 +1042,47 @@ impl App {
         self.save_all();
     }
 
+    fn reseed_extinction_remnant(&mut self) {
+        if !self.particles.is_empty() {
+            return;
+        }
+
+        let mut rng = StdRng::seed_from_u64(self.seed ^ self.age ^ 0xE771_7EAF);
+        let remnant_count = 128usize.min(MAX_PARTICLES);
+
+        for i in 0..remnant_count {
+            let tribe = Tribe::from_index(i % TRIBE_COUNT);
+
+            self.particles.push(Particle {
+                x: rng.gen_range(-1.10..1.10),
+                y: rng.gen_range(-1.10..1.10),
+                vx: rng.gen_range(-0.018..0.018),
+                vy: rng.gen_range(-0.018..0.018),
+                tribe,
+                age: 0,
+                health: rng.gen_range(72.0..112.0),
+                energy: rng.gen_range(80.0..125.0),
+                mass: rng.gen_range(0.58..1.32),
+                cluster_id: None,
+                species_id: None,
+                rare_trait: RareTrait::None,
+                genome: Genome {
+                    perception: rng.gen_range(0.150..0.295),
+                    hunger: rng.gen_range(0.008..0.020),
+                    bonding: rng.gen_range(0.62..1.48),
+                    volatility: rng.gen_range(0.78..1.48),
+                    orbit: rng.gen_range(0.10..1.08),
+                    membrane: rng.gen_range(0.08..1.00),
+                    metabolism: rng.gen_range(0.007..0.020),
+                    fertility: rng.gen_range(0.72..1.32),
+                },
+            });
+        }
+
+        self.memory.total_deaths = self.memory.total_deaths.saturating_add(1);
+        self.push_event("extinction failsafe: genesis remnant reseeded");
+    }
+
     pub fn randomize_world(&mut self) {
         self.save_all();
 
@@ -1052,7 +1094,6 @@ impl App {
         self.reset_particles();
         self.push_event("new trunk-root symbiote seed generated");
     }
-
     pub fn speed_up(&mut self) {
         self.tick_ms = self.tick_ms.saturating_sub(4).max(4);
     }
