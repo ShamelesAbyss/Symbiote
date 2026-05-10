@@ -1176,9 +1176,9 @@ fn field_polarity_response(
             hunger *= 0.48;
         }
         Some(Archetype::Phantom) => {
-            pull *= if dangerous { 0.72 } else { 1.08 };
-            calm *= 0.58;
-            hunger *= 0.62;
+            pull *= if dangerous { 1.36 } else { 0.74 };
+            calm *= 0.36;
+            hunger *= 0.84;
         }
         Some(Archetype::Hunter | Archetype::Parasite) => {
             pull *= if dangerous { -0.28 } else { 0.74 };
@@ -1396,10 +1396,11 @@ fn apply_signal_field(
             avoid += signal.fear * 0.12;
         }
         Some(Archetype::Phantom) => {
-            seek += signal.fear * 0.34;
-            seek += signal.danger * 0.28;
+            seek += signal.fear * 0.92;
+            seek += signal.danger * 0.74;
+            seek += signal.hunger * 0.20;
 
-            avoid += signal.growth * 0.18;
+            avoid += signal.growth * 0.26;
         }
         Some(Archetype::Swarmer | Archetype::Orbiter) | None => {
             seek += signal.growth * 0.32;
