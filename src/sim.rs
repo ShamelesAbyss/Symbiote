@@ -1098,8 +1098,14 @@ fn apply_mature_archetype_blessing(
                 (particle.genome.volatility - 0.000010 * blessing).clamp(0.36, 1.95);
         }
         Archetype::Phantom => {
-            particle.energy += 0.018 * blessing;
-            particle.genome.orbit = (particle.genome.orbit + 0.000018 * blessing).clamp(0.0, 1.55);
+            particle.energy += 0.028 * blessing;
+            particle.vx *= 1.0 + 0.0035 * blessing;
+            particle.vy *= 1.0 + 0.0035 * blessing;
+            particle.genome.orbit = (particle.genome.orbit + 0.000030 * blessing).clamp(0.0, 1.55);
+            particle.genome.volatility =
+                (particle.genome.volatility + 0.000018 * blessing).clamp(0.36, 1.95);
+            particle.genome.perception =
+                (particle.genome.perception + 0.000016 * blessing).clamp(0.1, 0.38);
         }
         Archetype::Harvester => {
             particle.health += 0.018 * blessing;
