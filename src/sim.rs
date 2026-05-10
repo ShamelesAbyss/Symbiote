@@ -944,10 +944,14 @@ fn archetype_local_fitness(
             }
         }
         Archetype::Leviathan => {
-            if local_density >= 1 {
-                0.85
+            if local_density >= 4 {
+                1.22
+            } else if local_density >= 2 {
+                1.00
+            } else if local_density >= 1 {
+                0.68
             } else {
-                0.45
+                0.22
             }
         }
         Archetype::Mycelial => {
