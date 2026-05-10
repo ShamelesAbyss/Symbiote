@@ -672,37 +672,50 @@ impl App {
         let pathfinder_relief = self.memory.pathfinder_bias() * 0.035;
 
         self.particles.retain(|particle| {
-            let old_age_pressure = if particle.age > 18_000 { 0.08 } else { 0.0 };
+            let old_age_pressure = if particle.age > 36_000 { 0.03 } else { 0.0 };
             let energy_score = (particle.energy / 130.0).clamp(0.0, 1.0);
             let health_score = (particle.health / 100.0).clamp(0.0, 1.0);
+
             let clustered_bonus = if particle.cluster_id.is_some() {
                 if u64::from(particle.age) < STRUCTURE_WARMUP_TICKS {
-                    0.03
+                    0.06
                 } else {
-                    0.18
+                    0.24
                 }
             } else {
                 0.0
             };
-            let rare_bonus = if particle.rare_trait != RareTrait::None {
-                0.04
+
+            let species_bonus = if particle.species_id.is_some() {
+                0.22
             } else {
                 0.0
             };
+
+            let rare_bonus = if particle.rare_trait != RareTrait::None {
+                0.08
+            } else {
+                0.0
+            };
+
             let edge_explorer_bonus = if particle.x.abs() > 0.82 || particle.y.abs() > 0.82 {
                 pathfinder_relief
             } else {
                 0.0
             };
 
-            let survival = (energy_score * 0.44
-                + health_score * 0.44
+            let baseline_survival = 0.62;
+
+            let survival = (baseline_survival
+                + energy_score * 0.18
+                + health_score * 0.18
                 + clustered_bonus
+                + species_bonus
                 + rare_bonus
                 + edge_explorer_bonus
                 - old_age_pressure)
-                .clamp(0.02, 0.995)
-                * adaptive_stability.clamp(0.92, 1.0);
+                .clamp(0.35, 0.9995)
+                * adaptive_stability.clamp(0.96, 1.02);
 
             particle.energy > 0.0 && particle.health > 0.0 && rng.gen_bool(survival as f64)
         });
