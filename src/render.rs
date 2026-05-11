@@ -1352,9 +1352,9 @@ fn ecosystem_phase_label(
     corridor_pressure: f32,
 ) -> &'static str {
     if reapers > 0 && harvesters > 0 {
-        "predator balance"
+        "natural ecology"
     } else if harvesters > 0 {
-        "harvester bloom"
+        "natural ecology"
     } else if substrate_ratio > 0.34 {
         "substrate bloom"
     } else if corridor_pressure > 0.62 && app.clusters.clusters.len() >= 16 {
