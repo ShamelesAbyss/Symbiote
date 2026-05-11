@@ -1,5 +1,6 @@
 use crate::{
     particle::{Particle, RareTrait},
+    smarticles::SmarticleRole,
     species::Archetype,
     tree::{self, TreePolicy},
 };
@@ -15,6 +16,20 @@ pub enum CellKind {
     Nest,
     Spore,
     Root,
+}
+
+#[allow(dead_code)]
+fn smarticle_role_for_cell(kind: CellKind) -> Option<SmarticleRole> {
+    match kind {
+        CellKind::Life => Some(SmarticleRole::Life),
+        CellKind::Nutrient => Some(SmarticleRole::Nutrient),
+        CellKind::Dead => Some(SmarticleRole::Dead),
+        CellKind::Mutagen => Some(SmarticleRole::Mutagen),
+        CellKind::Nest => Some(SmarticleRole::Nest),
+        CellKind::Spore => Some(SmarticleRole::Spore),
+        CellKind::Root => Some(SmarticleRole::Root),
+        CellKind::Empty => None,
+    }
 }
 
 impl CellKind {
