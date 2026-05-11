@@ -10,6 +10,7 @@ mod particle;
 mod pattern;
 mod render;
 mod sim;
+mod smarticles;
 mod species;
 mod tree;
 

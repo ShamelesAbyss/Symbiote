@@ -13,6 +13,7 @@ use crate::{
         lineage_axiom_imprint_strength, mutate_rules, scale_axiom_imprint, step_particles,
         RuleMatrix,
     },
+    smarticles::SmarticleField,
     species::{derive_archetype, Archetype, SpeciesBank},
     tree::TreeProfile,
 };
@@ -108,6 +109,7 @@ pub struct App {
     pub species_bank: SpeciesBank,
     pub ecology: Ecology,
     pub substrate: CellularAutomata,
+    pub smarticle_field: SmarticleField,
     pub pattern_field: PatternField,
     pub axiom_lattice: AxiomLattice,
     pub memory: MemoryBank,
@@ -155,6 +157,7 @@ impl App {
             species_bank: SpeciesBank::new(),
             ecology: Ecology::new(seed),
             substrate: CellularAutomata::new(seed ^ 0xC011, 124, 70),
+            smarticle_field: SmarticleField::from_seed(seed ^ 0x5A17_C1E5),
             pattern_field: PatternField::new(96, 48, FieldConfig::default()),
             axiom_lattice: AxiomLattice::new(seed ^ 0xA011_0C1C, 96, 48),
             memory: MemoryBank::load_or_new(seed),
@@ -941,6 +944,7 @@ impl App {
         self.species_bank = SpeciesBank::new();
         self.ecology = Ecology::new(self.seed ^ self.age);
         self.substrate = CellularAutomata::new(self.seed ^ self.age ^ 0xC011, 124, 70);
+        self.smarticle_field = SmarticleField::from_seed(self.seed ^ self.age ^ 0x5A17_C1E5);
         self.pattern_field = PatternField::new(96, 48, FieldConfig::default());
         self.axiom_lattice = AxiomLattice::new(self.seed ^ self.age ^ 0xA011_0C1C, 96, 48);
 
@@ -1192,6 +1196,7 @@ impl App {
             species_bank: state.species_bank,
             ecology: state.ecology,
             substrate: state.substrate,
+            smarticle_field: SmarticleField::from_seed(state.seed ^ state.age ^ 0x5A17_C1E5),
             pattern_field: PatternField::new(96, 48, FieldConfig::default()),
             axiom_lattice: AxiomLattice::new(state.seed ^ state.age ^ 0xA011_0C1C, 96, 48),
             memory: state.memory,

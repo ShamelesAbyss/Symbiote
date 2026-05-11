@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Smarticle Morphogenesis
 //!
 //! Phase 1 foundation file.
@@ -119,7 +120,9 @@ fn seeded_rule(seed: u64, source: usize, target: usize) -> SmarticleRule {
     let power = curved_signed(raw_power, POWER_CURVE) * 0.18;
 
     let raw_radius = RADIUS_MIN + (RADIUS_MAX - RADIUS_MIN) * radius_roll;
-    let radius = raw_radius.powf(1.0 / RADIUS_CURVE).clamp(RADIUS_MIN, RADIUS_MAX);
+    let radius = raw_radius
+        .powf(1.0 / RADIUS_CURVE)
+        .clamp(RADIUS_MIN, RADIUS_MAX);
 
     SmarticleRule { power, radius }
 }
