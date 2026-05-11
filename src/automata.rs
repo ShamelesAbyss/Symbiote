@@ -549,8 +549,108 @@ impl CellularAutomata {
                 self.cells[idx] = next;
             }
         }
+        self.apply_smarticle_motility(smarticle_field);
     }
 
+    fn apply_smarticle_motility(&mut self, smarticle_field: &SmarticleField) {
+        let snapshot = self.cells.clone();
+        let mut moved = vec![false; self.cells.len()];
+
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let idx = self.idx(x, y);
+
+                if moved[idx] {
+                    continue;
+                }
+
+                let source = snapshot[idx];
+
+                if !cell_can_migrate(source.kind) {
+                    continue;
+                }
+
+                if source.kind == CellKind::Root {
+                    continue;
+                }
+
+                let Some(source_role) = smarticle_role_for_cell(source.kind) else {
+                    continue;
+                };
+
+                let move_chance = motility_chance(source.kind, source.age);
+                let roll = hash(self.seed ^ self.cycle ^ 0x5107_1CE5, x, y) % 10_000;
+
+                if roll >= move_chance {
+                    continue;
+                }
+
+                let mut best_target = None;
+                let mut best_score = -10.0_f32;
+
+                for (dx, dy) in EIGHT_WAY_DIRS {
+                    let nx = wrap(x as isize + dx, self.width);
+                    let ny = wrap(y as isize + dy, self.height);
+                    let target_idx = self.idx(nx, ny);
+
+                    if moved[target_idx] {
+                        continue;
+                    }
+
+                    let target = snapshot[target_idx];
+
+                    if !cell_can_receive_migration(target.kind) {
+                        continue;
+                    }
+
+                    if target.kind == CellKind::Root {
+                        continue;
+                    }
+
+                    let score = smarticle_destination_score(
+                        smarticle_field,
+                        &snapshot,
+                        self.width,
+                        self.height,
+                        source_role,
+                        nx,
+                        ny,
+                    ) + migration_target_bonus(target.kind);
+
+                    if score > best_score {
+                        best_score = score;
+                        best_target = Some(target_idx);
+                    }
+                }
+
+                let Some(target_idx) = best_target else {
+                    continue;
+                };
+
+                if best_score < -0.08 {
+                    continue;
+                }
+
+                let mut migrating = self.cells[idx];
+                let mut displaced = self.cells[target_idx];
+
+                migrating.energy = (migrating.energy - migration_cost(migrating.kind)).max(0.0);
+                migrating.signal.growth = (migrating.signal.growth + 0.006).clamp(0.0, 1.0);
+
+                if displaced.kind == CellKind::Dead {
+                    displaced.kind = CellKind::Empty;
+                    displaced.energy = 0.0;
+                    displaced.age = 0;
+                }
+
+                self.cells[target_idx] = migrating;
+                self.cells[idx] = displaced;
+
+                moved[idx] = true;
+                moved[target_idx] = true;
+            }
+        }
+    }
     pub fn deposit_particle(&mut self, particle: &Particle, archetype: Option<Archetype>) {
         let Some((x, y)) = self.world_to_grid(particle.x, particle.y) else {
             return;
@@ -1085,6 +1185,110 @@ fn sample_smarticle_influence(
             };
 
             total += field.rule(center_role, neighbor_role).power;
+            count += 1;
+        }
+    }
+
+    if count == 0 {
+        0.0
+    } else {
+        (total / count as f32).clamp(-1.0, 1.0)
+    }
+}
+
+const EIGHT_WAY_DIRS: [(isize, isize); 8] = [
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (-1, 0),
+    (1, 0),
+    (-1, 1),
+    (0, 1),
+    (1, 1),
+];
+
+fn cell_can_migrate(kind: CellKind) -> bool {
+    matches!(
+        kind,
+        CellKind::Life | CellKind::Spore | CellKind::Nutrient | CellKind::Mutagen
+    )
+}
+
+fn cell_can_receive_migration(kind: CellKind) -> bool {
+    matches!(kind, CellKind::Empty | CellKind::Dead | CellKind::Nutrient)
+}
+
+fn motility_chance(kind: CellKind, age: u16) -> usize {
+    let base = match kind {
+        CellKind::Life => 120,
+        CellKind::Spore => 190,
+        CellKind::Nutrient => 70,
+        CellKind::Mutagen => 260,
+        _ => 0,
+    };
+
+    if age > 220 {
+        base / 2
+    } else if age > 80 {
+        base * 2 / 3
+    } else {
+        base
+    }
+}
+
+fn migration_cost(kind: CellKind) -> f32 {
+    match kind {
+        CellKind::Life => 0.28,
+        CellKind::Spore => 0.18,
+        CellKind::Nutrient => 0.08,
+        CellKind::Mutagen => 0.34,
+        _ => 0.0,
+    }
+}
+
+fn migration_target_bonus(kind: CellKind) -> f32 {
+    match kind {
+        CellKind::Empty => 0.020,
+        CellKind::Dead => 0.055,
+        CellKind::Nutrient => 0.030,
+        _ => -0.25,
+    }
+}
+
+fn smarticle_destination_score(
+    field: &SmarticleField,
+    snapshot: &[Cell],
+    width: usize,
+    height: usize,
+    source_role: SmarticleRole,
+    x: usize,
+    y: usize,
+) -> f32 {
+    let mut total = 0.0_f32;
+    let mut count = 0_u32;
+
+    let x0 = x.saturating_sub(1);
+    let y0 = y.saturating_sub(1);
+    let x1 = (x + 1).min(width.saturating_sub(1));
+    let y1 = (y + 1).min(height.saturating_sub(1));
+
+    for ny in y0..=y1 {
+        for nx in x0..=x1 {
+            if nx == x && ny == y {
+                continue;
+            }
+
+            let idx = ny * width + nx;
+            let Some(target_role) = smarticle_role_for_cell(snapshot[idx].kind) else {
+                continue;
+            };
+
+            if target_role == SmarticleRole::Root {
+                return -1.0;
+            }
+
+            let rule = field.rule(source_role, target_role);
+            total += rule.power;
             count += 1;
         }
     }
