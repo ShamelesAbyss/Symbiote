@@ -20,8 +20,6 @@ const WALL_FORCE: f32 = 0.017;
 const BOND_RADIUS: f32 = 0.105;
 
 const LOW_SUBSTRATE_RATIO: f32 = 0.035;
-const HARVESTER_BODY_PRESSURE_RATIO: f32 = 0.095;
-const HARVESTER_OVERGROWTH_RATIO: f32 = 0.155;
 
 const SIGNAL_FORCE_SCALE: f32 = 0.42;
 const ROOT_AVOIDANCE_RADIUS: f32 = TreeForces::DEFAULT.avoidance_radius;
@@ -102,13 +100,10 @@ pub fn step_particles(
     let total_substrate = substrate.total_cells();
     let living_substrate = substrate.living_cells();
     let substrate_ratio = living_substrate as f32 / total_substrate.max(1) as f32;
-    let harvester_ratio = harvester_particles as f32 / snapshot.len().max(1) as f32;
 
     let low_substrate = substrate_ratio < LOW_SUBSTRATE_RATIO;
-    let harvester_overgrowth = harvester_ratio > HARVESTER_OVERGROWTH_RATIO;
-    let reaper_pressure_needed = harvester_ratio > HARVESTER_BODY_PRESSURE_RATIO
-        || harvester_particles >= 10
-        || (harvester_particles >= 6 && substrate_ratio < 0.075);
+    let harvester_overgrowth = false;
+    let reaper_pressure_needed = false;
 
     let matrix_pressure = matrix_pressure(rules);
     let matrix_attraction = matrix_attraction(rules);
