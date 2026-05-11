@@ -293,13 +293,17 @@ impl CellularAutomata {
                             next.energy = 27.0;
                             next.age = 0;
                             next.tribe_hint = self.local_tribe_hint(&snapshot, x, y);
-                        } else if bloom_mode && seed_roll < 160 + morph_roll_bonus.min(55) {
+                        } else if false && bloom_mode && seed_roll < 160 + morph_roll_bonus.min(55)
+                        {
                             next.kind = CellKind::Nutrient;
                             next.energy = 38.0;
                             next.age = 0;
                             next.tribe_hint = seed_roll % 6;
                             next.signal.growth = (next.signal.growth + 0.06).clamp(0.0, 1.0);
-                        } else if recovery_mode && seed_roll < 70 + morph_roll_bonus.min(35) {
+                        } else if false
+                            && recovery_mode
+                            && seed_roll < 70 + morph_roll_bonus.min(35)
+                        {
                             next.kind = CellKind::Spore;
                             next.energy = 30.0;
                             next.age = 0;
