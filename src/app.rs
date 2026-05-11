@@ -291,11 +291,11 @@ impl App {
         }
 
         if self.age % 16 == 0 {
-            self.substrate.tick();
+            self.substrate.tick(&self.smarticle_field);
         }
 
         if self.memory.substrate_recovery_bias() > 0.52 && self.age % 96 == 0 {
-            self.substrate.tick();
+            self.substrate.tick(&self.smarticle_field);
         }
 
         if self.memory.substrate_throttle_pressure() > 0.62 && self.age % 72 == 0 {
