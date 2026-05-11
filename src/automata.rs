@@ -214,7 +214,9 @@ impl CellularAutomata {
                     x,
                     y,
                 );
-                let morph_roll_bonus = (morph_bias.max(0.0) * 85.0) as usize;
+                let morph_stability = morph_bias.max(0.0).min(1.0);
+                let morph_decay_guard = morph_stability * 0.42;
+                let morph_roll_bonus = (morph_stability * 85.0) as usize;
 
                 let mut next = cell;
                 next.signal.decay(recovery_mode);
@@ -307,11 +309,13 @@ impl CellularAutomata {
                     }
 
                     CellKind::Life => {
-                        if conway_neighbors < 2 {
+                        if conway_neighbors < 2 && cell.age > 18 && morph_bias < 0.18 {
                             next.kind = CellKind::Dead;
                             next.energy = 14.0;
                             next.signal.danger = (next.signal.danger + 0.16).clamp(0.0, 1.0);
-                        } else if conway_neighbors > 3 {
+                        } else if conway_neighbors > 4
+                            || (conway_neighbors > 3 && cell.age > 24 && morph_bias < 0.12)
+                        {
                             next.kind = CellKind::Dead;
                             next.energy = 24.0;
                             next.signal.danger = (next.signal.danger + 0.22).clamp(0.0, 1.0);
@@ -326,7 +330,10 @@ impl CellularAutomata {
                         {
                             next.energy = (cell.energy + 0.35).min(85.0);
                             next.signal.growth = (next.signal.growth + 0.03).clamp(0.0, 1.0);
-                        } else if neighbors < 2 || neighbors > 3 {
+                        } else if (neighbors < 2 || neighbors > 3)
+                            && cell.age > 18
+                            && morph_bias < 0.16
+                        {
                             next.kind = CellKind::Dead;
                             next.energy = 24.0;
                             next.signal.danger = (next.signal.danger + 0.22).clamp(0.0, 1.0);
@@ -339,7 +346,7 @@ impl CellularAutomata {
                             let crowd_thin = if density > 0.82 { 0.06 } else { 0.0 };
 
                             next.energy = (cell.energy + nutrient_neighbors as f32 * 1.20
-                                - 1.22
+                                - (0.92 - morph_decay_guard).max(0.42)
                                 - age_thin
                                 - crowd_thin)
                                 .clamp(0.0, 85.0);
@@ -368,7 +375,10 @@ impl CellularAutomata {
                         } else if root_neighbors > 0 && recovery_mode && nutrient_neighbors > 0 {
                             next.kind = CellKind::Life;
                             next.energy = 52.0;
-                        } else if neighbors < 2 || neighbors > 4 {
+                        } else if (neighbors < 2 || neighbors > 4)
+                            && cell.age > 18
+                            && morph_bias < 0.16
+                        {
                             next.kind = CellKind::Dead;
                             next.energy = 14.0;
                             next.signal.danger = (next.signal.danger + 0.14).clamp(0.0, 1.0);
@@ -376,7 +386,11 @@ impl CellularAutomata {
                             let age_thin = if cell.age > 860 { 0.03 } else { 0.0 };
                             let crowd_thin = if density > 0.82 { 0.04 } else { 0.0 };
 
-                            next.energy = (cell.energy - 1.02 - age_thin - crowd_thin).max(0.0);
+                            next.energy = (cell.energy
+                                - (0.72 - morph_decay_guard * 0.65).max(0.32)
+                                - age_thin
+                                - crowd_thin)
+                                .max(0.0);
 
                             if next.energy <= 0.0 {
                                 next.kind = CellKind::Dead;
