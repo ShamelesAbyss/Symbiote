@@ -26,9 +26,9 @@ const ECOSYSTEM_SCHEMA_PATH: &str = "memory/ecosystem_schema.txt";
 const ECOSYSTEM_SCHEMA_VERSION: &str = "trunk-root-v1";
 
 pub const TRIBE_COUNT: usize = 8;
-pub const PARTICLE_COUNT: usize = 900;
-pub const MAX_PARTICLES: usize = 2750;
-pub const MIN_PARTICLES: usize = 400;
+pub const PARTICLE_COUNT: usize = 720;
+pub const MAX_PARTICLES: usize = 2200;
+pub const MIN_PARTICLES: usize = 320;
 const DISPERSAL_WARMUP_TICKS: u64 = 200;
 const REPRODUCTION_WARMUP_TICKS: u64 = 400;
 const STRUCTURE_WARMUP_TICKS: u64 = 660;
@@ -154,7 +154,7 @@ impl App {
             clusters: ClusterTracker::new(),
             species_bank: SpeciesBank::new(),
             ecology: Ecology::new(seed),
-            substrate: CellularAutomata::new(seed ^ 0xC011, 256, 144),
+            substrate: CellularAutomata::new(seed ^ 0xC011, 214, 120),
             pattern_field: PatternField::new(96, 48, FieldConfig::default()),
             axiom_lattice: AxiomLattice::new(seed ^ 0xA011_0C1C, 96, 48),
             memory: MemoryBank::load_or_new(seed),
@@ -944,7 +944,7 @@ impl App {
         self.clusters = ClusterTracker::new();
         self.species_bank = SpeciesBank::new();
         self.ecology = Ecology::new(self.seed ^ self.age);
-        self.substrate = CellularAutomata::new(self.seed ^ self.age ^ 0xC011, 256, 144);
+        self.substrate = CellularAutomata::new(self.seed ^ self.age ^ 0xC011, 214, 120);
         self.pattern_field = PatternField::new(96, 48, FieldConfig::default());
         self.axiom_lattice = AxiomLattice::new(self.seed ^ self.age ^ 0xA011_0C1C, 96, 48);
 
