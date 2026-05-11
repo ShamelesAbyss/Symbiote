@@ -673,7 +673,6 @@ struct VisualMood {
     throttle: f32,
     recovery: f32,
     crowding: f32,
-    refill: f32,
 }
 
 impl VisualMood {
@@ -685,16 +684,11 @@ impl VisualMood {
             throttle: app.memory.substrate_throttle_pressure(),
             recovery: app.memory.substrate_recovery_bias(),
             crowding: app.memory.density_crowding_pressure as f32 / 1_000.0,
-            refill: app.memory.density_refill_pressure as f32 / 1_000.0,
         }
     }
 
     fn quieting(self) -> f32 {
         (self.maturity * 0.22 + self.throttle * 0.26 + self.crowding * 0.18).clamp(0.0, 0.52)
-    }
-
-    fn volatility(self) -> f32 {
-        (self.mutation * 0.48 + self.refill * 0.20 + self.recovery * 0.16).clamp(0.0, 0.72)
     }
 
     fn corridor_bias(self) -> f32 {
@@ -885,17 +879,18 @@ fn substrate_visual(
     mood: VisualMood,
 ) -> Option<(char, Color)> {
     let quiet = mood.quieting();
-    let volatile = mood.volatility();
 
     match kind {
         CellKind::Empty => None,
         CellKind::Life => {
-            let shimmer = visual_hash(app.age / 6, x, y) % 11;
+            // Life cells are real substrate, but rendering every one floods the viewport.
+            // Use stable spatial thinning so structures remain readable without flicker.
+            let visible = visual_hash(0, x, y) % 5 == 0;
 
-            if shimmer == 0 && volatile > 0.42 {
-                Some(('•', Color::Gray))
+            if visible {
+                Some(("∙".chars().next().unwrap(), Color::DarkGray))
             } else {
-                Some(('∙', Color::DarkGray))
+                None
             }
         }
         CellKind::Nutrient => {
