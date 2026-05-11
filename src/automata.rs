@@ -107,7 +107,7 @@ impl SignalKind {
         match self {
             Self::Hunger => '∿',
             Self::Fear => '!',
-            Self::Growth => '∙',
+            Self::Growth => '↑',
             Self::Danger => '∷',
         }
     }

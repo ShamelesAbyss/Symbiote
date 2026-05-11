@@ -1621,7 +1621,7 @@ fn render_rules(f: &mut Frame<'_>, area: Rect, app: &App) {
         ),
         Span::styled("∿ hunger ", Style::default().fg(Color::Yellow)),
         Span::styled("! fear ", Style::default().fg(Color::Red)),
-        Span::styled("∙ growth ", Style::default().fg(Color::Green)),
+        Span::styled("↑ growth ", Style::default().fg(Color::Green)),
         Span::styled("∷ danger", Style::default().fg(Color::Magenta)),
     ]));
 
