@@ -588,38 +588,62 @@ impl CellularAutomata {
                 let mut best_target = None;
                 let mut best_score = -10.0_f32;
 
-                for (dx, dy) in EIGHT_WAY_DIRS {
-                    let nx = wrap(x as isize + dx, self.width);
-                    let ny = wrap(y as isize + dy, self.height);
-                    let target_idx = self.idx(nx, ny);
+                let search_radius =
+                    if crowded_motile_patch(&snapshot, self.width, self.height, x, y) {
+                        2isize
+                    } else {
+                        1isize
+                    };
 
-                    if moved[target_idx] {
-                        continue;
-                    }
+                for dy in -search_radius..=search_radius {
+                    for dx in -search_radius..=search_radius {
+                        if dx == 0 && dy == 0 {
+                            continue;
+                        }
 
-                    let target = snapshot[target_idx];
+                        if dx.abs().max(dy.abs()) > search_radius {
+                            continue;
+                        }
 
-                    if !cell_can_receive_migration(target.kind) {
-                        continue;
-                    }
+                        let nx = wrap(x as isize + dx, self.width);
+                        let ny = wrap(y as isize + dy, self.height);
+                        let target_idx = self.idx(nx, ny);
 
-                    if target.kind == CellKind::Root {
-                        continue;
-                    }
+                        if moved[target_idx] {
+                            continue;
+                        }
 
-                    let score = smarticle_destination_score(
-                        smarticle_field,
-                        &snapshot,
-                        self.width,
-                        self.height,
-                        source_role,
-                        nx,
-                        ny,
-                    ) + migration_target_bonus(target.kind);
+                        let target = snapshot[target_idx];
 
-                    if score > best_score {
-                        best_score = score;
-                        best_target = Some(target_idx);
+                        if !cell_can_receive_migration(target.kind) {
+                            continue;
+                        }
+
+                        if target.kind == CellKind::Root {
+                            continue;
+                        }
+
+                        let distance_penalty = if dx.abs().max(dy.abs()) > 1 {
+                            0.018
+                        } else {
+                            0.0
+                        };
+                        let score = smarticle_destination_score(
+                            smarticle_field,
+                            &snapshot,
+                            self.width,
+                            self.height,
+                            source_role,
+                            nx,
+                            ny,
+                        ) + migration_target_bonus(target.kind)
+                            + pressure_escape_bonus(&snapshot, self.width, self.height, nx, ny)
+                            - distance_penalty;
+
+                        if score > best_score {
+                            best_score = score;
+                            best_target = Some(target_idx);
+                        }
                     }
                 }
 
@@ -1196,17 +1220,6 @@ fn sample_smarticle_influence(
     }
 }
 
-const EIGHT_WAY_DIRS: [(isize, isize); 8] = [
-    (-1, -1),
-    (0, -1),
-    (1, -1),
-    (-1, 0),
-    (1, 0),
-    (-1, 1),
-    (0, 1),
-    (1, 1),
-];
-
 fn cell_can_migrate(kind: CellKind) -> bool {
     matches!(
         kind,
@@ -1220,17 +1233,17 @@ fn cell_can_receive_migration(kind: CellKind) -> bool {
 
 fn motility_chance(kind: CellKind, age: u16) -> usize {
     let base = match kind {
-        CellKind::Life => 120,
-        CellKind::Spore => 190,
-        CellKind::Nutrient => 70,
-        CellKind::Mutagen => 260,
+        CellKind::Life => 300,
+        CellKind::Spore => 360,
+        CellKind::Nutrient => 160,
+        CellKind::Mutagen => 420,
         _ => 0,
     };
 
-    if age > 220 {
+    if age > 420 {
         base / 2
-    } else if age > 80 {
-        base * 2 / 3
+    } else if age > 160 {
+        base * 3 / 4
     } else {
         base
     }
@@ -1298,4 +1311,70 @@ fn smarticle_destination_score(
     } else {
         (total / count as f32).clamp(-1.0, 1.0)
     }
+}
+
+fn crowded_motile_patch(
+    snapshot: &[Cell],
+    width: usize,
+    height: usize,
+    x: usize,
+    y: usize,
+) -> bool {
+    let mut motile = 0usize;
+    let mut open = 0usize;
+
+    for dy in -1isize..=1 {
+        for dx in -1isize..=1 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+
+            let nx = wrap(x as isize + dx, width);
+            let ny = wrap(y as isize + dy, height);
+            let kind = snapshot[ny * width + nx].kind;
+
+            if cell_can_migrate(kind) {
+                motile += 1;
+            }
+
+            if cell_can_receive_migration(kind) {
+                open += 1;
+            }
+        }
+    }
+
+    motile >= 4 && open <= 2
+}
+
+fn pressure_escape_bonus(
+    snapshot: &[Cell],
+    width: usize,
+    height: usize,
+    x: usize,
+    y: usize,
+) -> f32 {
+    let mut open = 0usize;
+    let mut blocked = 0usize;
+
+    for dy in -1isize..=1 {
+        for dx in -1isize..=1 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+
+            let nx = wrap(x as isize + dx, width);
+            let ny = wrap(y as isize + dy, height);
+            let kind = snapshot[ny * width + nx].kind;
+
+            if kind == CellKind::Root {
+                blocked += 4;
+            } else if cell_can_receive_migration(kind) {
+                open += 1;
+            } else if cell_can_migrate(kind) {
+                blocked += 1;
+            }
+        }
+    }
+
+    (open as f32 * 0.012 - blocked as f32 * 0.004).clamp(-0.05, 0.08)
 }
