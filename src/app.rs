@@ -441,7 +441,6 @@ impl App {
             self.substrate.protected_cells() as f32 / self.substrate.total_cells() as f32
         };
 
-        let harvester_resistance = self.memory.harvester_resistance();
         let mutation_pressure = self.memory.mutation_pressure();
         let pathfinder_bias = self.memory.pathfinder_bias();
         let corridor_pressure = self.memory.corridor_pressure();
@@ -474,7 +473,7 @@ impl App {
                 0.0
             };
 
-            let adaptive_fertility_drag = harvester_resistance * 4.5 + population_pressure * 18.0;
+            let adaptive_fertility_drag = population_pressure * 18.0;
 
             let threshold = 118.0 - parent.genome.fertility * 11.5 - clustered_bonus * 14.0
                 + adaptive_fertility_drag;
@@ -514,10 +513,7 @@ impl App {
             };
 
             if substrate_density > 0.09
-                && rng.gen_bool(
-                    (substrate_density * (0.95 - harvester_resistance * 0.45)).clamp(0.01, 0.12)
-                        as f64,
-                )
+                && rng.gen_bool((substrate_density * 0.075).clamp(0.01, 0.10) as f64)
             {
                 child.genome.perception =
                     (child.genome.perception + rng.gen_range(0.004..0.024)).clamp(0.1, 0.38);

@@ -407,15 +407,6 @@ impl MemoryBank {
         self.recalculate_adaptive_pressures();
     }
 
-    pub fn harvester_resistance(&self) -> f32 {
-        let reaped_pressure = self.total_harvesters_consumed as f32 / 250.0;
-        let substrate_pressure = self.substrate_starved_ticks as f32 / 900.0;
-        let root_pressure = self.root_choked_ticks as f32 / 600.0;
-
-        (reaped_pressure + substrate_pressure + root_pressure + self.adaptive_substrate_throttle)
-            .clamp(0.0, 1.0)
-    }
-
     #[allow(dead_code)]
     pub fn reaper_urgency(&self) -> f32 {
         let harvester_peak = self.peak_harvesters as f32 / 80.0;
