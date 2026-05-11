@@ -1113,11 +1113,11 @@ fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
 
             if let Some((kind, value)) = signal.strongest() {
                 let threshold = match kind {
-                    SignalKind::Danger | SignalKind::Fear => 0.42 - mood.mutation * 0.08,
-                    SignalKind::Hunger => 0.48 - mood.recovery * 0.06,
-                    SignalKind::Growth => 0.56 - mood.recovery * 0.08,
+                    SignalKind::Danger | SignalKind::Fear => 0.58 - mood.mutation * 0.04,
+                    SignalKind::Hunger => 0.66 - mood.recovery * 0.03,
+                    SignalKind::Growth => 0.72 - mood.recovery * 0.03,
                 }
-                .clamp(0.34, 0.62);
+                .clamp(0.52, 0.82);
 
                 if value < threshold {
                     continue;
@@ -1128,7 +1128,7 @@ fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                         && value > 0.54
                         && mood.mutation > 0.38;
 
-                if !urgent && visual_hash(app.age / 7, x, y) % 9 != 0 {
+                if !urgent && visual_hash(app.age / 11, x, y) % 23 != 0 {
                     continue;
                 }
 
