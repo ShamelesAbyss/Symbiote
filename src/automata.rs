@@ -1,6 +1,6 @@
 use crate::{
     particle::{Particle, RareTrait},
-    smarticles::SmarticleRole,
+    smarticles::{SmarticleField, SmarticleRole},
     species::Archetype,
     tree::{self, TreePolicy},
 };
@@ -1009,4 +1009,49 @@ fn hash(seed: u64, x: usize, y: usize) -> usize {
     value = (value ^ (value >> 13)).wrapping_mul(1_274_126_177);
 
     value ^ (value >> 16)
+}
+
+#[allow(dead_code)]
+fn sample_smarticle_influence(
+    field: &SmarticleField,
+    snapshot: &[Cell],
+    width: usize,
+    height: usize,
+    x: usize,
+    y: usize,
+) -> f32 {
+    let center_idx = y * width + x;
+    let Some(center_role) = smarticle_role_for_cell(snapshot[center_idx].kind) else {
+        return 0.0;
+    };
+
+    let mut total = 0.0_f32;
+    let mut count = 0_u32;
+
+    let x0 = x.saturating_sub(2);
+    let y0 = y.saturating_sub(2);
+    let x1 = (x + 2).min(width.saturating_sub(1));
+    let y1 = (y + 2).min(height.saturating_sub(1));
+
+    for ny in y0..=y1 {
+        for nx in x0..=x1 {
+            if nx == x && ny == y {
+                continue;
+            }
+
+            let idx = ny * width + nx;
+            let Some(neighbor_role) = smarticle_role_for_cell(snapshot[idx].kind) else {
+                continue;
+            };
+
+            total += field.rule(center_role, neighbor_role).power;
+            count += 1;
+        }
+    }
+
+    if count == 0 {
+        0.0
+    } else {
+        (total / count as f32).clamp(-1.0, 1.0)
+    }
 }
