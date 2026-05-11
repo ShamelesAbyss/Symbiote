@@ -890,15 +890,12 @@ fn substrate_visual(
     match kind {
         CellKind::Empty => None,
         CellKind::Life => {
-            let spacing = (22.0 + quiet * 18.0 - volatile * 8.0).round().max(12.0) as u64;
-            let shimmer = visual_hash(app.age / 3, x, y) as u64 % spacing;
+            let shimmer = visual_hash(app.age / 6, x, y) % 11;
 
-            if shimmer == 0 {
-                None
-            } else if shimmer == 1 && volatile > 0.36 {
-                None
+            if shimmer == 0 && volatile > 0.42 {
+                Some(('•', Color::Gray))
             } else {
-                None
+                Some(('∙', Color::DarkGray))
             }
         }
         CellKind::Nutrient => {
