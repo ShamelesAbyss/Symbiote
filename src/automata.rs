@@ -72,6 +72,7 @@ pub struct Signal {
 }
 
 impl Signal {
+    #[allow(dead_code)]
     pub fn strongest(self) -> Option<(SignalKind, f32)> {
         let mut kind = SignalKind::Hunger;
         let mut value = self.hunger;
@@ -118,6 +119,7 @@ pub enum SignalKind {
 }
 
 impl SignalKind {
+    #[allow(dead_code)]
     pub fn glyph(self) -> char {
         match self {
             Self::Hunger => '∿',

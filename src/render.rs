@@ -174,7 +174,7 @@ fn render_world(f: &mut Frame<'_>, area: Rect, app: &App) {
     let mut cells: Vec<Vec<Cell>> = vec![vec![Cell::default(); width]; height];
 
     draw_substrate(&mut cells, app, width, height);
-    draw_signal_trails(&mut cells, app, width, height);
+    // draw_signal_trails(draw_signal_trails(&mut cells, app, width, height);mut cells, app, width, height); // signal rendering disabled
     draw_ecology_zones(&mut cells, app, width, height);
     draw_pattern_field(&mut cells, app, width, height);
     draw_axiom_lattice(&mut cells, app, width, height);
@@ -542,6 +542,7 @@ fn camera_sample_substrate(
     app.substrate.influence_at(wx, wy)
 }
 
+#[allow(dead_code)]
 fn camera_sample_signal(
     app: &App,
     sx: usize,
@@ -747,7 +748,7 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                 continue;
             }
 
-            let Some((glyph, color)) = field_haze_visual(
+            let Some((_glyph, _color)) = field_haze_visual(
                 field_cell.kind,
                 field_cell.danger,
                 field_cell.intensity,
@@ -756,7 +757,7 @@ fn draw_pattern_field(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                 continue;
             };
 
-            screen_cell.signal = Some((glyph, color));
+            // screen_cell.signal = Some((glyph, color)); // signal-layer haze rendering disabled
         }
     }
 }
@@ -1100,6 +1101,7 @@ fn root_screen_visual(app: &App, x: usize, y: usize, width: usize, height: usize
     (glyph, color)
 }
 
+#[allow(dead_code)]
 fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: usize) {
     let mood = VisualMood::from_app(app);
 
@@ -1132,8 +1134,7 @@ fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                     continue;
                 }
 
-                let color = signal_color(kind, value);
-                cells[y][x].signal = Some((kind.glyph(), color));
+                // cells[y][x].signal = Some((kind.glyph(), color)); // signal rendering disabled
             }
         }
     }
@@ -2266,6 +2267,7 @@ fn density_band_color(band: &str) -> Color {
     }
 }
 
+#[allow(dead_code)]
 fn signal_color(kind: SignalKind, value: f32) -> Color {
     match kind {
         SignalKind::Hunger => {
