@@ -156,7 +156,7 @@ impl App {
             clusters: ClusterTracker::new(),
             species_bank: SpeciesBank::new(),
             ecology: Ecology::new(seed),
-            substrate: CellularAutomata::new(seed ^ 0xC011, 124, 70),
+            substrate: CellularAutomata::new(seed ^ 0xC011, 88, 49),
             smarticle_field: SmarticleField::from_seed(seed ^ 0x5A17_C1E5),
             pattern_field: PatternField::new(96, 48, FieldConfig::default()),
             axiom_lattice: AxiomLattice::new(seed ^ 0xA011_0C1C, 96, 48),
@@ -943,7 +943,7 @@ impl App {
         self.clusters = ClusterTracker::new();
         self.species_bank = SpeciesBank::new();
         self.ecology = Ecology::new(self.seed ^ self.age);
-        self.substrate = CellularAutomata::new(self.seed ^ self.age ^ 0xC011, 124, 70);
+        self.substrate = CellularAutomata::new(self.seed ^ self.age ^ 0xC011, 88, 49);
         self.smarticle_field = SmarticleField::from_seed(self.seed ^ self.age ^ 0x5A17_C1E5);
         self.pattern_field = PatternField::new(96, 48, FieldConfig::default());
         self.axiom_lattice = AxiomLattice::new(self.seed ^ self.age ^ 0xA011_0C1C, 96, 48);
