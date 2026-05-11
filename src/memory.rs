@@ -416,6 +416,7 @@ impl MemoryBank {
             .clamp(0.0, 1.0)
     }
 
+    #[allow(dead_code)]
     pub fn reaper_urgency(&self) -> f32 {
         let harvester_peak = self.peak_harvesters as f32 / 80.0;
         let consumed_pressure = self.total_cells_consumed as f32 / 15_000.0;

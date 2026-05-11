@@ -849,6 +849,8 @@ impl App {
     }
 
     fn evolve_attraction_matrix(&mut self, intensity: f32) {
+        let harvester_resistance = self.memory.harvester_resistance();
+        let reaper_urgency = self.memory.reaper_urgency();
         let recovery_bias = self.memory.substrate_recovery_bias();
         let mutation_pressure = self.memory.mutation_pressure();
         let pathfinder_bias = self.memory.pathfinder_bias();
@@ -864,19 +866,27 @@ impl App {
                     0.0
                 };
 
-                let corridor_split = if a != b && value > 0.28 {
-                    -corridor_pressure * 0.006
-                } else if a == b {
-                    pathfinder_bias * 0.003
+                let predator_target = (a + 1) % TRIBE_COUNT == b;
+                let prey_target = (b + 1) % TRIBE_COUNT == a;
+
+                let predator_bias = if predator_target {
+                    -(0.006 + reaper_urgency * 0.018 + mutation_pressure * 0.008)
+                } else if prey_target {
+                    0.004 + recovery_bias * 0.01
                 } else {
                     0.0
                 };
 
-                let mutation_drift = if a != b {
-                    ((a as f32 * 1.37 + b as f32 * 2.11 + self.age as f32 * 0.007).cos())
-                        * mutation_pressure
-                        * intensity
-                        * 0.004
+                let overgrowth_dampener = if harvester_resistance > 0.42 && value > 0.45 {
+                    -harvester_resistance * 0.018
+                } else {
+                    0.0
+                };
+
+                let corridor_split = if a != b && value > 0.28 {
+                    -corridor_pressure * 0.006
+                } else if a == b {
+                    pathfinder_bias * 0.003
                 } else {
                     0.0
                 };
@@ -886,9 +896,13 @@ impl App {
                     * intensity
                     * 0.12;
 
-                self.rules[a][b] =
-                    (value + stabilizer + corridor_split + mutation_drift + chaos_drift)
-                        .clamp(-1.0, 1.0);
+                self.rules[a][b] = (value
+                    + stabilizer
+                    + predator_bias
+                    + overgrowth_dampener
+                    + corridor_split
+                    + chaos_drift)
+                    .clamp(-1.0, 1.0);
             }
         }
 
@@ -1277,24 +1291,27 @@ impl App {
 
     fn shift_environment(&mut self) {
         let roll = hash(self.seed, self.age as usize, self.generation as usize) % 100;
+        let recovery_bias = self.memory.substrate_recovery_bias();
+        let reaper_urgency = self.memory.reaper_urgency();
         let pathfinder_bias = self.memory.pathfinder_bias();
 
-        self.environment = if pathfinder_bias > 0.55 && roll > 40 {
+        self.environment = if recovery_bias > 0.62 && roll < 48 {
+            Environment::Bloom
+        } else if reaper_urgency > 0.68 && roll > 58 {
+            Environment::Hunger
+        } else if pathfinder_bias > 0.55 && roll > 40 {
             Environment::Drift
         } else {
             match roll {
-                0..=44 => Environment::Calm,
-                45..=58 => Environment::Bloom,
-                59..=68 => Environment::Hunger,
-                69..=84 => Environment::Drift,
+                0..=32 => Environment::Calm,
+                33..=55 => Environment::Bloom,
+                56..=70 => Environment::Hunger,
+                71..=86 => Environment::Drift,
                 _ => Environment::Storm,
             }
         };
 
-        self.push_event(&format!(
-            "environment shifted to {}",
-            self.environment.name()
-        ));
+        self.push_event(&format!("environment shifted: {}", self.environment.name()));
     }
 
     fn measure(&mut self) {
