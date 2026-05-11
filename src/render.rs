@@ -1115,9 +1115,9 @@ fn draw_signal_trails(cells: &mut [Vec<Cell>], app: &App, width: usize, height: 
                 let threshold = match kind {
                     SignalKind::Danger | SignalKind::Fear => 0.58 - mood.mutation * 0.04,
                     SignalKind::Hunger => 0.66 - mood.recovery * 0.03,
-                    SignalKind::Growth => 0.72 - mood.recovery * 0.03,
+                    SignalKind::Growth => 0.90 - mood.recovery * 0.015,
                 }
-                .clamp(0.52, 0.82);
+                .clamp(0.52, 0.94);
 
                 if value < threshold {
                     continue;
