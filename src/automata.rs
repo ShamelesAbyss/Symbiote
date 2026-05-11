@@ -1,6 +1,6 @@
 use crate::{
     particle::{Particle, RareTrait},
-    smarticles::{SmarticleField, SmarticleRole},
+    smarticles::{SmarticleField, SmarticleRole, SmarticleSample},
     species::Archetype,
     tree::{self, TreePolicy},
 };
@@ -206,7 +206,7 @@ impl CellularAutomata {
                 let dead_neighbors = self.kind_neighbors(&snapshot, x, y, CellKind::Dead);
                 let spore_neighbors = self.kind_neighbors(&snapshot, x, y, CellKind::Spore);
                 let root_neighbors = self.kind_neighbors(&snapshot, x, y, CellKind::Root);
-                let morph_bias = sample_smarticle_influence(
+                let morph_sample = sample_smarticle_influence(
                     smarticle_field,
                     &snapshot,
                     self.width,
@@ -214,9 +214,14 @@ impl CellularAutomata {
                     x,
                     y,
                 );
-                let morph_stability = morph_bias.max(0.0).min(1.0);
-                let morph_decay_guard = morph_stability * 0.42;
-                let morph_roll_bonus = (morph_stability * 85.0) as usize;
+                let morph_bias: f32 = morph_sample.growth_bias;
+                let morph_stability: f32 = morph_bias.max(0.0_f32).min(1.0_f32);
+                let morph_decay_guard: f32 = morph_sample
+                    .decay_bias
+                    .max(morph_bias * 0.65_f32)
+                    .clamp(0.0_f32, 1.0_f32)
+                    * 0.42_f32;
+                let morph_roll_bonus: usize = (morph_stability * 85.0_f32) as usize;
 
                 let mut next = cell;
                 next.signal.decay(recovery_mode);
@@ -1183,13 +1188,13 @@ fn sample_smarticle_influence(
     height: usize,
     x: usize,
     y: usize,
-) -> f32 {
+) -> SmarticleSample {
     let center_idx = y * width + x;
     let Some(center_role) = smarticle_role_for_cell(snapshot[center_idx].kind) else {
-        return 0.0;
+        return SmarticleSample::default();
     };
 
-    let mut total = 0.0_f32;
+    let mut sample = SmarticleSample::default();
     let mut count = 0_u32;
 
     let x0 = x.saturating_sub(2);
@@ -1208,16 +1213,59 @@ fn sample_smarticle_influence(
                 continue;
             };
 
-            total += field.rule(center_role, neighbor_role).power;
+            if neighbor_role == SmarticleRole::Root {
+                sample.decay_bias += 0.035;
+                count += 1;
+                continue;
+            }
+
+            let rule = field.rule(center_role, neighbor_role);
+            let power: f32 = rule.power.clamp(-1.0_f32, 1.0_f32);
+            let dx = nx as f32 - x as f32;
+            let dy = ny as f32 - y as f32;
+            let distance = (dx * dx + dy * dy).sqrt().max(1.0_f32);
+            let weight = (1.0_f32 / distance).clamp(0.18_f32, 1.0_f32);
+            let weighted = power * weight;
+
+            if weighted >= 0.0_f32 {
+                sample.pull += weighted;
+                sample.growth_bias += weighted * 0.72_f32;
+            } else {
+                sample.push += -weighted;
+                sample.decay_bias += -weighted * 0.58_f32;
+            }
+
+            match neighbor_role {
+                SmarticleRole::Mutagen => sample.mutation_bias += weighted.abs() * 0.62_f32,
+                SmarticleRole::Nest => sample.nest_bias += weighted.max(0.0_f32) * 0.70_f32,
+                SmarticleRole::Spore => sample.growth_bias += weighted.max(0.0_f32) * 0.18_f32,
+                SmarticleRole::Dead => sample.decay_bias += weighted.abs() * 0.12_f32,
+                SmarticleRole::Nutrient => sample.growth_bias += weighted.max(0.0_f32) * 0.22_f32,
+                SmarticleRole::Life => sample.growth_bias += weighted.max(0.0_f32) * 0.16_f32,
+                SmarticleRole::Root => {}
+            }
+
+            sample.drift_x += (dx / distance) * weighted;
+            sample.drift_y += (dy / distance) * weighted;
             count += 1;
         }
     }
 
     if count == 0 {
-        0.0
-    } else {
-        (total / count as f32).clamp(-1.0, 1.0)
+        return sample;
     }
+
+    let count = count as f32;
+    sample.pull = (sample.pull / count).clamp(0.0_f32, 1.0_f32);
+    sample.push = (sample.push / count).clamp(0.0_f32, 1.0_f32);
+    sample.growth_bias = (sample.growth_bias / count).clamp(-1.0_f32, 1.0_f32);
+    sample.decay_bias = (sample.decay_bias / count).clamp(0.0_f32, 1.0_f32);
+    sample.mutation_bias = (sample.mutation_bias / count).clamp(0.0_f32, 1.0_f32);
+    sample.nest_bias = (sample.nest_bias / count).clamp(0.0_f32, 1.0_f32);
+    sample.drift_x = (sample.drift_x / count).clamp(-1.0_f32, 1.0_f32);
+    sample.drift_y = (sample.drift_y / count).clamp(-1.0_f32, 1.0_f32);
+
+    sample
 }
 
 fn cell_can_migrate(kind: CellKind) -> bool {
